@@ -4,6 +4,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Dates follow ISO 8601 (`YYYY-MM-DD`).
 
+## v0.9.0-dev - [unreleased]
+
+### `Added`
+
+- `bin/variantcomp_report.py` (`VARIANTCOMP_REPORT`): enrichment of discordant vs. concordant variants (indel, low VAF, stratifications; Fisher's exact test, BH correction), gene summary with per-gene enrichment, discordance class summary, plots, and MultiQC custom-content sections (recall/precision per comparison and per sample, recall by VAF, discordance classes)
+- Parameter `--low_vaf`; outputs `report/`
+- Container for the report built with Seqera Containers (python, pandas, scipy, matplotlib, upsetplot)
+
 ## v0.8.0-dev - [2026-10-07]
 
 ### `Added`
