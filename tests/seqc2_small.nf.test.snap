@@ -6,6 +6,13 @@
                     "pandas": "2.2.1",
                     "python": "3.12.15"
                 },
+                "AGGREGATE_POWER": {
+                    "pandas": "2.2.1",
+                    "python": "3.12.15"
+                },
+                "ANNOTATE_VARIANTS": {
+                    "bedtools": "2.31.1"
+                },
                 "BCFTOOLS_ANNOTATE": {
                     "bcftools": "1.23.1"
                 },
@@ -34,6 +41,10 @@
                 "CALLABLE_REGIONS": {
                     "bedtools": "2.31.1"
                 },
+                "CHECK_REFERENCE_ANNOTATION": {
+                    "pysam": "0.24.1",
+                    "python": "3.12.15"
+                },
                 "CHECK_REFERENCE_BAM": {
                     "pysam": "0.24.1",
                     "python": "3.12.15"
@@ -43,6 +54,10 @@
                     "python": "3.12.15"
                 },
                 "CHECK_REFERENCE_VCF": {
+                    "pysam": "0.24.1",
+                    "python": "3.12.15"
+                },
+                "CLASSIFY_DISCORDANCE": {
                     "pysam": "0.24.1",
                     "python": "3.12.15"
                 },
@@ -60,6 +75,9 @@
                     "gzip": 1.14,
                     "mosdepth": "0.3.14"
                 },
+                "READ_EVIDENCE": {
+                    "bcftools": "1.23.1"
+                },
                 "RTGTOOLS_FORMAT": {
                     "rtgtools": 3.13
                 },
@@ -70,7 +88,7 @@
                     "samtools": 1.24
                 },
                 "Workflow": {
-                    "core-unit-bioinformatics/workflow-nxf-somatic-variantcomp": "v0.6.0-dev"
+                    "core-unit-bioinformatics/workflow-nxf-somatic-variantcomp": "v0.7.0-dev"
                 }
             },
             [
@@ -128,6 +146,8 @@
                 "benchmark/SEQC2_NV_1/vcfeval/SEQC2_NV_1_wgs_vs_wes.weighted_roc.tsv.gz",
                 "benchmark/metrics.aggregated.tsv",
                 "benchmark/metrics.per_pair.tsv",
+                "benchmark/power.aggregated.tsv",
+                "benchmark/power.per_pair.tsv",
                 "coverage",
                 "coverage/SEQC2_IL_1",
                 "coverage/SEQC2_IL_1.callable.bed",
@@ -165,6 +185,33 @@
                 "coverage/reference_check/SEQC2_IL_1_wes_tumor.bam.reference_check.tsv",
                 "coverage/reference_check/SEQC2_IL_1_wgs_normal.bam.reference_check.tsv",
                 "coverage/reference_check/SEQC2_IL_1_wgs_tumor.bam.reference_check.tsv",
+                "discordance",
+                "discordance/SEQC2_FD_1",
+                "discordance/SEQC2_FD_1/SEQC2_FD_1_wgs_vs_wes.discordance.tsv",
+                "discordance/SEQC2_FD_1/SEQC2_FD_1_wgs_vs_wes.power.tsv",
+                "discordance/SEQC2_IL_1",
+                "discordance/SEQC2_IL_1/SEQC2_IL_1_wgs_vs_wes.discordance.tsv",
+                "discordance/SEQC2_IL_1/SEQC2_IL_1_wgs_vs_wes.power.tsv",
+                "discordance/SEQC2_IL_1/evidence",
+                "discordance/SEQC2_IL_1/evidence/SEQC2_IL_1_wes_normal.evidence.vcf.gz",
+                "discordance/SEQC2_IL_1/evidence/SEQC2_IL_1_wes_normal.evidence.vcf.gz.tbi",
+                "discordance/SEQC2_IL_1/evidence/SEQC2_IL_1_wes_tumor.evidence.vcf.gz",
+                "discordance/SEQC2_IL_1/evidence/SEQC2_IL_1_wes_tumor.evidence.vcf.gz.tbi",
+                "discordance/SEQC2_IL_1/evidence/SEQC2_IL_1_wgs_normal.evidence.vcf.gz",
+                "discordance/SEQC2_IL_1/evidence/SEQC2_IL_1_wgs_normal.evidence.vcf.gz.tbi",
+                "discordance/SEQC2_IL_1/evidence/SEQC2_IL_1_wgs_tumor.evidence.vcf.gz",
+                "discordance/SEQC2_IL_1/evidence/SEQC2_IL_1_wgs_tumor.evidence.vcf.gz.tbi",
+                "discordance/SEQC2_NV_1",
+                "discordance/SEQC2_NV_1/SEQC2_NV_1_wgs_vs_wes.discordance.tsv",
+                "discordance/SEQC2_NV_1/SEQC2_NV_1_wgs_vs_wes.power.tsv",
+                "discordance/reference_check",
+                "discordance/reference_check/all_difficult.reference_check.tsv",
+                "discordance/reference_check/genes.reference_check.tsv",
+                "discordance/reference_check/homopolymer.reference_check.tsv",
+                "discordance/reference_check/low_mappability.reference_check.tsv",
+                "discordance/reference_check/segmental_duplication.reference_check.tsv",
+                "discordance/reference_check/tandem_repeat.reference_check.tsv",
+                "discordance/variants.annotated.tsv",
                 "multiqc",
                 "multiqc/multiqc_data",
                 "multiqc/multiqc_data/llms-full.txt",
@@ -249,6 +296,8 @@
                 "SEQC2_NV_1_wgs_vs_wes.variants.tsv:md5,fea11a71b1f3cce405e3f8d3249d3296",
                 "metrics.aggregated.tsv:md5,151777922e04c8e77b08113bf6190afa",
                 "metrics.per_pair.tsv:md5,196d966b627fed091479fd32afc8334f",
+                "power.aggregated.tsv:md5,7df2bcd86f2b8ef4604df5db1e858c71",
+                "power.per_pair.tsv:md5,1fb4e6b4bf243a1915595e57ace52eca",
                 "SEQC2_IL_1.callable.bed:md5,27377c2895beb2e9deda2658873040cb",
                 "SEQC2_IL_1_wes_normal.mosdepth.global.dist.txt:md5,67c5bce268d5ae8cdbd98b27cc15fffc",
                 "SEQC2_IL_1_wes_normal.mosdepth.region.dist.txt:md5,feee80cb01cee571474ad2f2c2a95b4a",
@@ -283,6 +332,19 @@
                 "SEQC2_IL_1_wes_tumor.bam.reference_check.tsv:md5,430f0502fa443ad797d6d52d9a03102f",
                 "SEQC2_IL_1_wgs_normal.bam.reference_check.tsv:md5,23923c5db948d16cdd02d04a2fd6a8a9",
                 "SEQC2_IL_1_wgs_tumor.bam.reference_check.tsv:md5,ebb4fb2adf8fcadbf55e992295c2a216",
+                "SEQC2_FD_1_wgs_vs_wes.discordance.tsv:md5,3708b46e10618b3d222417cee5af46d4",
+                "SEQC2_FD_1_wgs_vs_wes.power.tsv:md5,85b65314b330b9a8aa5dd53cc07cc966",
+                "SEQC2_IL_1_wgs_vs_wes.discordance.tsv:md5,e7c69f90dfc010b2c3e3c4ca0f1061c4",
+                "SEQC2_IL_1_wgs_vs_wes.power.tsv:md5,c2018ab7720f864ff7c7912b54e678c8",
+                "SEQC2_NV_1_wgs_vs_wes.discordance.tsv:md5,947c941cfe75e09eabb3348e56d98b54",
+                "SEQC2_NV_1_wgs_vs_wes.power.tsv:md5,9a191d8b177198ca56e8069e87ba4ec6",
+                "all_difficult.reference_check.tsv:md5,df552af62de31759aa577d79223c90ef",
+                "genes.reference_check.tsv:md5,7393486dc79ae18c29b82b6cc52a1579",
+                "homopolymer.reference_check.tsv:md5,795033fe5b221ea1fee14fad1bf732cf",
+                "low_mappability.reference_check.tsv:md5,2c8474cb81e6ea08e82d5d2252552776",
+                "segmental_duplication.reference_check.tsv:md5,83c513c72452651e215fb478037f373c",
+                "tandem_repeat.reference_check.tsv:md5,ca2f173c04faa42c20e52164cdb61ca0",
+                "variants.annotated.tsv:md5,8998847a23a5a1d199714113cb088cb7",
                 "mosdepth-coverage-per-contig-single.txt:md5,b3af770133bfb0d4fc1aae5009a9f3fd",
                 "mosdepth-cumcoverage-dist-id.txt:md5,f3b01f3c4b0d97be5876b785a419fe9f",
                 "mosdepth_cov_dist.txt:md5,1038978f90a283cf745ffadf81a21699",
@@ -302,7 +364,7 @@
                 "SEQC2_NV_1_wgs.vcf.reference_check.tsv:md5,5a7b19686ea76fc90f31b6c10130a984"
             ]
         ],
-        "timestamp": "2026-10-07T21:31:49.848959603",
+        "timestamp": "2026-10-07T23:00:33.037918539",
         "meta": {
             "nf-test": "0.9.5",
             "nextflow": "26.04.4"

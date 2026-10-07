@@ -9,6 +9,7 @@ include { PREPARE_REGIONS        } from '../subworkflows/local/prepare_regions'
 include { PREPROCESS_VCF         } from '../subworkflows/local/preprocess_vcf'
 include { COVERAGE               } from '../subworkflows/local/coverage'
 include { BENCHMARK              } from '../subworkflows/local/benchmark'
+include { DISCORDANCE            } from '../subworkflows/local/discordance'
 include { paramsSummaryMap       } from 'plugin/nf-schema'
 include { paramsSummaryMultiqc   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { softwareVersionsToYAML } from '../subworkflows/nf-core/utils_nfcore_pipeline'
@@ -24,10 +25,12 @@ workflow VARIANTCOMP {
 
     take:
     ch_samplesheet // channel: samplesheet entries [ meta, vcf, vcf_index, tumor_bam, tumor_bai, normal_bam, normal_bai, target_bed ]
+    ch_strata      // channel: stratification BEDs [ meta(id: name), bed ]
     fasta          // string: reference FASTA
     fasta_fai      // string: optional reference .fai
     regions_bed    // string: optional BED restricting the comparison
     exclude_bed    // string: optional BED of regions excluded from the comparison
+    gene_bed       // string: optional gene BED (BED4)
     multiqc_config
     multiqc_logo
     multiqc_methods_description
@@ -111,6 +114,19 @@ workflow VARIANTCOMP {
         COVERAGE.out.regions,
         PREPARE_REFERENCE.out.reference,
         params.comparison_mode
+    )
+
+    //
+    // SUBWORKFLOW: read evidence, classification and annotation of discordant variants
+    //
+    DISCORDANCE(
+        ch_samplesheet,
+        PREPROCESS_VCF.out.normalized,
+        PREPROCESS_VCF.out.compare,
+        BENCHMARK.out.variants,
+        PREPARE_REFERENCE.out.reference,
+        gene_bed ? file(gene_bed, checkIfExists: true) : null,
+        ch_strata
     )
 
     //

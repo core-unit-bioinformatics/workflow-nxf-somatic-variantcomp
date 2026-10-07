@@ -101,6 +101,24 @@ Samples without alignments for every technology keep the common region. The comp
 still works for them, but variants in poorly covered parts of a target can't be
 distinguished from real discordance.
 
+## Discordance analysis
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `--gene_bed` | – | BED4 with gene names in column 4, e.g. derived from GENCODE. |
+| `--stratification` | – | Tab-separated sheet with columns `name` and `bed` (relative paths resolved against the sheet), e.g. GIAB stratifications for homopolymers, tandem repeats, segmental duplications, low mappability. |
+| `--germline_vaf` | `0.1` | Normal VAF from which a discordant variant is classified as `germline_in_normal`. |
+| `--evidence_min_alt_reads` | `2` | Alt reads in a normal needed for `germline_in_normal`. |
+| `--power_min_alt_reads` | `3` | Alt reads a caller needs (power model). |
+| `--detection_power` | `0.95` | Power from which a truth variant counts as detectable. |
+
+```tsv title="stratification.tsv"
+name	bed
+homopolymer	giab/GRCh38_AllHomopolymers_ge7bp_imperfectge11bp_slop5.bed.gz
+tandem_repeat	giab/GRCh38_AllTandemRepeats.bed.gz
+segmental_duplication	giab/GRCh38_segdups.bed.gz
+```
+
 ## Filters
 
 The input VCFs are **unfiltered** (all calls with the caller's FILTER column). The pipeline

@@ -32,6 +32,7 @@ workflow PIPELINE_INITIALISATION {
     outdir            //  string: The output directory where the results will be saved
     input             //  string: Path to input samplesheet
     truth_technology  //  string: Technology used as ground truth
+    stratification    //  string: Optional stratification sheet (name, bed)
     help              // boolean: Display help message and exit
     help_full         // boolean: Show the full help message
     show_hidden       // boolean: Show hidden parameters in the help message
@@ -102,8 +103,24 @@ workflow PIPELINE_INITIALISATION {
 
     ch_samplesheet = channel.fromList(entries)
 
+    //
+    // Optional stratification sheet: [ meta(id: name), bed ], paths relative to the sheet
+    //
+    def ch_strata = channel.empty()
+    if (stratification) {
+        def strata = samplesheetToList(stratification, "${projectDir}/assets/schema_stratification.json")
+            .collect { row -> [row[0], resolveSamplesheetPath(row[1], file(stratification).parent)] }
+        def missing = strata.findAll { stratum -> !stratum[1].exists() }
+            .collect { stratum -> "${stratum[0].id}: ${stratum[1].toUriString()}" }
+        if (missing) {
+            error("Stratification BED(s) not found:\n  - " + missing.join("\n  - "))
+        }
+        ch_strata = channel.fromList(strata)
+    }
+
     emit:
     samplesheet = ch_samplesheet
+    strata      = ch_strata
     versions    = ch_versions
 }
 

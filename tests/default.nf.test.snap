@@ -6,6 +6,13 @@
                     "pandas": "2.2.1",
                     "python": "3.12.15"
                 },
+                "AGGREGATE_POWER": {
+                    "pandas": "2.2.1",
+                    "python": "3.12.15"
+                },
+                "ANNOTATE_VARIANTS": {
+                    "bedtools": "2.31.1"
+                },
                 "BCFTOOLS_ANNOTATE": {
                     "bcftools": "1.23.1"
                 },
@@ -31,11 +38,19 @@
                     "pysam": "0.24.1",
                     "python": "3.12.15"
                 },
+                "CHECK_REFERENCE_ANNOTATION": {
+                    "pysam": "0.24.1",
+                    "python": "3.12.15"
+                },
                 "CHECK_REFERENCE_BED": {
                     "pysam": "0.24.1",
                     "python": "3.12.15"
                 },
                 "CHECK_REFERENCE_VCF": {
+                    "pysam": "0.24.1",
+                    "python": "3.12.15"
+                },
+                "CLASSIFY_DISCORDANCE": {
                     "pysam": "0.24.1",
                     "python": "3.12.15"
                 },
@@ -56,7 +71,7 @@
                     "samtools": 1.24
                 },
                 "Workflow": {
-                    "core-unit-bioinformatics/workflow-nxf-somatic-variantcomp": "v0.6.0-dev"
+                    "core-unit-bioinformatics/workflow-nxf-somatic-variantcomp": "v0.7.0-dev"
                 }
             },
             [
@@ -127,7 +142,25 @@
                 "benchmark/S2/vcfeval/S2_wgs_vs_wes.weighted_roc.tsv.gz",
                 "benchmark/metrics.aggregated.tsv",
                 "benchmark/metrics.per_pair.tsv",
+                "benchmark/power.aggregated.tsv",
+                "benchmark/power.per_pair.tsv",
                 "coverage",
+                "discordance",
+                "discordance/S1",
+                "discordance/S1/S1_wgs_vs_panel.discordance.tsv",
+                "discordance/S1/S1_wgs_vs_panel.power.tsv",
+                "discordance/S1/S1_wgs_vs_wes.discordance.tsv",
+                "discordance/S1/S1_wgs_vs_wes.power.tsv",
+                "discordance/S2",
+                "discordance/S2/S2_wgs_vs_panel.discordance.tsv",
+                "discordance/S2/S2_wgs_vs_panel.power.tsv",
+                "discordance/S2/S2_wgs_vs_wes.discordance.tsv",
+                "discordance/S2/S2_wgs_vs_wes.power.tsv",
+                "discordance/reference_check",
+                "discordance/reference_check/genes.reference_check.tsv",
+                "discordance/reference_check/homopolymer.reference_check.tsv",
+                "discordance/reference_check/tandem_repeat.reference_check.tsv",
+                "discordance/variants.annotated.tsv",
                 "multiqc",
                 "multiqc/multiqc_data",
                 "multiqc/multiqc_data/llms-full.txt",
@@ -196,6 +229,20 @@
                 "S2_wgs_vs_wes.variants.tsv:md5,ae68af0e73c76688947083a35c0063a2",
                 "metrics.aggregated.tsv:md5,75181ad30a7ca37072096ba2a51ec17f",
                 "metrics.per_pair.tsv:md5,897622dbc63cc600a354a8ae1c0b987e",
+                "power.aggregated.tsv:md5,8ae24172f572ae18bc04dda610e2e92f",
+                "power.per_pair.tsv:md5,0fb85043dd97427dcb1898a98302a568",
+                "S1_wgs_vs_panel.discordance.tsv:md5,53cefadc314033781405c30aabeffc1e",
+                "S1_wgs_vs_panel.power.tsv:md5,ac09429e752094d307513c66c367d186",
+                "S1_wgs_vs_wes.discordance.tsv:md5,f3c379524ce618eb39a4c131ef102a80",
+                "S1_wgs_vs_wes.power.tsv:md5,15105b2198837f5620f176fc4d85ce73",
+                "S2_wgs_vs_panel.discordance.tsv:md5,b630a470492c1255f8263d3b888f003d",
+                "S2_wgs_vs_panel.power.tsv:md5,3f080a812073657e85983892a5c3bbcb",
+                "S2_wgs_vs_wes.discordance.tsv:md5,2a6af6e794ecb6db24e1bb31a9f707f7",
+                "S2_wgs_vs_wes.power.tsv:md5,f4debbd1ddb8dfb6a4130e313ef1be65",
+                "genes.reference_check.tsv:md5,02101e14aaaba89fe892f33dfc493b24",
+                "homopolymer.reference_check.tsv:md5,cebf9443a8702fcf5192f235bc487e3e",
+                "tandem_repeat.reference_check.tsv:md5,65b548f5185d8fd3571d01400d46a1e0",
+                "variants.annotated.tsv:md5,0c20e8fc9941a1f1774edb59d2bbe03e",
                 "multiqc_citations.txt:md5,4c806e63a283ec1b7e78cdae3a923d4f",
                 "common_targets.bed:md5,05beabccb7d0af813ec94b6dad30a3c6",
                 "common_targets.summary.tsv:md5,354fd9bf32178ede1809d465548a223c",
@@ -211,7 +258,7 @@
                 "S2_wgs.vcf.reference_check.tsv:md5,87b5af0a0b0372af9e6d78dd0dcd98f8"
             ]
         ],
-        "timestamp": "2026-10-07T21:14:03.222909633",
+        "timestamp": "2026-10-07T22:39:29.124844341",
         "meta": {
             "nf-test": "0.9.5",
             "nextflow": "26.04.4"

@@ -14,6 +14,7 @@ The pipeline is built using [Nextflow](https://www.nextflow.io/) and processes d
 - [Coverage](#coverage) - Depth of every alignment and per-sample callable regions
 - [Preprocessed VCFs](#preprocessed-vcfs) - Reference check, normalization, harmonization and uniform filtering of every VCF
 - [Benchmark](#benchmark) - Recall, precision and F1 of every technology against the truth technology
+- [Discordance](#discordance) - Why variants differ: classification, read evidence, genes and stratifications
 - [MultiQC](#multiqc) - Aggregate report describing results and QC from the whole pipeline
 - [Pipeline information](#pipeline-information) - Report metrics generated during the workflow execution
 
@@ -113,6 +114,8 @@ Every VCF goes through the same steps:
     and VAF, depth and alt reads in both technologies.
   - `vcfeval/`: rtg vcfeval output per pair (`*.tp.vcf.gz`, `*.tp-baseline.vcf.gz`,
     `*.fn.vcf.gz`, `*.fp.vcf.gz`, `*.summary.txt`, ROC tables over tumor VAF thresholds).
+- `benchmark/power.aggregated.tsv`, `benchmark/power.per_pair.tsv`: power-adjusted recall
+  (see [Discordance](#discordance)); `NA` without query alignments.
 
 </details>
 
@@ -133,6 +136,50 @@ of the compare VCFs), so different representations of the same variant still mat
 
 `recall = TP_baseline / (TP_baseline + FN)`, `precision = TP_call / (TP_call + FP)`, and
 `F1` is their harmonic mean. Undefined values are `NA`.
+
+### Discordance
+
+<details markdown="1">
+<summary>Output files</summary>
+
+- `discordance/variants.annotated.tsv`: **every compared variant of every comparison** (TP,
+  FN, FP). The columns are the per-variant columns of the benchmark, plus:
+  - `class` of each FN/FP (see below; `concordant` for TP);
+  - `other_in_normalized`, `other_filter`, `other_vaf_normalized`: the call of the other
+    technology before filtering, if any;
+  - `other_tumor_dp`, `other_tumor_alt`: depth and alt reads in the other technology's tumor
+    alignment;
+  - `normal_dp`, `normal_alt`, `normal_vaf`: summed over the normal alignments of both
+    technologies;
+  - `query_power`, `detectable`: detection power of the query technology for truth variants;
+  - `gene` (with `--gene_bed`) and one `yes`/`no` column per stratification
+    (`--stratification`).
+- `discordance/<sample>/<sample>_<truth>_vs_<query>.discordance.tsv`: the same, per
+  comparison, without annotation.
+- `discordance/<sample>/evidence/*.evidence.vcf.gz`: `bcftools mpileup` allele counts of
+  every alignment at all compared positions of the sample.
+- `discordance/reference_check/`: reference check of the gene and stratification BEDs.
+
+</details>
+
+A variant found in only one technology is explained from the point of view of the
+technology that misses it (the query for an FN, the truth for an FP):
+
+| Class | Meaning |
+| --- | --- |
+| `present_but_filtered` | The other technology called it, but the call failed FILTER or the uniform thresholds. |
+| `germline_in_normal` | A normal alignment shows the alt allele (VAF ≥ `--germline_vaf`, ≥ `--evidence_min_alt_reads` reads): likely germline. |
+| `low_coverage` | The other technology's tumor depth is below `--min_coverage`. |
+| `subthreshold_evidence` | The other tumor alignment has alt reads, but the variant was not called. |
+| `no_evidence` | The other tumor alignment has no alt read (MQ ≥ 20, BQ ≥ 13). |
+| `absent` | No call and no alignment to look further. |
+
+Power-adjusted recall: for each truth variant, the detection power of the query technology
+is `P(X ≥ --power_min_alt_reads)` with `X ~ Binomial(query depth, truth VAF)`. Only variants
+with power ≥ `--detection_power` count. This separates "the technology could not have
+seen it" (depth/VAF) from "it should have seen it".
+
+Read evidence needs the alignments to use the reference contig names.
 
 ### MultiQC
 

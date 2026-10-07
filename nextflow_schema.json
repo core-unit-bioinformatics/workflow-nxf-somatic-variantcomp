@@ -200,6 +200,62 @@
                 }
             }
         },
+        "discordance_options": {
+            "title": "Discordance options",
+            "type": "object",
+            "fa_icon": "fas fa-search",
+            "description": "Classification and annotation of variants that differ between technologies.",
+            "properties": {
+                "gene_bed": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "pattern": "^\\S+\\.bed(\\.gz)?$",
+                    "description": "Optional BED4 with gene names in the 4th column (e.g. from GENCODE).",
+                    "fa_icon": "fas fa-dna"
+                },
+                "stratification": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "schema": "assets/schema_stratification.json",
+                    "mimetype": "text/tab-separated-values",
+                    "pattern": "^\\S+\\.tsv$",
+                    "description": "Optional tab-separated sheet (columns name, bed) of stratification BEDs, e.g. GIAB homopolymers, tandem repeats, segmental duplications. Each becomes a yes/no column of the variant table.",
+                    "fa_icon": "fas fa-layer-group"
+                },
+                "germline_vaf": {
+                    "type": "number",
+                    "default": 0.1,
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Normal VAF from which a discordant variant is classified as germline_in_normal.",
+                    "fa_icon": "fas fa-user"
+                },
+                "evidence_min_alt_reads": {
+                    "type": "integer",
+                    "default": 2,
+                    "minimum": 1,
+                    "description": "Alt reads in a normal needed for germline_in_normal.",
+                    "fa_icon": "fas fa-sort-numeric-up"
+                },
+                "power_min_alt_reads": {
+                    "type": "integer",
+                    "default": 3,
+                    "minimum": 1,
+                    "description": "Alt reads a caller needs to call a variant (power model of the power-adjusted recall).",
+                    "fa_icon": "fas fa-sort-numeric-up"
+                },
+                "detection_power": {
+                    "type": "number",
+                    "default": 0.95,
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Detection power from which a truth variant counts as detectable by the query technology.",
+                    "fa_icon": "fas fa-bolt"
+                }
+            }
+        },
         "institutional_config_options": {
             "title": "Institutional config options",
             "type": "object",
@@ -355,6 +411,9 @@
         },
         {
             "$ref": "#/$defs/comparison_options"
+        },
+        {
+            "$ref": "#/$defs/discordance_options"
         },
         {
             "$ref": "#/$defs/region_options"

@@ -19,6 +19,9 @@ nextflow_pipeline {
             def stable_content = getAllFilesFromDir(params.outdir, ignoreFile: 'tests/.nftignore')
             // samplesheet_validated.tsv holds absolute paths: check its structure instead of its content
             def validated = path("$outputDir/pipeline_info/samplesheet_validated.tsv").readLines()
+            def annotatedLines = path("$outputDir/discordance/variants.annotated.tsv").readLines()
+            def annotatedHeader = annotatedLines[0].tokenize('\t')
+            def annotated = annotatedLines[1..-1].collect { line -> [annotatedHeader, line.split('\t', -1).toList()].transpose().collectEntries() }
             def overallCounts = { metrics ->
                 path(metrics).readLines().find { line -> line.contains('\toverall\tall\t') }.tokenize('\t')[5..8]
             }
@@ -34,6 +37,11 @@ nextflow_pipeline {
                 { assert overallCounts("$outputDir/benchmark/S1/S1_wgs_vs_panel.metrics.tsv") == ['8', '2', '8', '1'] },
                 { assert overallCounts("$outputDir/benchmark/S2/S2_wgs_vs_wes.metrics.tsv") == ['2', '1', '2', '1'] },
                 { assert overallCounts("$outputDir/benchmark/S2/S2_wgs_vs_panel.metrics.tsv") == ['3', '0', '3', '1'] },
+                // discordance: E08 filtered in wes; E12 insertion in the tandem repeat; genes assigned
+                { assert annotated.find { r -> r.query == 'wes' && r.pos == '4700' }.class == 'present_but_filtered' },
+                { assert annotated.find { r -> r.query == 'panel' && r.pos == '2999' }.tandem_repeat == 'yes' },
+                { assert annotated.find { r -> r.query == 'panel' && r.pos == '4999' }.homopolymer == 'yes' },
+                { assert annotated.every { r -> r.gene.startsWith('GENE_') } },
                 { assert validated.count { line -> line.contains('\twgs\twgs\t') && line.contains('\ttrue\t') } == 2 },
                 { assert snapshot(
                     // pipeline versions.yml file for multiqc from which Nextflow version is removed because we test pipelines on multiple Nextflow versions
