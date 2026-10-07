@@ -4,6 +4,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Dates follow ISO 8601 (`YYYY-MM-DD`).
 
+## v0.10.0-dev - [unreleased]
+
+### `Added`
+
+- Known variants (`--known_variants` sheet: name, sample or `all`, mode, variants, regions): `bin/known_variants.py` converts VCF/TSV lists to normalized VCFs on the reference
+  - mode `required`: PASS/FAIL per sample, technology and variant (`FAIL_filtered`, `FAIL_outside_region`, `FAIL_not_called`) with read evidence; warnings, MultiQC table and `--fail_on_missing_required`
+  - mode `benchmark`: every technology against an external truth set (rtg vcfeval in ALT mode) within its regions and the comparison region, with the main benchmark metrics
+- Test data: known-variant lists in the synthetic set; SEQC2 truth set v1.2.1 and a demo required list in the SEQC2 set
+- nf-test: shared conda cache for tests (`NFT_CONDA_CACHE`)
+
+### `Changed`
+
+- `rtgtools/vcfeval` module patched: ROC outputs per variant type are optional (not written in ALT mode)
+- `benchmark_metrics.py`: `--regions` restricts the match strata; works with VCFs without the `VC_*` tags
+
 ## v0.9.0-dev - [2026-10-08]
 
 ### `Added`
