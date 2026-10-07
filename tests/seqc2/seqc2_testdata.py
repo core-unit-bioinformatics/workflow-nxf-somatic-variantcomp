@@ -279,6 +279,53 @@ class Dataset:
         files["regions"] = dest
         return files
 
+    # annotation ----------------------------------------------------------------
+
+    def keep_contig(self, chrom):
+        return not self.contigs or chrom in self.contigs
+
+    def prepare_annotation(self):
+        """Gene BED (GENCODE) and GIAB stratification BEDs, restricted to the contigs."""
+        acfg = self.cfg["annotation"]
+        ann_dir = self.out / "annotation"
+        (ann_dir / "stratification").mkdir(parents=True, exist_ok=True)
+
+        url = acfg["genes"]["url"]
+        gtf = download(url, self.cache / "annotation" / Path(url).name)
+        self.sources.append(("annotation/genes.bed", url, "n/a (not published)"))
+        genes = ann_dir / "genes.bed"
+        with gzip.open(gtf, "rt") as fin, genes.open("w") as fout:
+            for line in fin:
+                if line.startswith("#"):
+                    continue
+                fields = line.rstrip("\n").split("\t")
+                if fields[2] != "gene" or not self.keep_contig(fields[0]):
+                    continue
+                name = fields[8].split('gene_name "', 1)[1].split('"', 1)[0]
+                fout.write(f"{fields[0]}\t{int(fields[3]) - 1}\t{fields[4]}\t{name}\n")
+
+        scfg = acfg["stratifications"]
+        base = scfg["base_url"].rstrip("/")
+        md5 = fetch_md5_table(f"{base}/{scfg['md5']}", self.cache / "annotation" / scfg["md5"])
+        rows = []
+        for name, rel in scfg["files"].items():
+            src = download(f"{base}/{rel}", self.cache / "annotation" / Path(rel).name,
+                           md5.get(Path(rel).name))  # fmt: skip
+            self.sources.append((f"annotation/stratification/{name}.bed", f"{base}/{rel}",
+                                 md5.get(Path(rel).name, "n/a")))  # fmt: skip
+            dest = ann_dir / "stratification" / f"{name}.bed"
+            with gzip.open(src, "rt") as fin, dest.open("w") as fout:
+                for line in fin:
+                    if line.startswith("#"):
+                        continue
+                    chrom = line.split("\t", 1)[0]
+                    if self.keep_contig(chrom):
+                        fout.write(line)
+            rows.append(f"{name}\tannotation/stratification/{name}.bed\n")
+        strat = self.out / "stratification.tsv"
+        strat.write_text("name\tbed\n" + "".join(rows))
+        return genes, strat
+
     # BAMs ----------------------------------------------------------------------
 
     def bam_regions(self, wes_bed):
@@ -407,11 +454,13 @@ class Dataset:
             fh.writelines("\t".join(r) + "\n" for r in rows)
         return path
 
-    def write_params(self, fasta, truth):
+    def write_params(self, fasta, truth, genes, strat):
         params = {
             "input": "samplesheet.tsv",
             "truth_technology": "wgs",
             "fasta": str(fasta.relative_to(self.out)),
+            "gene_bed": str(genes.relative_to(self.out)),
+            "stratification": str(strat.relative_to(self.out)),
             "known_variants_snv": str(truth["snv"].relative_to(self.out)),
             "known_variants_indel": str(truth["indel"].relative_to(self.out)),
             "known_variants_regions": str(truth["regions"].relative_to(self.out)),
@@ -462,6 +511,8 @@ class Dataset:
             "| `vcf/` | Unfiltered MuTect2 (GATK 3.8) tumor/normal VCFs per pseudo-sample |",
             "| `bam/` | BAM slices (WES targets +/- padding in the BAM windows, subsampled) |",
             "| `truth/` | SEQC2 somatic reference call set v1.2.1 + high-confidence regions |",
+            "| `annotation/` | Genes (GENCODE v46 basic) and GIAB v3.5 stratifications |",
+            "| `stratification.tsv` | Stratification sheet (name, BED) for `--stratification` |",
             "| `checksums.md5` | md5 of every file in this folder |",
             "",
             "## Sources",
@@ -485,8 +536,9 @@ class Dataset:
         vcfs = self.prepare_vcfs()
         truth = self.prepare_truth()
         bams = self.prepare_bams(wes_bed)
+        genes, strat = self.prepare_annotation()
         self.write_samplesheet(vcfs, bams, wes_bed)
-        self.write_params(fasta, truth)
+        self.write_params(fasta, truth, genes, strat)
         self.write_provenance(args)
         log.info("Done: %s", self.out)
 

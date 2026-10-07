@@ -19,6 +19,22 @@ truth:
   indel: "release/latest/high-confidence_sINDEL_in_HC_regions_v1.2.1.vcf.gz"
   regions: "release/latest/High-Confidence_Regions_v1.2.bed"
 
+# Annotation for the discordance analysis (GRCh38, chr names)
+annotation:
+  genes:
+    # GENCODE basic gene annotation -> BED4 (gene_name)
+    url: "https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_46/gencode.v46.basic.annotation.gtf.gz"
+  stratifications:
+    # GIAB genome stratifications v3.5 (Dwarshuis et al. 2024, Nat Commun 15:9029)
+    base_url: "https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/genome-stratifications/v3.5/GRCh38@all"
+    md5: "GRCh38-genome-stratifications-md5s.txt"
+    files:
+      homopolymer: "LowComplexity/GRCh38_AllHomopolymers_ge7bp_imperfectge11bp_slop5.bed.gz"
+      tandem_repeat: "LowComplexity/GRCh38_AllTandemRepeats.bed.gz"
+      segmental_duplication: "SegmentalDuplications/GRCh38_segdups.bed.gz"
+      low_mappability: "Mappability/GRCh38_lowmappabilityall.bed.gz"
+      all_difficult: "Union/GRCh38_alldifficultregions.bed.gz"
+
 # Per-run somatic calls: MuTect2 (GATK 3.8) on BWA alignments. The VCFs are
 # unfiltered (all records kept, FILTER column set) and use sample names TUMOR/NORMAL.
 vcf_pattern: "analysis/SNVs/vcfs/{tech}/{tech}_{pair}.bwa.muTect2.vcf.gz"

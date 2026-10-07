@@ -21,6 +21,8 @@ Edge cases (see ``design.tsv`` for the full list):
 - duplicated record (panel)
 - FILTER != PASS for a true variant (wes)
 - variants outside the common target region
+- gene BED (``bed/genes.bed``) and stratification BEDs for the homopolymer and the
+  dinucleotide repeat (``stratification.tsv``)
 - sample S2: contigs without ``chr`` prefix and no contig header lines
   (panel), wrong chrM length in the header (wes), normal column before tumor
   column (wgs)
@@ -49,6 +51,13 @@ BEDS = {
     "wes.bed": [("chr1", 1000, 20000), ("chr2", 1000, 15000)],
     "panel.bed": [("chr1", 3990, 6000), ("chr1", 8000, 9000), ("chr2", 2000, 6000)],
 }
+# gene annotation (BED4) and stratification BEDs for the discordance annotation
+GENES = [
+    ("chr1", 4000, 4500, "GENE_A"),
+    ("chr1", 4500, 6000, "GENE_B"),
+    ("chr1", 8000, 9000, "GENE_C"),
+    ("chr2", 2000, 6000, "GENE_D"),
+]
 HOMOPOLYMER = ("chr1", 5000, "A" * 12)  # 1-based start
 DINUC_REPEAT = ("chr2", 3000, "CA" * 8)  # 1-based start
 
@@ -365,6 +374,19 @@ def main():
     for name, intervals in BEDS.items():
         with (out / "bed" / name).open("w") as fh:
             fh.writelines(f"{c}\t{s}\t{e}\n" for c, s, e in intervals)
+    with (out / "bed" / "genes.bed").open("w") as fh:
+        fh.writelines(f"{c}\t{s}\t{e}\t{g}\n" for c, s, e, g in GENES)
+    # stratifications: the designed repeat contexts (1-based starts -> BED; one base of flank)
+    strata = {
+        "homopolymer": HOMOPOLYMER,
+        "tandem_repeat": DINUC_REPEAT,
+    }
+    rows = []
+    for name, (chrom, start, motif) in strata.items():
+        bed = out / "bed" / f"stratification_{name}.bed"
+        bed.write_text(f"{chrom}\t{start - 2}\t{start - 1 + len(motif) + 1}\n")
+        rows.append(f"{name}\tbed/{bed.name}\n")
+    (out / "stratification.tsv").write_text("name\tbed\n" + "".join(rows))
 
     d = Designer(ref)
     design_variants(d)
