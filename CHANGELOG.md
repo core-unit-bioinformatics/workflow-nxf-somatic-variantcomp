@@ -4,6 +4,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Dates follow ISO 8601 (`YYYY-MM-DD`).
 
+## v0.11.0-dev - [unreleased]
+
+### `Added`
+
+- `scripts/make_offline_bundle.py`: pipeline archive at a git tag, list (and optionally pull) of all Singularity images named like Nextflow's cache, Nextflow plugins, README
+- `docs/hpc.md`: offline installation, PBS Pro example configuration, full SEQC2 test (T2)
+
+### `Changed`
+
+- README with the implemented workflow steps; plan status and implementation decisions
+
 ## v0.10.0-dev - [2026-10-08]
 
 ### `Added`
