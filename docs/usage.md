@@ -111,6 +111,7 @@ distinguished from real discordance.
 | `--evidence_min_alt_reads` | `2` | Alt reads in a normal needed for `germline_in_normal`. |
 | `--power_min_alt_reads` | `3` | Alt reads a caller needs (power model). |
 | `--detection_power` | `0.95` | Power from which a truth variant counts as detectable. |
+| `--low_vaf` | `0.1` | VAF threshold of the low-VAF feature in the enrichment tests. |
 
 ```tsv title="stratification.tsv"
 name	bed

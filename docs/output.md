@@ -15,6 +15,7 @@ The pipeline is built using [Nextflow](https://www.nextflow.io/) and processes d
 - [Preprocessed VCFs](#preprocessed-vcfs) - Reference check, normalization, harmonization and uniform filtering of every VCF
 - [Benchmark](#benchmark) - Recall, precision and F1 of every technology against the truth technology
 - [Discordance](#discordance) - Why variants differ: classification, read evidence, genes and stratifications
+- [Report](#report) - Enrichment statistics, gene summary and plots
 - [MultiQC](#multiqc) - Aggregate report describing results and QC from the whole pipeline
 - [Pipeline information](#pipeline-information) - Report metrics generated during the workflow execution
 
@@ -180,6 +181,29 @@ with power ≥ `--detection_power` count. This separates "the technology could n
 seen it" (depth/VAF) from "it should have seen it".
 
 Read evidence needs the alignments to use the reference contig names.
+
+### Report
+
+<details markdown="1">
+<summary>Output files</summary>
+
+- `report/`
+  - `variantcomp.enrichment.tsv`: are discordant variants different from concordant ones?
+    For every comparison and for FN, FP and FN+FP separately, the counts with and without a
+    feature, Fisher's exact test (odds ratio, p) and the Benjamini-Hochberg q-value over all
+    tests. Features: `indel`, `vaf_lt_<--low_vaf>` (truth VAF for FN/TP, query VAF for FP)
+    and every stratification.
+  - `variantcomp.genes.tsv`: per comparison and gene, TP/FN/FP counts, discordance rate,
+    number of samples and Fisher's exact test of discordant vs. concordant variants in the
+    gene vs. all other genes (BH q-value). Sorted by p-value.
+  - `variantcomp.classes.tsv`: discordance classes per comparison and status.
+  - `plots/`: `recall_precision.png` (bars: all samples, dots: per sample),
+    `recall_by_vaf.png`, `discordance_classes.png`, `enrichment.png` (log2 odds ratios).
+
+</details>
+
+The MultiQC report starts with these sections: recall and precision per comparison and per
+sample, recall by truth VAF and the discordance classes.
 
 ### MultiQC
 

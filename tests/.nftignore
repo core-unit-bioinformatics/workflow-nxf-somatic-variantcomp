@@ -13,3 +13,4 @@ vcf_preprocessed/**/*.vcf.gz
 vcf_preprocessed/**/*.vcf.gz.tbi
 benchmark/**/vcfeval/*
 discordance/**/evidence/*
+report/plots/*.png

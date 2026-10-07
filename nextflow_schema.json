@@ -253,6 +253,14 @@
                     "maximum": 1,
                     "description": "Detection power from which a truth variant counts as detectable by the query technology.",
                     "fa_icon": "fas fa-bolt"
+                },
+                "low_vaf": {
+                    "type": "number",
+                    "default": 0.1,
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "VAF threshold of the 'low VAF' feature in the enrichment tests (truth VAF for FN/TP, query VAF for FP).",
+                    "fa_icon": "fas fa-percentage"
                 }
             }
         },

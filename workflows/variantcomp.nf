@@ -10,6 +10,7 @@ include { PREPROCESS_VCF         } from '../subworkflows/local/preprocess_vcf'
 include { COVERAGE               } from '../subworkflows/local/coverage'
 include { BENCHMARK              } from '../subworkflows/local/benchmark'
 include { DISCORDANCE            } from '../subworkflows/local/discordance'
+include { VARIANTCOMP_REPORT     } from '../modules/local/variantcomp_report/main'
 include { paramsSummaryMap       } from 'plugin/nf-schema'
 include { paramsSummaryMultiqc   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { softwareVersionsToYAML } from '../subworkflows/nf-core/utils_nfcore_pipeline'
@@ -128,6 +129,18 @@ workflow VARIANTCOMP {
         gene_bed ? file(gene_bed, checkIfExists: true) : null,
         ch_strata
     )
+
+    //
+    // MODULE: statistics (enrichment, genes, classes), plots and MultiQC sections
+    //
+    VARIANTCOMP_REPORT(
+        BENCHMARK.out.aggregated.map { _meta, tsv -> tsv }
+            .combine(BENCHMARK.out.per_pair.map { _meta, tsv -> tsv })
+            .combine(DISCORDANCE.out.power.map { _meta, tsv -> tsv })
+            .combine(DISCORDANCE.out.annotated.map { _meta, tsv -> tsv })
+            .map { metrics, per_pair, power, variants -> [[id: 'variantcomp'], metrics, per_pair, power, variants] }
+    )
+    ch_multiqc_files = ch_multiqc_files.mix(VARIANTCOMP_REPORT.out.multiqc.flatten())
 
     //
     // Collate and save software versions
