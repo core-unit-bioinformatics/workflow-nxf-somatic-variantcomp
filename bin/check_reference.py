@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check that a VCF or BED file is on the configured reference genome.
+"""Check that a VCF, BED or BAM/CRAM file is on the configured reference genome.
 
 Checks:
   - contig names: exact match, or a safe rename (chr1 <-> 1, chrM <-> MT/M)
@@ -12,6 +12,8 @@ Checks:
   - records/intervals on contigs absent from the reference (dropped, reported)
   - records/intervals beyond the end of a contig (error)
   - (VCF, --samples) the expected sample columns exist (error otherwise)
+  - (BAM/CRAM) @SQ names and lengths: nuclear length mismatch -> error; the
+    rename map translates the alignment's contig names to the reference
 
 Outputs (prefix given by --prefix):
   <prefix>.rename_chrs.tsv      old<TAB>new contig names (for bcftools annotate
@@ -19,6 +21,9 @@ Outputs (prefix given by --prefix):
   <prefix>.keep_contigs.txt     reference contig names present in the input
                                 (after renaming), one per line
   <prefix>.reference_check.tsv  key<TAB>value report
+  <prefix>.regions.bed          (--type bam with --regions) the regions BED
+                                (reference names) translated to the
+                                alignment's contig names, e.g. for mosdepth --by
   <prefix>.harmonized.bed       (--type bed only) first three columns with
                                 renamed contigs, intervals on unknown contigs
                                 dropped; input order kept (sort afterwards)
@@ -225,14 +230,35 @@ def check_bed(args, reference, report):
     return mapping
 
 
+def check_bam(args, reference, report):
+    import pysam
+
+    with pysam.AlignmentFile(args.input, reference_filename=args.fasta) as bam:
+        header_lengths = dict(zip(bam.references, bam.lengths, strict=True))
+    report.set("header_contigs", len(header_lengths))
+    mapping, _unknown = finish_mapping(set(header_lengths), reference, report, args.prefix)
+    check_header_lengths(header_lengths, mapping, reference, report)
+    if not any(mapping.values()):
+        report.errors.append("no alignment contig is on the reference: wrong reference or naming")
+    if args.regions:
+        to_bam = {new: old for old, new in mapping.items() if new is not None}
+        with open_text(args.regions) as fin, open(f"{args.prefix}.regions.bed", "w") as fout:
+            for line in fin:
+                fields = line.rstrip("\n").split("\t")
+                if len(fields) >= 3 and fields[0] in to_bam:
+                    fout.write("\t".join([to_bam[fields[0]], *fields[1:3]]) + "\n")
+    return mapping
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--input", required=True, help="VCF/BCF or BED(.gz) file")
-    parser.add_argument("--type", choices=["vcf", "bed"], required=True)
+    parser.add_argument("--input", required=True, help="VCF/BCF, BED(.gz) or BAM/CRAM file")
+    parser.add_argument("--type", choices=["vcf", "bed", "bam"], required=True)
     parser.add_argument("--fai", required=True, help="reference .fai")
     parser.add_argument("--fasta", help="reference FASTA (required for --type vcf)")
     parser.add_argument("--prefix", required=True, help="output prefix")
     parser.add_argument("--samples", help="(VCF) comma-separated sample names that must exist")
+    parser.add_argument("--regions", help="(BAM) BED in reference names to translate to BAM names")
     parser.add_argument(
         "--max-ref-mismatch",
         type=float,
@@ -247,7 +273,8 @@ def main():
     report = Report()
     report.set("input", Path(args.input).name)
     report.set("reference_contigs", len(reference))
-    mapping = (check_vcf if args.type == "vcf" else check_bed)(args, reference, report)
+    checks = {"vcf": check_vcf, "bed": check_bed, "bam": check_bam}
+    mapping = checks[args.type](args, reference, report)
 
     keep = sorted({new for new in mapping.values() if new is not None}, key=list(reference).index)
     with open(f"{args.prefix}.keep_contigs.txt", "w") as fh:

@@ -31,7 +31,7 @@ workflow PREPARE_REGIONS {
     }
 
     // reference check: contig renaming, unknown contigs dropped, build mismatch -> error
-    CHECK_REFERENCE_BED(ch_beds, 'bed', ch_reference)
+    CHECK_REFERENCE_BED(ch_beds, 'bed', ch_reference, [])
     BEDTOOLS_SORT(CHECK_REFERENCE_BED.out.bed, ch_reference.map { _meta, _fasta, fai, _gzi -> fai })
 
     def ch_sorted = BEDTOOLS_SORT.out.sorted.branch { meta, _bed ->

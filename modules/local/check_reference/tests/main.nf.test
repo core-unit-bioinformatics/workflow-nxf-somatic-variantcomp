@@ -17,6 +17,7 @@ nextflow_process {
                 input[1] = 'vcf'
                 input[2] = [[id: 'synthetic'], file(base + 'reference/synthetic.fa', checkIfExists: true),
                             file(base + 'reference/synthetic.fa.fai', checkIfExists: true), []]
+                input[3] = []
                 """
             }
         }
@@ -43,6 +44,7 @@ nextflow_process {
                 input[1] = 'vcf'
                 input[2] = [[id: 'synthetic'], file(base + 'reference/synthetic.fa', checkIfExists: true),
                             file(base + 'reference/synthetic.fa.fai', checkIfExists: true), []]
+                input[3] = []
                 """
             }
         }
@@ -70,6 +72,7 @@ nextflow_process {
                 input[1] = 'bed'
                 input[2] = [[id: 'synthetic'], file(base + 'reference/synthetic.fa', checkIfExists: true),
                             file(base + 'reference/synthetic.fa.fai', checkIfExists: true), []]
+                input[3] = []
                 """
             }
         }
@@ -94,6 +97,7 @@ nextflow_process {
                 input[1] = 'vcf'
                 input[2] = [[id: 'synthetic'], file(base + 'reference/synthetic.fa', checkIfExists: true),
                             file(base + 'reference/synthetic.fa.fai', checkIfExists: true), []]
+                input[3] = []
                 """
             }
         }

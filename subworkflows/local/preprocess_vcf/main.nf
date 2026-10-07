@@ -33,7 +33,7 @@ workflow PREPROCESS_VCF {
     def ch_vcf = ch_samplesheet.map { entry -> [entry[0], entry[1], entry[2]] }
 
     // 1. reference check; fails the run on a build mismatch or missing sample
-    CHECK_REFERENCE_VCF(ch_vcf.map { meta, vcf, _tbi -> [meta, vcf] }, 'vcf', ch_reference)
+    CHECK_REFERENCE_VCF(ch_vcf.map { meta, vcf, _tbi -> [meta, vcf] }, 'vcf', ch_reference, [])
 
     // 2. tumor (+ normal) in a fixed order, BGZF output (input may be plain gzip)
     BCFTOOLS_VIEW_SELECT(ch_vcf, [], [], [])

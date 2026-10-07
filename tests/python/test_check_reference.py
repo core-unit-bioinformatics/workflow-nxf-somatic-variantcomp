@@ -165,3 +165,30 @@ def test_missing_sample_is_error(tmp_path, reference):
     assert report["samples"] == "TUMOR,NORMAL"
     assert "sample(s) T1 not in the VCF" in result.stderr
 
+
+def write_bam(path, contigs):
+    header = {"HD": {"VN": "1.6"}, "SQ": [{"SN": c, "LN": n} for c, n in contigs]}
+    with pysam.AlignmentFile(str(path), "wb", header=header):
+        pass
+    return path
+
+
+def test_bam_nochr_is_renamed(tmp_path, reference):
+    bam = write_bam(tmp_path / "in.bam", [("1", 2000), ("2", 1000), ("MT", 500), ("decoy", 50)])
+    regions = tmp_path / "regions.bed"
+    regions.write_text("chr1\t10\t20\nchrM\t0\t5\nchrX\t0\t5\n")
+    result, report, renames, keep = run_check(
+        tmp_path, bam, "bam", reference, "--regions", str(regions)
+    )
+    assert (tmp_path / "out.regions.bed").read_text() == "1\t10\t20\nMT\t0\t5\n"
+    assert result.returncode == 0, result.stderr
+    assert report["status"] == "fixed"
+    assert renames.splitlines() == ["1\tchr1", "2\tchr2", "MT\tchrM"]
+    assert keep == ["chr1", "chr2", "chrM"]
+
+
+def test_bam_other_build_is_error(tmp_path, reference):
+    bam = write_bam(tmp_path / "in.bam", [("chr1", 2100), ("chr2", 1000)])
+    result, report, _, _ = run_check(tmp_path, bam, "bam", reference)
+    assert result.returncode == 1
+    assert "different genome build" in result.stderr
