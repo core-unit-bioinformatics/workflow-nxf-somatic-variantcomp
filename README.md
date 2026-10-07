@@ -1,8 +1,8 @@
 # core-unit-bioinformatics/workflow-nxf-somatic-variantcomp
 
 > [!WARNING]
-> Under active development (`v0.1.0-dev`). Not ready for production use. See
-> [`docs/pipeline-plan.md`](docs/pipeline-plan.md) for the design and roadmap.
+> Development version. Not yet validated on a full dataset (see the roadmap in
+> [`docs/pipeline-plan.md`](docs/pipeline-plan.md)).
 
 ## Introduction
 
@@ -25,16 +25,25 @@ therefore require:
 5. Classification and annotation of every discordant variant (type, gene, repeat
    context, coverage, filter status, read evidence)
 
-Planned workflow steps (see the plan for details):
+Workflow steps:
 
-1. Input and reference consistency checks
-2. Region harmonization and N-way intersection of target BEDs
-3. Callable regions from coverage (`mosdepth`, optional BAMs)
-4. VCF normalization and harmonization (`bcftools`)
-5. Comparison (`rtgtools vcfeval`, `bcftools isec`) and metrics
-6. Discordance classification and annotation
-7. Statistics and reports (`MultiQC`, `datavzrd`)
-8. Optional known-variant checks (clinical must-find list, external truth sets)
+1. Input and reference consistency checks (contig names and lengths, REF alleles, sample
+   names; safe fixes, hard errors on a build mismatch)
+2. Target BEDs: harmonization and N-way intersection
+3. Coverage and per-sample callable regions (`mosdepth`, optional BAMs)
+4. VCF normalization and harmonization (`bcftools`: split, left-align, atomize, deduplicate;
+   VAF/depth from AD for every caller) and uniform filters
+5. Comparison with the truth technology (`rtg vcfeval`) and metrics: recall, precision, F1
+   overall, by variant type, by VAF; power-adjusted recall
+6. Discordance: classification of every missed or extra call (filtered, germline, low
+   coverage, read evidence), genes and stratifications (repeats, segdups, ...)
+7. Statistics (enrichment of indels, low VAF, repeats, genes) and MultiQC report
+8. Known variants: clinically required variants (PASS/FAIL per technology) and external truth
+   sets (e.g. SEQC2, GIAB)
+
+Outputs are described in [`docs/output.md`](docs/output.md), parameters in
+[`docs/usage.md`](docs/usage.md), HPC/offline use in [`docs/hpc.md`](docs/hpc.md) and testing
+in [`docs/testing.md`](docs/testing.md).
 
 ## Usage
 
@@ -61,8 +70,9 @@ nextflow run core-unit-bioinformatics/workflow-nxf-somatic-variantcomp \
 - Development environment: `conda env create -f envs/variantcomp-dev.yaml`
 - Branches: `main` (releases), `dev` (development), `feat-*` (features, branched from
   `dev`). The history is kept linear.
-- Test data (SEQC2 HCC1395/HCC1395BL, WES + WGS) live in a separate repository and
-  are prepared reproducibly with the scripts in `tests/seqc2/`.
+- Test data (synthetic edge cases; SEQC2 HCC1395/HCC1395BL, WES + WGS) live in a separate
+  repository and are prepared reproducibly with the scripts in `tests/`.
+- Offline bundle for an HPC: `scripts/make_offline_bundle.py` (see `docs/hpc.md`).
 
 ## Credits
 
