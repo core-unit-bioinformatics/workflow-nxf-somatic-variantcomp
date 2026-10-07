@@ -11,6 +11,7 @@ Checks:
     --max-ref-mismatch -> error (wrong build or wrong reference)
   - records/intervals on contigs absent from the reference (dropped, reported)
   - records/intervals beyond the end of a contig (error)
+  - (VCF, --samples) the expected sample columns exist (error otherwise)
 
 Outputs (prefix given by --prefix):
   <prefix>.rename_chrs.tsv      old<TAB>new contig names (for bcftools annotate
@@ -118,6 +119,14 @@ def check_vcf(args, reference, report):
     fasta = pysam.FastaFile(args.fasta)
     header_lengths = {name: rec.length for name, rec in vcf.header.contigs.items()}
     report.set("header_contigs", len(header_lengths))
+    if args.samples:
+        available = list(vcf.header.samples)
+        missing = [s for s in args.samples.split(",") if s not in available]
+        report.set("samples", ",".join(available))
+        if missing:
+            report.errors.append(
+                f"sample(s) {','.join(missing)} not in the VCF (available: {','.join(available)})"
+            )
 
     mapping = {}
     record_contigs = {}
@@ -223,6 +232,7 @@ def main():
     parser.add_argument("--fai", required=True, help="reference .fai")
     parser.add_argument("--fasta", help="reference FASTA (required for --type vcf)")
     parser.add_argument("--prefix", required=True, help="output prefix")
+    parser.add_argument("--samples", help="(VCF) comma-separated sample names that must exist")
     parser.add_argument(
         "--max-ref-mismatch",
         type=float,

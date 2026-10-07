@@ -152,3 +152,16 @@ def test_bed_ok(tmp_path, reference):
     assert result.returncode == 0
     assert report["status"] == "ok"
     assert keep == ["chr1", "chr2"]
+
+
+def test_missing_sample_is_error(tmp_path, reference):
+    _, seqs = reference
+    vcf = tmp_path / "in.vcf"
+    write_vcf(vcf, [], list(CONTIGS.items()))
+    text = vcf.read_text().replace("\tINFO\n", "\tINFO\tFORMAT\tTUMOR\tNORMAL\n")
+    vcf.write_text(text)
+    result, report, _, _ = run_check(tmp_path, vcf, "vcf", reference, "--samples", "T1,NORMAL")
+    assert result.returncode == 1
+    assert report["samples"] == "TUMOR,NORMAL"
+    assert "sample(s) T1 not in the VCF" in result.stderr
+
