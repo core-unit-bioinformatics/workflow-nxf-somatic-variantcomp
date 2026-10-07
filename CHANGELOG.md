@@ -4,6 +4,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Dates follow ISO 8601 (`YYYY-MM-DD`).
 
+## v0.4.0-dev - [unreleased]
+
+### `Added`
+
+- Reference preparation (`--fasta`, `--fasta_fai`; `.fai`/`.gzi` created with `samtools faidx` when needed)
+- Reference consistency check `bin/check_reference.py` (local module `CHECK_REFERENCE`): contig renaming (`chr` prefix, `MT`/`chrM`), header length check (nuclear mismatch = build error, mitochondrial = header fix), REF allele check (`--max_ref_mismatch`), dropping of unknown contigs, intervals/records beyond contig ends
+- Region preparation: per-technology BED check, sort and merge, N-way intersection of all target BEDs (`COMMON_REGIONS`), optional `--regions_bed` / `--exclude_bed`, region summary
+- nf-test module/subworkflow tests and pytest unit tests
+
 ## v0.3.0-dev - [2026-10-07]
 
 ### `Added`
