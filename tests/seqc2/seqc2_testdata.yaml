@@ -45,9 +45,13 @@ modes:
     pairs: [IL_1, FD_1, NV_1]
     contigs: [chr22]
     bam_pairs: [IL_1]
-    # reads are extracted only for WES targets (+/- padding) inside this window
-    bam_window: "chr22:29500000-30500000"
+    # reads are extracted only for WES targets (+/- padding) inside these windows;
+    # the two 1-Mb windows of chr22 with the most PASS exome calls in IL_1 + truth
+    bam_windows: ["chr22:23000000-24000000", "chr22:50000000-50818468"]
     bam_padding: 100
+    # fixed-seed read subsampling of the slices to keep the test data small
+    # (coverage stays far above the default --min_coverage of 10)
+    bam_subsample: 0.5
   # Full: genome-wide, for an HPC. Full BAMs are 10-160 GB each.
   full:
     pairs: [EA_1, FD_1, FD_2, FD_3, IL_1, IL_2, IL_3, LL_1, NC_1, NV_1, NV_2, NV_3]

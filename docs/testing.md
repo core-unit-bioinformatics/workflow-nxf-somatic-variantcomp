@@ -85,7 +85,7 @@ the single entry point:
 
 | Mode | Content | Size | Default profile |
 | --- | --- | --- | --- |
-| `small` | chr22 only; pseudo-samples IL_1, FD_1, NV_1; BAM slices (WES targets ±100 bp in chr22:29.5-30.5 Mb) for IL_1 | ~50 MB (+130 MB download cache) | `test_seqc2,conda` |
+| `small` | chr22 only; pseudo-samples IL_1, FD_1, NV_1; BAM slices (WES targets ±100 bp in chr22:23-24 Mb and 50-50.8 Mb, reads subsampled to 50% with a fixed seed) for IL_1 | ~50 MB (+130 MB download cache) | `test_seqc2,conda` |
 | `full` | Genome-wide; 12 pseudo-samples; VCFs only (`--with-bams` adds the full BAMs, 10-160 GB each) | ~3 GB without BAMs (reference 2.9 GB) | `test_full,singularity` |
 
 ```bash

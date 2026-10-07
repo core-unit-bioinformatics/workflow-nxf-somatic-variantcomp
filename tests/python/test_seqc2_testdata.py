@@ -25,11 +25,11 @@ def test_config_modes_use_available_pairs():
 
 def test_bam_regions_pad_clip_and_merge(tmp_path):
     cfg = load_config()
-    cfg["modes"]["small"]["bam_window"] = "chr22:1000-2000"
+    cfg["modes"]["small"]["bam_windows"] = ["chr22:1000-2000", "chr21:1150-1180"]
     cfg["modes"]["small"]["bam_padding"] = 50
     wes_bed = tmp_path / "wes.bed"
     wes_bed.write_text(
-        "chr21\t1100\t1200\n"  # other contig: dropped
+        "chr21\t1100\t1200\n"  # other contig: only in the second window
         "chr22\t900\t1010\n"  # clipped to window start
         "chr22\t1100\t1200\n"  # padded, overlaps the next one after padding
         "chr22\t1280\t1300\n"
@@ -38,7 +38,7 @@ def test_bam_regions_pad_clip_and_merge(tmp_path):
     )
     ds = seqc2.Dataset(cfg, "small", tmp_path / "out", None)
     regions = ds.bam_regions(wes_bed).read_text().splitlines()
-    assert regions == ["chr22\t999\t1350", "chr22\t1940\t2000"]
+    assert regions == ["chr22\t999\t1350", "chr22\t1940\t2000", "chr21\t1149\t1180"]
 
 
 def test_unknown_pairs_are_rejected(tmp_path):

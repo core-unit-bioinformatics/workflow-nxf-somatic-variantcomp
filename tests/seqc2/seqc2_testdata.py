@@ -13,7 +13,7 @@ Subcommands:
 
 Modes (see seqc2_testdata.yaml):
 
-  small    chr22 only, 3 pseudo-samples, BAM slices for one pseudo-sample.
+  small    chr22 only, 3 pseudo-samples, BAM slices (two 1-Mb windows) for one.
            A few tens of MB, runs on a laptop / Raspberry Pi with -profile conda.
            This is the dataset committed to the test-data repository.
   full     genome-wide, 12 pseudo-samples, VCFs only by default (the full BAMs
@@ -267,30 +267,32 @@ class Dataset:
     # BAMs ----------------------------------------------------------------------
 
     def bam_regions(self, wes_bed):
-        """WES targets +/- padding inside the BAM window (small mode)."""
-        window = self.mcfg.get("bam_window")
-        if not window:
+        """WES targets +/- padding inside the BAM windows (small mode)."""
+        windows = self.mcfg.get("bam_windows") or []
+        if not windows:
             return None
-        chrom, span = window.split(":")
-        start, end = (int(x.replace(",", "")) for x in span.split("-"))
         pad = int(self.mcfg.get("bam_padding", 0))
         regions = self.out / "bam" / "bam_regions.bed"
         regions.parent.mkdir(parents=True, exist_ok=True)
-        with open(wes_bed) as fin, regions.open("w") as fout:
-            last = None
-            for line in fin:
-                c, s, e = line.split("\t")[:3]
-                s, e = max(int(s) - pad, start - 1), min(int(e) + pad, end)
-                if c != chrom or e <= s:
-                    continue
-                if last and s <= last[1]:
-                    last[1] = max(last[1], e)
-                    continue
+        with open(wes_bed) as fh:
+            targets = [line.split("\t")[:3] for line in fh if line.strip()]
+        with regions.open("w") as fout:
+            for window in windows:
+                chrom, span = window.split(":")
+                start, end = (int(x.replace(",", "")) for x in span.split("-"))
+                last = None
+                for c, s, e in targets:
+                    s, e = max(int(s) - pad, start - 1), min(int(e) + pad, end)
+                    if c != chrom or e <= s:
+                        continue
+                    if last and s <= last[1]:
+                        last[1] = max(last[1], e)
+                        continue
+                    if last:
+                        fout.write(f"{chrom}\t{last[0]}\t{last[1]}\n")
+                    last = [s, e]
                 if last:
                     fout.write(f"{chrom}\t{last[0]}\t{last[1]}\n")
-                last = [s, e]
-            if last:
-                fout.write(f"{chrom}\t{last[0]}\t{last[1]}\n")
         return regions
 
     def prepare_bams(self, wes_bed):
@@ -315,29 +317,23 @@ class Dataset:
                             os.link(bam, dest)
                             os.link(bai, str(dest) + ".bai")
                     else:
+                        fraction = self.mcfg.get("bam_subsample")
+                        subsample = (
+                            ["--subsample", str(fraction), "--subsample-seed", "42"]
+                            if fraction
+                            else []
+                        )
                         if not Path(str(dest) + ".bai").exists():
                             run(
-                                [
-                                    "samtools",
-                                    "view",
-                                    "-b",
-                                    "-M",
-                                    "-L",
-                                    regions,
-                                    "-o",
-                                    dest,
-                                    "-X",
-                                    self.url(bam_rel),
-                                    self.url(bai_rel),
-                                ]
+                                ["samtools", "view", "-b", "-M", "-L", regions, *subsample]
+                                + ["-o", dest, "-X", self.url(bam_rel), self.url(bai_rel)]
                             )
                             run(["samtools", "index", dest])
+                        note = f"slice of {regions.name}"
+                        if fraction:
+                            note += f", subsampled to {fraction} (seed 42)"
                         self.sources.append(
-                            (
-                                f"bam/{dest.name}",
-                                self.url(bam_rel),
-                                f"n/a (slice of {regions.name})",
-                            )
+                            (f"bam/{dest.name}", self.url(bam_rel), f"n/a ({note})")
                         )
                     result[(pair, tech, role)] = dest
         # samtools caches remote indices in the working directory
@@ -449,7 +445,7 @@ class Dataset:
             "| `reference/` | Reference FASTA (+ .fai/.gzi) |",
             "| `bed/` | WES target BED (Agilent SureSelect v6 + UTR, hg38 liftover), merged |",
             "| `vcf/` | Unfiltered MuTect2 (GATK 3.8) tumor/normal VCFs per pseudo-sample |",
-            "| `bam/` | BAM slices (WES targets +/- padding in the BAM window) |",
+            "| `bam/` | BAM slices (WES targets +/- padding in the BAM windows, subsampled) |",
             "| `truth/` | SEQC2 somatic reference call set v1.2.1 + high-confidence regions |",
             "| `checksums.md5` | md5 of every file in this folder |",
             "",
