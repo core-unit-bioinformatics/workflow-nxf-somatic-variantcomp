@@ -13,6 +13,7 @@ The pipeline is built using [Nextflow](https://www.nextflow.io/) and processes d
 - [Regions](#regions) - Reference check of all target BEDs and the common comparison region
 - [Coverage](#coverage) - Depth of every alignment and per-sample callable regions
 - [Preprocessed VCFs](#preprocessed-vcfs) - Reference check, normalization, harmonization and uniform filtering of every VCF
+- [Benchmark](#benchmark) - Recall, precision and F1 of every technology against the truth technology
 - [MultiQC](#multiqc) - Aggregate report describing results and QC from the whole pipeline
 - [Pipeline information](#pipeline-information) - Report metrics generated during the workflow execution
 
@@ -93,6 +94,45 @@ Every VCF goes through the same steps:
    remaining symbolic alleles are dropped.
 8. Uniform filters (`--filter_pass_only`, `--min_vaf`, `--min_depth`, `--min_alt_reads`) and
    restriction to the comparison region (records overlapping it are kept).
+
+### Benchmark
+
+<details markdown="1">
+<summary>Output files</summary>
+
+- `benchmark/`
+  - `metrics.aggregated.tsv`: **main result**. Per truth/query technology and stratum, the
+    summed counts over all samples and the resulting `micro_recall`, `micro_precision` and
+    `micro_f1`, and the mean and standard deviation of the per-sample values
+    (`macro_*_mean`, `macro_*_sd`). `n_samples` is the number of samples.
+  - `metrics.per_pair.tsv`: the metrics of every sample and technology pair.
+- `benchmark/<sample>/`
+  - `<sample>_<truth>_vs_<query>.metrics.tsv`: metrics of one pair.
+  - `<sample>_<truth>_vs_<query>.variants.tsv`: every compared variant with status `TP`,
+    `FN` (in truth, missed by the query) or `FP` (called by the query only), type, length
+    and VAF, depth and alt reads in both technologies.
+  - `vcfeval/`: rtg vcfeval output per pair (`*.tp.vcf.gz`, `*.tp-baseline.vcf.gz`,
+    `*.fn.vcf.gz`, `*.fp.vcf.gz`, `*.summary.txt`, ROC tables over tumor VAF thresholds).
+
+</details>
+
+The truth technology's calls are the baseline and every other technology is compared with
+it. With `--comparison_mode all_pairs`, all other technologies are also compared pairwise;
+the alphabetically first technology is the baseline.
+
+Matching uses `rtg vcfeval` (haplotype-aware, `--squash-ploidy`, `--decompose`, all records
+of the compare VCFs), so different representations of the same variant still match.
+
+| Stratum type | Strata | Meaning |
+| --- | --- | --- |
+| `overall` | `all` | All compared variants. |
+| `variant_type` | `SNV`, `INDEL` | SNV includes atomized MNVs; INDEL includes insertions, deletions and complex variants. |
+| `truth_vaf` | VAF bins (`--vaf_bins`) | Recall by the VAF of the truth call. Shows the detection limit of the query technology. |
+| `query_vaf` | VAF bins | Precision by the VAF of the query call. Low-VAF false positives show up here. |
+| `match` | `exact`, `position` | Set comparison of the two VCFs by `CHROM/POS/REF/ALT` and by `CHROM/POS` only. Differences to `overall` show how much discordance is representation or a different allele at the same position. |
+
+`recall = TP_baseline / (TP_baseline + FN)`, `precision = TP_call / (TP_call + FP)`, and
+`F1` is their harmonic mean. Undefined values are `NA`.
 
 ### MultiQC
 

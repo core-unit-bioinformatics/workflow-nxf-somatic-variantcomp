@@ -123,6 +123,7 @@ as "present but filtered".
 | --- | --- | --- |
 | `--truth_technology` | required | Technology used as ground truth for all samples. |
 | `--comparison_mode` | `truth` | `truth`: compare every technology with the truth technology. `all_pairs`: additionally compare all technologies pairwise. |
+| `--vaf_bins` | `0,0.05,0.1,0.2,0.5,1` | VAF bin edges for the VAF-stratified metrics. |
 
 ## Running the pipeline
 

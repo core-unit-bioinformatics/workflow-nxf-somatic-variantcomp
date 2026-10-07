@@ -190,6 +190,13 @@
                     "default": "truth",
                     "description": "'truth': compare every technology with the truth technology. 'all_pairs': additionally compare all technologies pairwise.",
                     "fa_icon": "fas fa-project-diagram"
+                },
+                "vaf_bins": {
+                    "type": "string",
+                    "default": "0,0.05,0.1,0.2,0.5,1",
+                    "pattern": "^[0-9.]+(,[0-9.]+)+$",
+                    "description": "Comma-separated VAF bin edges for the VAF-stratified recall (truth VAF) and precision (query VAF).",
+                    "fa_icon": "fas fa-sliders-h"
                 }
             }
         },

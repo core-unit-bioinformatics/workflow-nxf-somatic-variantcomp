@@ -2,6 +2,10 @@
     "-profile test_seqc2": {
         "content": [
             {
+                "AGGREGATE_METRICS": {
+                    "pandas": "2.2.1",
+                    "python": "3.12.15"
+                },
                 "BCFTOOLS_ANNOTATE": {
                     "bcftools": "1.23.1"
                 },
@@ -22,6 +26,10 @@
                 },
                 "BEDTOOLS_SORT": {
                     "bedtools": "2.31.1"
+                },
+                "BENCHMARK_METRICS": {
+                    "pysam": "0.24.1",
+                    "python": "3.12.15"
                 },
                 "CALLABLE_REGIONS": {
                     "bedtools": "2.31.1"
@@ -52,14 +60,74 @@
                     "gzip": 1.14,
                     "mosdepth": "0.3.14"
                 },
+                "RTGTOOLS_FORMAT": {
+                    "rtgtools": 3.13
+                },
+                "RTGTOOLS_VCFEVAL": {
+                    "rtgtools": 3.13
+                },
                 "SAMTOOLS_FAIDX": {
                     "samtools": 1.24
                 },
                 "Workflow": {
-                    "core-unit-bioinformatics/workflow-nxf-somatic-variantcomp": "v0.5.0-dev"
+                    "core-unit-bioinformatics/workflow-nxf-somatic-variantcomp": "v0.6.0-dev"
                 }
             },
             [
+                "benchmark",
+                "benchmark/SEQC2_FD_1",
+                "benchmark/SEQC2_FD_1/SEQC2_FD_1_wgs_vs_wes.metrics.tsv",
+                "benchmark/SEQC2_FD_1/SEQC2_FD_1_wgs_vs_wes.variants.tsv",
+                "benchmark/SEQC2_FD_1/vcfeval",
+                "benchmark/SEQC2_FD_1/vcfeval/SEQC2_FD_1_wgs_vs_wes.fn.vcf.gz",
+                "benchmark/SEQC2_FD_1/vcfeval/SEQC2_FD_1_wgs_vs_wes.fn.vcf.gz.tbi",
+                "benchmark/SEQC2_FD_1/vcfeval/SEQC2_FD_1_wgs_vs_wes.fp.vcf.gz",
+                "benchmark/SEQC2_FD_1/vcfeval/SEQC2_FD_1_wgs_vs_wes.fp.vcf.gz.tbi",
+                "benchmark/SEQC2_FD_1/vcfeval/SEQC2_FD_1_wgs_vs_wes.non_snp_roc.tsv.gz",
+                "benchmark/SEQC2_FD_1/vcfeval/SEQC2_FD_1_wgs_vs_wes.phasing.txt",
+                "benchmark/SEQC2_FD_1/vcfeval/SEQC2_FD_1_wgs_vs_wes.snp_roc.tsv.gz",
+                "benchmark/SEQC2_FD_1/vcfeval/SEQC2_FD_1_wgs_vs_wes.summary.txt",
+                "benchmark/SEQC2_FD_1/vcfeval/SEQC2_FD_1_wgs_vs_wes.tp-baseline.vcf.gz",
+                "benchmark/SEQC2_FD_1/vcfeval/SEQC2_FD_1_wgs_vs_wes.tp-baseline.vcf.gz.tbi",
+                "benchmark/SEQC2_FD_1/vcfeval/SEQC2_FD_1_wgs_vs_wes.tp.vcf.gz",
+                "benchmark/SEQC2_FD_1/vcfeval/SEQC2_FD_1_wgs_vs_wes.tp.vcf.gz.tbi",
+                "benchmark/SEQC2_FD_1/vcfeval/SEQC2_FD_1_wgs_vs_wes.weighted_roc.tsv.gz",
+                "benchmark/SEQC2_IL_1",
+                "benchmark/SEQC2_IL_1/SEQC2_IL_1_wgs_vs_wes.metrics.tsv",
+                "benchmark/SEQC2_IL_1/SEQC2_IL_1_wgs_vs_wes.variants.tsv",
+                "benchmark/SEQC2_IL_1/vcfeval",
+                "benchmark/SEQC2_IL_1/vcfeval/SEQC2_IL_1_wgs_vs_wes.fn.vcf.gz",
+                "benchmark/SEQC2_IL_1/vcfeval/SEQC2_IL_1_wgs_vs_wes.fn.vcf.gz.tbi",
+                "benchmark/SEQC2_IL_1/vcfeval/SEQC2_IL_1_wgs_vs_wes.fp.vcf.gz",
+                "benchmark/SEQC2_IL_1/vcfeval/SEQC2_IL_1_wgs_vs_wes.fp.vcf.gz.tbi",
+                "benchmark/SEQC2_IL_1/vcfeval/SEQC2_IL_1_wgs_vs_wes.non_snp_roc.tsv.gz",
+                "benchmark/SEQC2_IL_1/vcfeval/SEQC2_IL_1_wgs_vs_wes.phasing.txt",
+                "benchmark/SEQC2_IL_1/vcfeval/SEQC2_IL_1_wgs_vs_wes.snp_roc.tsv.gz",
+                "benchmark/SEQC2_IL_1/vcfeval/SEQC2_IL_1_wgs_vs_wes.summary.txt",
+                "benchmark/SEQC2_IL_1/vcfeval/SEQC2_IL_1_wgs_vs_wes.tp-baseline.vcf.gz",
+                "benchmark/SEQC2_IL_1/vcfeval/SEQC2_IL_1_wgs_vs_wes.tp-baseline.vcf.gz.tbi",
+                "benchmark/SEQC2_IL_1/vcfeval/SEQC2_IL_1_wgs_vs_wes.tp.vcf.gz",
+                "benchmark/SEQC2_IL_1/vcfeval/SEQC2_IL_1_wgs_vs_wes.tp.vcf.gz.tbi",
+                "benchmark/SEQC2_IL_1/vcfeval/SEQC2_IL_1_wgs_vs_wes.weighted_roc.tsv.gz",
+                "benchmark/SEQC2_NV_1",
+                "benchmark/SEQC2_NV_1/SEQC2_NV_1_wgs_vs_wes.metrics.tsv",
+                "benchmark/SEQC2_NV_1/SEQC2_NV_1_wgs_vs_wes.variants.tsv",
+                "benchmark/SEQC2_NV_1/vcfeval",
+                "benchmark/SEQC2_NV_1/vcfeval/SEQC2_NV_1_wgs_vs_wes.fn.vcf.gz",
+                "benchmark/SEQC2_NV_1/vcfeval/SEQC2_NV_1_wgs_vs_wes.fn.vcf.gz.tbi",
+                "benchmark/SEQC2_NV_1/vcfeval/SEQC2_NV_1_wgs_vs_wes.fp.vcf.gz",
+                "benchmark/SEQC2_NV_1/vcfeval/SEQC2_NV_1_wgs_vs_wes.fp.vcf.gz.tbi",
+                "benchmark/SEQC2_NV_1/vcfeval/SEQC2_NV_1_wgs_vs_wes.non_snp_roc.tsv.gz",
+                "benchmark/SEQC2_NV_1/vcfeval/SEQC2_NV_1_wgs_vs_wes.phasing.txt",
+                "benchmark/SEQC2_NV_1/vcfeval/SEQC2_NV_1_wgs_vs_wes.snp_roc.tsv.gz",
+                "benchmark/SEQC2_NV_1/vcfeval/SEQC2_NV_1_wgs_vs_wes.summary.txt",
+                "benchmark/SEQC2_NV_1/vcfeval/SEQC2_NV_1_wgs_vs_wes.tp-baseline.vcf.gz",
+                "benchmark/SEQC2_NV_1/vcfeval/SEQC2_NV_1_wgs_vs_wes.tp-baseline.vcf.gz.tbi",
+                "benchmark/SEQC2_NV_1/vcfeval/SEQC2_NV_1_wgs_vs_wes.tp.vcf.gz",
+                "benchmark/SEQC2_NV_1/vcfeval/SEQC2_NV_1_wgs_vs_wes.tp.vcf.gz.tbi",
+                "benchmark/SEQC2_NV_1/vcfeval/SEQC2_NV_1_wgs_vs_wes.weighted_roc.tsv.gz",
+                "benchmark/metrics.aggregated.tsv",
+                "benchmark/metrics.per_pair.tsv",
                 "coverage",
                 "coverage/SEQC2_IL_1",
                 "coverage/SEQC2_IL_1.callable.bed",
@@ -173,6 +241,14 @@
                 "vcf_preprocessed/reference_check/SEQC2_NV_1_wgs.vcf.reference_check.tsv"
             ],
             [
+                "SEQC2_FD_1_wgs_vs_wes.metrics.tsv:md5,2f33277996dcef3ad965403d251d4efc",
+                "SEQC2_FD_1_wgs_vs_wes.variants.tsv:md5,9df97dcf2e327ee7c6de09790cdfbd49",
+                "SEQC2_IL_1_wgs_vs_wes.metrics.tsv:md5,58d757e66b6aae96820150487ee09257",
+                "SEQC2_IL_1_wgs_vs_wes.variants.tsv:md5,9d8d9f67684ff9856f0936556790699b",
+                "SEQC2_NV_1_wgs_vs_wes.metrics.tsv:md5,0e7e0a79fee353fff6cbf9c32895ee6e",
+                "SEQC2_NV_1_wgs_vs_wes.variants.tsv:md5,fea11a71b1f3cce405e3f8d3249d3296",
+                "metrics.aggregated.tsv:md5,151777922e04c8e77b08113bf6190afa",
+                "metrics.per_pair.tsv:md5,196d966b627fed091479fd32afc8334f",
                 "SEQC2_IL_1.callable.bed:md5,27377c2895beb2e9deda2658873040cb",
                 "SEQC2_IL_1_wes_normal.mosdepth.global.dist.txt:md5,67c5bce268d5ae8cdbd98b27cc15fffc",
                 "SEQC2_IL_1_wes_normal.mosdepth.region.dist.txt:md5,feee80cb01cee571474ad2f2c2a95b4a",
@@ -226,7 +302,7 @@
                 "SEQC2_NV_1_wgs.vcf.reference_check.tsv:md5,5a7b19686ea76fc90f31b6c10130a984"
             ]
         ],
-        "timestamp": "2026-10-07T20:19:30.3885171",
+        "timestamp": "2026-10-07T21:31:49.848959603",
         "meta": {
             "nf-test": "0.9.5",
             "nextflow": "26.04.4"

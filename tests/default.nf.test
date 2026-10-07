@@ -19,6 +19,9 @@ nextflow_pipeline {
             def stable_content = getAllFilesFromDir(params.outdir, ignoreFile: 'tests/.nftignore')
             // samplesheet_validated.tsv holds absolute paths: check its structure instead of its content
             def validated = path("$outputDir/pipeline_info/samplesheet_validated.tsv").readLines()
+            def overallCounts = { metrics ->
+                path(metrics).readLines().find { line -> line.contains('\toverall\tall\t') }.tokenize('\t')[5..8]
+            }
             assert workflow.success
             assertAll(
                 { assert validated.size() == 7 },
@@ -26,6 +29,11 @@ nextflow_pipeline {
                 // VCF headers contain bcftools command lines with dates: check records instead
                 { assert path("$outputDir/vcf_preprocessed/S1/S1_wes.compare.vcf.gz").linesGzip.count { line -> !line.startsWith('#') } == 10 },
                 { assert path("$outputDir/vcf_preprocessed/S1/S1_panel.compare.vcf.gz").linesGzip.count { line -> !line.startsWith('#') } == 9 },
+                // benchmark counts as designed in design.tsv (tp_baseline, fn, tp_call, fp)
+                { assert overallCounts("$outputDir/benchmark/S1/S1_wgs_vs_wes.metrics.tsv") == ['9', '1', '9', '1'] },
+                { assert overallCounts("$outputDir/benchmark/S1/S1_wgs_vs_panel.metrics.tsv") == ['8', '2', '8', '1'] },
+                { assert overallCounts("$outputDir/benchmark/S2/S2_wgs_vs_wes.metrics.tsv") == ['2', '1', '2', '1'] },
+                { assert overallCounts("$outputDir/benchmark/S2/S2_wgs_vs_panel.metrics.tsv") == ['3', '0', '3', '1'] },
                 { assert validated.count { line -> line.contains('\twgs\twgs\t') && line.contains('\ttrue\t') } == 2 },
                 { assert snapshot(
                     // pipeline versions.yml file for multiqc from which Nextflow version is removed because we test pipelines on multiple Nextflow versions

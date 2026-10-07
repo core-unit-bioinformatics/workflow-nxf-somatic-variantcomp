@@ -8,6 +8,7 @@ include { PREPARE_REFERENCE      } from '../subworkflows/local/prepare_reference
 include { PREPARE_REGIONS        } from '../subworkflows/local/prepare_regions'
 include { PREPROCESS_VCF         } from '../subworkflows/local/preprocess_vcf'
 include { COVERAGE               } from '../subworkflows/local/coverage'
+include { BENCHMARK              } from '../subworkflows/local/benchmark'
 include { paramsSummaryMap       } from 'plugin/nf-schema'
 include { paramsSummaryMultiqc   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { softwareVersionsToYAML } from '../subworkflows/nf-core/utils_nfcore_pipeline'
@@ -100,6 +101,16 @@ workflow VARIANTCOMP {
         PREPARE_REFERENCE.out.reference,
         PREPARE_REFERENCE.out.genome_bed,
         COVERAGE.out.regions
+    )
+
+    //
+    // SUBWORKFLOW: compare every technology with the truth technology (rtg vcfeval) and compute metrics
+    //
+    BENCHMARK(
+        PREPROCESS_VCF.out.compare,
+        COVERAGE.out.regions,
+        PREPARE_REFERENCE.out.reference,
+        params.comparison_mode
     )
 
     //

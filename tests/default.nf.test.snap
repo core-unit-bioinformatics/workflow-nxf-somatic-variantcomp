@@ -2,6 +2,10 @@
     "-profile test": {
         "content": [
             {
+                "AGGREGATE_METRICS": {
+                    "pandas": "2.2.1",
+                    "python": "3.12.15"
+                },
                 "BCFTOOLS_ANNOTATE": {
                     "bcftools": "1.23.1"
                 },
@@ -23,6 +27,10 @@
                 "BEDTOOLS_SORT": {
                     "bedtools": "2.31.1"
                 },
+                "BENCHMARK_METRICS": {
+                    "pysam": "0.24.1",
+                    "python": "3.12.15"
+                },
                 "CHECK_REFERENCE_BED": {
                     "pysam": "0.24.1",
                     "python": "3.12.15"
@@ -38,14 +46,87 @@
                     "pysam": "0.24.1",
                     "python": "3.12.15"
                 },
+                "RTGTOOLS_FORMAT": {
+                    "rtgtools": 3.13
+                },
+                "RTGTOOLS_VCFEVAL": {
+                    "rtgtools": 3.13
+                },
                 "SAMTOOLS_FAIDX": {
                     "samtools": 1.24
                 },
                 "Workflow": {
-                    "core-unit-bioinformatics/workflow-nxf-somatic-variantcomp": "v0.5.0-dev"
+                    "core-unit-bioinformatics/workflow-nxf-somatic-variantcomp": "v0.6.0-dev"
                 }
             },
             [
+                "benchmark",
+                "benchmark/S1",
+                "benchmark/S1/S1_wgs_vs_panel.metrics.tsv",
+                "benchmark/S1/S1_wgs_vs_panel.variants.tsv",
+                "benchmark/S1/S1_wgs_vs_wes.metrics.tsv",
+                "benchmark/S1/S1_wgs_vs_wes.variants.tsv",
+                "benchmark/S1/vcfeval",
+                "benchmark/S1/vcfeval/S1_wgs_vs_panel.fn.vcf.gz",
+                "benchmark/S1/vcfeval/S1_wgs_vs_panel.fn.vcf.gz.tbi",
+                "benchmark/S1/vcfeval/S1_wgs_vs_panel.fp.vcf.gz",
+                "benchmark/S1/vcfeval/S1_wgs_vs_panel.fp.vcf.gz.tbi",
+                "benchmark/S1/vcfeval/S1_wgs_vs_panel.non_snp_roc.tsv.gz",
+                "benchmark/S1/vcfeval/S1_wgs_vs_panel.phasing.txt",
+                "benchmark/S1/vcfeval/S1_wgs_vs_panel.snp_roc.tsv.gz",
+                "benchmark/S1/vcfeval/S1_wgs_vs_panel.summary.txt",
+                "benchmark/S1/vcfeval/S1_wgs_vs_panel.tp-baseline.vcf.gz",
+                "benchmark/S1/vcfeval/S1_wgs_vs_panel.tp-baseline.vcf.gz.tbi",
+                "benchmark/S1/vcfeval/S1_wgs_vs_panel.tp.vcf.gz",
+                "benchmark/S1/vcfeval/S1_wgs_vs_panel.tp.vcf.gz.tbi",
+                "benchmark/S1/vcfeval/S1_wgs_vs_panel.weighted_roc.tsv.gz",
+                "benchmark/S1/vcfeval/S1_wgs_vs_wes.fn.vcf.gz",
+                "benchmark/S1/vcfeval/S1_wgs_vs_wes.fn.vcf.gz.tbi",
+                "benchmark/S1/vcfeval/S1_wgs_vs_wes.fp.vcf.gz",
+                "benchmark/S1/vcfeval/S1_wgs_vs_wes.fp.vcf.gz.tbi",
+                "benchmark/S1/vcfeval/S1_wgs_vs_wes.non_snp_roc.tsv.gz",
+                "benchmark/S1/vcfeval/S1_wgs_vs_wes.phasing.txt",
+                "benchmark/S1/vcfeval/S1_wgs_vs_wes.snp_roc.tsv.gz",
+                "benchmark/S1/vcfeval/S1_wgs_vs_wes.summary.txt",
+                "benchmark/S1/vcfeval/S1_wgs_vs_wes.tp-baseline.vcf.gz",
+                "benchmark/S1/vcfeval/S1_wgs_vs_wes.tp-baseline.vcf.gz.tbi",
+                "benchmark/S1/vcfeval/S1_wgs_vs_wes.tp.vcf.gz",
+                "benchmark/S1/vcfeval/S1_wgs_vs_wes.tp.vcf.gz.tbi",
+                "benchmark/S1/vcfeval/S1_wgs_vs_wes.weighted_roc.tsv.gz",
+                "benchmark/S2",
+                "benchmark/S2/S2_wgs_vs_panel.metrics.tsv",
+                "benchmark/S2/S2_wgs_vs_panel.variants.tsv",
+                "benchmark/S2/S2_wgs_vs_wes.metrics.tsv",
+                "benchmark/S2/S2_wgs_vs_wes.variants.tsv",
+                "benchmark/S2/vcfeval",
+                "benchmark/S2/vcfeval/S2_wgs_vs_panel.fn.vcf.gz",
+                "benchmark/S2/vcfeval/S2_wgs_vs_panel.fn.vcf.gz.tbi",
+                "benchmark/S2/vcfeval/S2_wgs_vs_panel.fp.vcf.gz",
+                "benchmark/S2/vcfeval/S2_wgs_vs_panel.fp.vcf.gz.tbi",
+                "benchmark/S2/vcfeval/S2_wgs_vs_panel.non_snp_roc.tsv.gz",
+                "benchmark/S2/vcfeval/S2_wgs_vs_panel.phasing.txt",
+                "benchmark/S2/vcfeval/S2_wgs_vs_panel.snp_roc.tsv.gz",
+                "benchmark/S2/vcfeval/S2_wgs_vs_panel.summary.txt",
+                "benchmark/S2/vcfeval/S2_wgs_vs_panel.tp-baseline.vcf.gz",
+                "benchmark/S2/vcfeval/S2_wgs_vs_panel.tp-baseline.vcf.gz.tbi",
+                "benchmark/S2/vcfeval/S2_wgs_vs_panel.tp.vcf.gz",
+                "benchmark/S2/vcfeval/S2_wgs_vs_panel.tp.vcf.gz.tbi",
+                "benchmark/S2/vcfeval/S2_wgs_vs_panel.weighted_roc.tsv.gz",
+                "benchmark/S2/vcfeval/S2_wgs_vs_wes.fn.vcf.gz",
+                "benchmark/S2/vcfeval/S2_wgs_vs_wes.fn.vcf.gz.tbi",
+                "benchmark/S2/vcfeval/S2_wgs_vs_wes.fp.vcf.gz",
+                "benchmark/S2/vcfeval/S2_wgs_vs_wes.fp.vcf.gz.tbi",
+                "benchmark/S2/vcfeval/S2_wgs_vs_wes.non_snp_roc.tsv.gz",
+                "benchmark/S2/vcfeval/S2_wgs_vs_wes.phasing.txt",
+                "benchmark/S2/vcfeval/S2_wgs_vs_wes.snp_roc.tsv.gz",
+                "benchmark/S2/vcfeval/S2_wgs_vs_wes.summary.txt",
+                "benchmark/S2/vcfeval/S2_wgs_vs_wes.tp-baseline.vcf.gz",
+                "benchmark/S2/vcfeval/S2_wgs_vs_wes.tp-baseline.vcf.gz.tbi",
+                "benchmark/S2/vcfeval/S2_wgs_vs_wes.tp.vcf.gz",
+                "benchmark/S2/vcfeval/S2_wgs_vs_wes.tp.vcf.gz.tbi",
+                "benchmark/S2/vcfeval/S2_wgs_vs_wes.weighted_roc.tsv.gz",
+                "benchmark/metrics.aggregated.tsv",
+                "benchmark/metrics.per_pair.tsv",
                 "coverage",
                 "multiqc",
                 "multiqc/multiqc_data",
@@ -105,6 +186,16 @@
                 "vcf_preprocessed/reference_check/S2_wgs.vcf.reference_check.tsv"
             ],
             [
+                "S1_wgs_vs_panel.metrics.tsv:md5,af4eeda87a45d90edeca2ff0e1add7fe",
+                "S1_wgs_vs_panel.variants.tsv:md5,4406443638070d6c0c5bff04bcf5add9",
+                "S1_wgs_vs_wes.metrics.tsv:md5,c152736e37b9fada98d41a4d932547a3",
+                "S1_wgs_vs_wes.variants.tsv:md5,17a16b59e2acf68c17293722a6fecd62",
+                "S2_wgs_vs_panel.metrics.tsv:md5,5e52eaedd1c2e432dab58867ac8628c8",
+                "S2_wgs_vs_panel.variants.tsv:md5,aff4e27a779ae6ce1ccc7431782d0b88",
+                "S2_wgs_vs_wes.metrics.tsv:md5,50f56c1863ba21972c893c8e24d531c6",
+                "S2_wgs_vs_wes.variants.tsv:md5,ae68af0e73c76688947083a35c0063a2",
+                "metrics.aggregated.tsv:md5,75181ad30a7ca37072096ba2a51ec17f",
+                "metrics.per_pair.tsv:md5,897622dbc63cc600a354a8ae1c0b987e",
                 "multiqc_citations.txt:md5,4c806e63a283ec1b7e78cdae3a923d4f",
                 "common_targets.bed:md5,05beabccb7d0af813ec94b6dad30a3c6",
                 "common_targets.summary.tsv:md5,354fd9bf32178ede1809d465548a223c",
@@ -120,7 +211,7 @@
                 "S2_wgs.vcf.reference_check.tsv:md5,87b5af0a0b0372af9e6d78dd0dcd98f8"
             ]
         ],
-        "timestamp": "2026-10-07T20:05:01.720676963",
+        "timestamp": "2026-10-07T21:14:03.222909633",
         "meta": {
             "nf-test": "0.9.5",
             "nextflow": "26.04.4"

@@ -11,3 +11,4 @@ pipeline_info/*.{html,json,txt,yml}
 pipeline_info/samplesheet_validated.tsv
 vcf_preprocessed/**/*.vcf.gz
 vcf_preprocessed/**/*.vcf.gz.tbi
+benchmark/**/vcfeval/*
