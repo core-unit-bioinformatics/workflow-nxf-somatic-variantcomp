@@ -31,6 +31,7 @@ workflow PIPELINE_INITIALISATION {
     nextflow_cli_args //   array: List of positional nextflow CLI args
     outdir            //  string: The output directory where the results will be saved
     input             //  string: Path to input samplesheet
+    truth_technology  //  string: Technology used as ground truth
     help              // boolean: Display help message and exit
     help_full         // boolean: Show the full help message
     show_hidden       // boolean: Show hidden parameters in the help message
@@ -59,7 +60,7 @@ workflow PIPELINE_INITIALISATION {
         before_text = before_text.replaceAll(/\033\[[0-9;]*m/, '')
     }
 
-    command = "nextflow run ${workflow.manifest.name} -profile <docker/singularity/.../institute> --input samplesheet.csv --outdir <OUTDIR>"
+    command = "nextflow run ${workflow.manifest.name} -profile <docker/singularity/.../institute> --input samplesheet.tsv --truth_technology <technology> --outdir <OUTDIR>"
 
     UTILS_NFSCHEMA_PLUGIN (
         workflow,
@@ -85,25 +86,21 @@ workflow PIPELINE_INITIALISATION {
     // Create channel from input file provided through params.input
     //
 
-    channel
-        .fromList(samplesheetToList(input, "${projectDir}/assets/schema_input.json"))
-        .map {
-            meta, fastq_1, fastq_2 ->
-                if (!fastq_2) {
-                    return [ meta.id, meta + [ single_end:true ], [ fastq_1 ] ]
-                } else {
-                    return [ meta.id, meta + [ single_end:false ], [ fastq_1, fastq_2 ] ]
-                }
-        }
-        .groupTuple()
-        .map { samplesheet ->
-            validateInputSamplesheet(samplesheet)
-        }
-        .map {
-            meta, fastqs ->
-                return [ meta, fastqs.flatten() ]
-        }
-        .set { ch_samplesheet }
+    // Relative paths are resolved against the samplesheet's directory, 'n/a' marks
+    // an empty optional field. Rows are checked across the whole samplesheet.
+    //
+    def entries = buildSamplesheetEntries(
+        samplesheetToList(input, "${projectDir}/assets/schema_input.json"),
+        file(input).parent,
+        truth_technology
+    )
+    def errors = samplesheetErrors(entries, truth_technology) + missingSamplesheetFiles(entries)
+    if (errors) {
+        error("Invalid samplesheet '${input}':\n  - " + errors.join("\n  - "))
+    }
+    samplesheetWarnings(entries).each { msg -> log.warn(msg) }
+
+    ch_samplesheet = channel.fromList(entries)
 
     emit:
     samplesheet = ch_samplesheet
@@ -144,19 +141,149 @@ workflow PIPELINE_COMPLETION {
 */
 
 //
-// Validate channels from input samplesheet
+// Samplesheet handling
 //
-def validateInputSamplesheet(input) {
-    def (metas, fastqs) = input[1..2]
+// A samplesheet entry is a list:
+//   [ meta, vcf, vcf_index, tumor_bam, tumor_bai, normal_bam, normal_bai, target_bed ]
+// with meta = [ id, sample, technology, library_type, tumor_id, normal_id, caller, is_truth ].
+// Empty optional fields are represented by [].
+//
 
-    // Check that multiple runs of the same sample are of the same datatype i.e. single-end / paired-end
-    def endedness_ok = metas.collect{ meta -> meta.single_end }.unique().size == 1
-    if (!endedness_ok) {
-        error("Please check input samplesheet -> Multiple runs of a sample must be of the same datatype i.e. single-end or paired-end: ${metas[0].id}")
+//
+// Resolve a samplesheet path: 'n/a'/empty -> [], URLs and absolute paths as given,
+// relative paths against the samplesheet's directory
+//
+def resolveSamplesheetPath(value, base_dir) {
+    def str = value instanceof List ? '' : (value == null ? '' : value.toString().trim())
+    if (str == '' || str == 'n/a') {
+        return []
+    }
+    if (str ==~ /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\/.*/ || str.startsWith('/')) {
+        return file(str)
+    }
+    return file("${base_dir}/${str}")
+}
+
+//
+// Convert the rows returned by samplesheetToList into samplesheet entries
+//
+def buildSamplesheetEntries(rows, base_dir, truth_technology) {
+    return rows.collect { row ->
+        def meta = row[0]
+        def paths = row[1..-1].collect { value -> resolveSamplesheetPath(value, base_dir) }
+        def normal_id = meta.normal_id in [null, '', 'n/a'] ? null : meta.normal_id
+        def new_meta = meta + [
+            id       : "${meta.sample}_${meta.technology}".toString(),
+            normal_id: normal_id,
+            caller   : meta.caller ?: 'unknown',
+            is_truth : meta.technology == truth_technology,
+        ]
+        [new_meta] + paths
+    }
+}
+
+//
+// Cross-row checks; returns a list of error messages (empty if valid)
+//
+def samplesheetErrors(entries, truth_technology) {
+    def errors = []
+    def metas = entries.collect { entry -> entry[0] }
+
+    metas.groupBy { meta -> meta.id }.each { _id, group ->
+        if (group.size() > 1) {
+            errors << "Duplicate rows for sample '${group[0].sample}' and technology '${group[0].technology}'"
+        }
     }
 
-    return [ metas[0], fastqs ]
+    def technologies = metas.collect { meta -> meta.technology }.unique()
+    if (technologies.size() < 2) {
+        errors << "At least two technologies are required, found: ${technologies.join(', ')}"
+    }
+    if (!truth_technology) {
+        errors << "No truth technology given (--truth_technology)"
+    }
+    else if (!(truth_technology in technologies)) {
+        errors << "Truth technology '${truth_technology}' is not in the samplesheet (technologies: ${technologies.join(', ')})"
+    }
+    else {
+        metas.groupBy { meta -> meta.sample }.each { sample, group ->
+            def sample_techs = group.collect { meta -> meta.technology }
+            if (!(truth_technology in sample_techs)) {
+                errors << "Sample '${sample}' has no row for the truth technology '${truth_technology}'"
+            }
+            else if (sample_techs.unique().size() < 2) {
+                errors << "Sample '${sample}' has no technology to compare with the truth technology '${truth_technology}'"
+            }
+        }
+    }
+
+    entries.groupBy { entry -> entry[0].technology }.each { technology, group ->
+        def beds = group.collect { entry -> entry[7] ? entry[7].toUriString() : 'n/a' }.unique()
+        if (beds.size() > 1) {
+            errors << "Technology '${technology}' must use one target BED for all samples, found: ${beds.join(', ')}"
+        }
+        def library_types = group.collect { entry -> entry[0].library_type }.unique()
+        if (library_types.size() > 1) {
+            errors << "Technology '${technology}' must have one library_type, found: ${library_types.join(', ')}"
+        }
+        if (library_types.any { type -> type != 'wgs' } && group.any { entry -> !entry[7] }) {
+            errors << "Technology '${technology}' (library_type ${library_types.join('/')}) requires a target_bed"
+        }
+    }
+
+    entries.each { entry ->
+        def meta = entry[0]
+        if (meta.normal_id && meta.tumor_id == meta.normal_id) {
+            errors << "Row '${meta.id}': tumor_id and normal_id are identical ('${meta.tumor_id}')"
+        }
+        if (entry[4] && !entry[3]) {
+            errors << "Row '${meta.id}': tumor_bai given without tumor_bam"
+        }
+        if (entry[6] && !entry[5]) {
+            errors << "Row '${meta.id}': normal_bai given without normal_bam"
+        }
+        if (entry[5] && !entry[3]) {
+            errors << "Row '${meta.id}': normal_bam given without tumor_bam"
+        }
+        if (entry[5] && !meta.normal_id) {
+            errors << "Row '${meta.id}': normal_bam given but normal_id is 'n/a'"
+        }
+    }
+    return errors.collect { msg -> msg.toString() }
 }
+
+//
+// Check that all files referenced in the samplesheet exist
+//
+def missingSamplesheetFiles(entries) {
+    def columns = ['vcf', 'vcf_index', 'tumor_bam', 'tumor_bai', 'normal_bam', 'normal_bai', 'target_bed']
+    def errors = []
+    entries.each { entry ->
+        columns.eachWithIndex { column, idx ->
+            def path = entry[idx + 1]
+            if (path && !path.exists()) {
+                errors << "Row '${entry[0].id}': ${column} not found: ${path.toUriString()}"
+            }
+        }
+    }
+    return errors.collect { msg -> msg.toString() }
+}
+
+//
+// Non-fatal samplesheet issues
+//
+def samplesheetWarnings(entries) {
+    def warnings = []
+    def with_bam = entries.findAll { entry -> entry[3] }
+    if (with_bam && with_bam.size() < entries.size()) {
+        warnings << "Alignments are given for only ${with_bam.size()} of ${entries.size()} rows. Coverage-based callable regions and read-evidence checks need alignments for all technologies of a sample."
+    }
+    entries.findAll { entry -> !entry[0].normal_id }.each { entry ->
+        warnings << "Row '${entry[0].id}': no normal sample (tumor-only). Germline variants may appear as false positives."
+    }
+    return warnings.collect { msg -> msg.toString() }
+}
+
 //
 // Generate methods description for MultiQC
 //

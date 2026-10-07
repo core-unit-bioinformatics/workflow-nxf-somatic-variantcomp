@@ -64,6 +64,7 @@ workflow {
         args,
         params.outdir,
         params.input,
+        params.truth_technology,
         params.help,
         params.help_full,
         params.show_hidden

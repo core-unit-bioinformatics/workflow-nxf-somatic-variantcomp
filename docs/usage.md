@@ -4,61 +4,72 @@
 
 ## Introduction
 
-<!-- TODO nf-core: Add documentation about anything specific to running your pipeline. For general topics, please point to (and add to) the main nf-core website. -->
+The pipeline compares somatic small-variant calls of the **same tumor/normal pairs**
+sequenced with **different technologies** (e.g. WGS, WES, targeted panels). One
+technology is the ground truth for all samples (`--truth_technology`). The design is
+described in [`pipeline-plan.md`](pipeline-plan.md).
 
 ## Samplesheet input
 
-You will need to create a samplesheet with information about the samples you would like to analyse before running the pipeline. Use this parameter to specify its location. It has to be a comma-separated file with 3 columns, and a header row as shown in the examples below.
+The samplesheet is a **tab-separated** file (`.tsv`) with a header row and one row per
+sample and technology:
 
 ```bash
---input '[path to samplesheet file]'
+--input '[path to samplesheet.tsv]' --truth_technology wgs
 ```
 
-### Multiple runs of the same sample
-
-The `sample` identifiers have to be the same when you have re-sequenced the same sample more than once e.g. to increase sequencing depth. The pipeline will concatenate the raw reads before performing any downstream analysis. Below is an example for the same sample sequenced across 3 lanes:
-
-```csv title="samplesheet.csv"
-sample,fastq_1,fastq_2
-CONTROL_REP1,AEG588A1_S1_L002_R1_001.fastq.gz,AEG588A1_S1_L002_R2_001.fastq.gz
-CONTROL_REP1,AEG588A1_S1_L003_R1_001.fastq.gz,AEG588A1_S1_L003_R2_001.fastq.gz
-CONTROL_REP1,AEG588A1_S1_L004_R1_001.fastq.gz,AEG588A1_S1_L004_R2_001.fastq.gz
+```tsv title="samplesheet.tsv"
+sample	technology	library_type	tumor_id	normal_id	caller	vcf	vcf_index	tumor_bam	tumor_bai	normal_bam	normal_bai	target_bed
+P01	wgs	wgs	P01_T	P01_N	dragen-4.4.4	vcf/P01_wgs.hard-filtered.vcf.gz	n/a	n/a	n/a	n/a	n/a	n/a
+P01	wes	capture	P01_T	P01_N	dragen-4.4.4	vcf/P01_wes.hard-filtered.vcf.gz	n/a	n/a	n/a	n/a	n/a	bed/exome_v2.bed
+P01	panel	amplicon	P01_T	P01_N	dragen-4.4.4	vcf/P01_panel.hard-filtered.vcf.gz	n/a	n/a	n/a	n/a	n/a	bed/panel_v1.bed
 ```
 
-### Full samplesheet
+| Column | Required | Description |
+| --- | --- | --- |
+| `sample` | yes | Patient/case identifier, identical for all technologies of the same tumor/normal pair. Allowed characters: `A-Z a-z 0-9 _ . -`. |
+| `technology` | yes | Technology label, e.g. `wgs`, `wes`, `panel-oca`. Allowed characters: `a-z 0-9 -`. |
+| `library_type` | yes | `wgs`, `capture` or `amplicon`. Controls how coverage is computed later on (duplicates are kept for amplicon data). |
+| `tumor_id` | yes | Name of the tumor sample column in the VCF. |
+| `normal_id` | yes | Name of the normal sample column in the VCF, `n/a` for tumor-only calls. |
+| `caller` | no | Variant caller and version, e.g. `dragen-4.4.4` (default `unknown`). Reported only. |
+| `vcf` | yes | **Unfiltered** somatic VCF (all records, FILTER column set by the caller), e.g. DRAGEN `*.hard-filtered.vcf.gz`. |
+| `vcf_index` | no | `.tbi`/`.csi` index of the VCF. |
+| `tumor_bam`, `tumor_bai` | no | Tumor alignment (BAM/CRAM) and index. Enables coverage-based callable regions and read-evidence checks. |
+| `normal_bam`, `normal_bai` | no | Normal alignment and index. |
+| `target_bed` | for `capture`/`amplicon` | Target regions of the technology. `n/a` = genome-wide (WGS). |
 
-The pipeline will auto-detect whether a sample is single- or paired-end using the information provided in the samplesheet. The samplesheet can have as many columns as you desire, however, there is a strict requirement for the first 3 columns to match those defined in the table below.
+Rules:
 
-A final samplesheet file consisting of both single- and paired-end data may look something like the one below. This is for 6 samples, where `TREATMENT_REP3` has been sequenced twice.
+- Empty optional fields are written as `n/a`.
+- Relative paths are resolved against the directory of the samplesheet, so a
+  project folder with samplesheet, VCFs and BEDs can be moved as a whole. Absolute
+  paths and URLs are used as given.
+- At least two technologies are needed, and every sample needs a row for the truth
+  technology and at least one other technology.
+- Each `sample`/`technology` combination may occur only once.
+- All rows of a technology must use the same `target_bed` and `library_type`.
+- All checks run before any process starts. All problems are reported at once.
 
-```csv title="samplesheet.csv"
-sample,fastq_1,fastq_2
-CONTROL_REP1,AEG588A1_S1_L002_R1_001.fastq.gz,AEG588A1_S1_L002_R2_001.fastq.gz
-CONTROL_REP2,AEG588A2_S2_L002_R1_001.fastq.gz,AEG588A2_S2_L002_R2_001.fastq.gz
-CONTROL_REP3,AEG588A3_S3_L002_R1_001.fastq.gz,AEG588A3_S3_L002_R2_001.fastq.gz
-TREATMENT_REP1,AEG588A4_S4_L003_R1_001.fastq.gz,
-TREATMENT_REP2,AEG588A5_S5_L003_R1_001.fastq.gz,
-TREATMENT_REP3,AEG588A6_S6_L003_R1_001.fastq.gz,
-TREATMENT_REP3,AEG588A6_S6_L004_R1_001.fastq.gz,
-```
+The validated samplesheet with resolved paths is written to
+`<outdir>/pipeline_info/samplesheet_validated.tsv`.
 
-| Column    | Description                                                                                                                                                                            |
-| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sample`  | Custom sample name. This entry will be identical for multiple sequencing libraries/runs from the same sample. Spaces in sample names are automatically converted to underscores (`_`). |
-| `fastq_1` | Full path to FastQ file for Illumina short reads 1. File has to be gzipped and have the extension ".fastq.gz" or ".fq.gz".                                                             |
-| `fastq_2` | Full path to FastQ file for Illumina short reads 2. File has to be gzipped and have the extension ".fastq.gz" or ".fq.gz".                                                             |
+## Comparison options
 
-An [example samplesheet](../assets/samplesheet.csv) has been provided with the pipeline.
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `--truth_technology` | required | Technology used as ground truth for all samples. |
+| `--comparison_mode` | `truth` | `truth`: compare every technology with the truth technology. `all_pairs`: additionally compare all technologies pairwise. |
 
 ## Running the pipeline
 
 The typical command for running the pipeline is as follows:
 
 ```bash
-nextflow run core-unit-bioinformatics/workflow-nxf-somatic-variantcomp --input ./samplesheet.csv --outdir ./results  -profile docker
+nextflow run core-unit-bioinformatics/workflow-nxf-somatic-variantcomp --input ./samplesheet.tsv --truth_technology wgs --outdir ./results -profile singularity
 ```
 
-This will launch the pipeline with the `docker` configuration profile. See below for more information about profiles.
+This will launch the pipeline with the `singularity` configuration profile. See below for more information about profiles.
 
 Note that the pipeline will create the following files in your working directory:
 
@@ -85,7 +96,8 @@ nextflow run core-unit-bioinformatics/workflow-nxf-somatic-variantcomp -profile 
 with:
 
 ```yaml title="params.yaml"
-input: './samplesheet.csv'
+input: './samplesheet.tsv'
+truth_technology: 'wgs'
 outdir: './results/'
 <...>
 ```

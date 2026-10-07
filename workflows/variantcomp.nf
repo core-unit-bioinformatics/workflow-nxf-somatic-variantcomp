@@ -30,6 +30,27 @@ workflow VARIANTCOMP {
     def ch_multiqc_files = channel.empty()
 
     //
+    // Record the validated samplesheet (resolved paths) for provenance
+    //
+    def samplesheet_columns = ['sample', 'technology', 'library_type', 'tumor_id', 'normal_id', 'caller', 'is_truth',
+                               'vcf', 'vcf_index', 'tumor_bam', 'tumor_bai', 'normal_bam', 'normal_bai', 'target_bed']
+    ch_samplesheet
+        .map { entry ->
+            def meta = entry[0]
+            def values = ['sample', 'technology', 'library_type', 'tumor_id', 'normal_id', 'caller', 'is_truth']
+                .collect { key -> meta[key] == null ? 'n/a' : meta[key].toString() }
+            values += entry[1..-1].collect { path -> path ? path.toUriString() : 'n/a' }
+            values.join('\t')
+        }
+        .collectFile(
+            name: 'samplesheet_validated.tsv',
+            storeDir: "${outdir}/pipeline_info",
+            seed: samplesheet_columns.join('\t'),
+            newLine: true,
+            sort: true
+        )
+
+    //
     // Collate and save software versions
     //
     def topic_versions = channel.topic("versions")
