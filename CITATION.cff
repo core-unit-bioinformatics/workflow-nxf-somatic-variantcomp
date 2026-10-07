@@ -1,0 +1,13 @@
+cff-version: 1.2.0
+message: "If you use this workflow, please cite it as below."
+title: "workflow-nxf-somatic-variantcomp"
+abstract: >-
+  Nextflow (nf-core template) workflow to compare somatic variant calls of the
+  same tumor/normal pairs across sequencing technologies (WGS, WES, panel).
+authors:
+  - family-names: Horny
+    given-names: Kai
+version: 0.1.0dev
+date-released: "2026-10-07"
+license: MIT
+repository-code: "https://github.com/core-unit-bioinformatics/workflow-nxf-somatic-variantcomp"

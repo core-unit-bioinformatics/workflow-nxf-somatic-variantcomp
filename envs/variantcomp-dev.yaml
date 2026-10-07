@@ -1,0 +1,27 @@
+name: variantcomp-dev
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  # workflow engine and nf-core tooling
+  - nextflow=26.04.4
+  - nf-core=4.1.0
+  - nf-test
+  # python for bin/ scripts and test-data preparation
+  - python=3.12
+  - pysam
+  - pandas
+  - scipy
+  - matplotlib
+  - upsetplot
+  - pyyaml
+  - requests
+  - pytest
+  - ruff
+  # bioinformatics tools (all have linux-aarch64 or noarch builds)
+  - bcftools=1.24
+  - samtools=1.24
+  - htslib=1.24
+  - bedtools=2.31.1
+  - mosdepth=0.3.14
+  - rtg-tools=3.13

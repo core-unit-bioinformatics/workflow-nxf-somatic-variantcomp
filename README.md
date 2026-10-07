@@ -1,76 +1,87 @@
-# core-unit-bioinformatics/variantcomp
+# core-unit-bioinformatics/workflow-nxf-somatic-variantcomp
+
+> [!WARNING]
+> Under active development (`v0.1.0-dev`). Not ready for production use. See
+> [`docs/pipeline-plan.md`](docs/pipeline-plan.md) for the design and roadmap.
 
 ## Introduction
 
-**core-unit-bioinformatics/variantcomp** is a bioinformatics pipeline that ...
+**workflow-nxf-somatic-variantcomp** compares somatic small-variant calls (SNVs and indels)
+of the **same tumor/normal pairs** sequenced with **different technologies**
+(e.g. WGS, WES, targeted panels). One technology is the ground truth for all samples.
+The pipeline reports recall, precision and F1, and explains *why* variants differ
+between technologies.
 
-<!-- TODO nf-core:
-   Complete this sentence with a 2-3 sentence summary of what types of data the pipeline ingests, a brief overview of the
-   major pipeline sections and the types of output it produces. You're giving an overview to someone new
-   to nf-core here, in 15-20 seconds. For an example, see https://github.com/nf-core/rnaseq/blob/master/README.md#introduction
--->
+Unlike benchmarking pipelines that compare different callers on the same data
+(e.g. nf-core/variantbenchmarking), here the input data differ. Meaningful numbers
+therefore require:
 
-<!-- TODO nf-core: Include a figure that guides the user through the major workflow steps. Many nf-core
-     workflows use the "tube map" design for that. See https://nf-co.re/docs/community/brand/workflow-schematics#examples for examples.   -->
-<!-- TODO nf-core: Fill in short bullet-pointed list of the default steps in the pipeline -->2. Present QC for raw reads ([`MultiQC`](http://multiqc.info/))
+1. Checking that every input is on the same reference genome, and harmonizing it
+2. Identical normalization of all VCFs (split, left-align, atomize, deduplicate, tag
+   harmonization) and identical filtering
+3. Restriction to the intersection of all target regions and, if BAMs are given, to
+   regions callable in all technologies
+4. VAF-stratified, detection-power-aware metrics
+5. Classification and annotation of every discordant variant (type, gene, repeat
+   context, coverage, filter status, read evidence)
+
+Planned workflow steps (see the plan for details):
+
+1. Input and reference consistency checks
+2. Region harmonization and N-way intersection of target BEDs
+3. Callable regions from coverage (`mosdepth`, optional BAMs)
+4. VCF normalization and harmonization (`bcftools`)
+5. Comparison (`rtgtools vcfeval`, `bcftools isec`) and metrics
+6. Discordance classification and annotation
+7. Statistics and reports (`MultiQC`, `datavzrd`)
+8. Optional known-variant checks (clinical must-find list, external truth sets)
 
 ## Usage
 
-> [!NOTE]
-> If you are new to Nextflow and nf-core, please refer to [this page](https://nf-co.re/docs/get_started/environment_setup/overview) on how to set-up Nextflow. Make sure to [test your setup](https://nf-co.re/docs/get_started/run-your-first-pipeline) with `-profile test` before running the workflow on actual data.
-
-<!-- TODO nf-core: Describe the minimum required steps to execute the pipeline, e.g. how to prepare samplesheets.
-     Explain what rows and columns represent. For instance (please edit as appropriate):
-
-First, prepare a samplesheet with your input data that looks as follows:
-
-`samplesheet.csv`:
-
-```csv
-sample,fastq_1,fastq_2
-CONTROL_REP1,AEG588A1_S1_L002_R1_001.fastq.gz,AEG588A1_S1_L002_R2_001.fastq.gz
-```
-
-Each row represents a fastq file (single-end) or a pair of fastq files (paired end).
-
--->
-
-Now, you can run the pipeline using:
-
-<!-- TODO nf-core: update the following command to include all required parameters for a minimal example -->
+The samplesheet is a tab-separated file with one row per sample and technology.
+Its full specification will follow in `docs/usage.md`.
 
 ```bash
-nextflow run core-unit-bioinformatics/variantcomp \
-   -profile <docker/singularity/.../institute> \
-   --input samplesheet.csv \
+nextflow run core-unit-bioinformatics/workflow-nxf-somatic-variantcomp \
+   -profile <conda/singularity/.../institute> \
+   --input samplesheet.tsv \
+   --fasta genome.fa \
+   --truth_technology wgs \
    --outdir <OUTDIR>
 ```
 
 > [!WARNING]
-> Please provide pipeline parameters via the CLI or Nextflow `-params-file` option. Custom config files including those provided by the `-c` Nextflow option can be used to provide any configuration _**except for parameters**_; see [docs](https://nf-co.re/docs/running/run-pipelines#using-parameter-files).
+> Please provide pipeline parameters via the CLI or the Nextflow `-params-file` option.
+> Custom config files, including those provided by the `-c` Nextflow option, can be used
+> to provide any configuration _**except for parameters**_; see the
+> [docs](https://nf-co.re/docs/running/run-pipelines#using-parameter-files).
+
+## Development
+
+- Development environment: `conda env create -f envs/variantcomp-dev.yaml`
+- Branches: `main` (releases), `dev` (development), `feat-*` (features, branched from
+  `dev`). The history is kept linear.
+- Test data (SEQC2 HCC1395/HCC1395BL, WES + WGS) live in a separate repository and
+  are prepared reproducibly with the scripts in `tests/seqc2/`.
 
 ## Credits
 
-core-unit-bioinformatics/variantcomp was originally written by Kai Horny.
-
-We thank the following people for their extensive assistance in the development of this pipeline:
-
-<!-- TODO nf-core: If applicable, make list of people who have also contributed -->
+core-unit-bioinformatics/workflow-nxf-somatic-variantcomp was originally written by Kai Horny.
 
 ## Contributions and Support
 
-If you would like to contribute to this pipeline, please see the [contributing guidelines](docs/CONTRIBUTING.md).
+If you would like to contribute to this pipeline, please see the
+[contributing guidelines](docs/CONTRIBUTING.md).
 
 ## Citations
 
-<!-- TODO nf-core: Add citation for pipeline after first release. Uncomment lines below and update Zenodo doi and badge at the top of this file. -->
-<!-- If you use core-unit-bioinformatics/variantcomp for your analysis, please cite it using the following doi: [10.5281/zenodo.XXXXXX](https://doi.org/10.5281/zenodo.XXXXXX) -->
+An extensive list of references for the tools used by the pipeline can be found in the
+[`CITATIONS.md`](CITATIONS.md) file. A machine-readable citation is in
+[`CITATION.cff`](CITATION.cff).
 
-<!-- TODO nf-core: Add bibliography of tools and data used in your pipeline -->
-
-An extensive list of references for the tools used by the pipeline can be found in the [`CITATIONS.md`](CITATIONS.md) file.
-
-This pipeline uses code and infrastructure developed and maintained by the [nf-core](https://nf-co.re) community, reused here under the [MIT license](https://github.com/nf-core/tools/blob/main/LICENSE).
+This pipeline uses code and infrastructure developed and maintained by the
+[nf-core](https://nf-co.re) community, reused here under the
+[MIT license](https://github.com/nf-core/tools/blob/main/LICENSE).
 
 > **The nf-core framework for community-curated bioinformatics pipelines.**
 >
