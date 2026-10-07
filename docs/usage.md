@@ -54,6 +54,32 @@ Rules:
 The validated samplesheet with resolved paths is written to
 `<outdir>/pipeline_info/samplesheet_validated.tsv`.
 
+## Reference genome
+
+All inputs must be on the reference given with `--fasta` (plain or bgzipped; a `.fai` can be
+given with `--fasta_fai` and is created otherwise). The pipeline checks every input against
+it:
+
+| Check | Action |
+| --- | --- |
+| Contig names differ only by the `chr` prefix or `MT`/`chrM` | renamed automatically |
+| Contig on the reference but with a different length in a VCF header (mitochondrial only, e.g. `chrM` 16570 vs 16571) | header rewritten from the `.fai` |
+| Contig with a different length (nuclear), BED interval beyond a contig end | **error**: different genome build |
+| More than `--max_ref_mismatch` (default 1%) of VCF REF alleles differ from the FASTA | **error**: different build or reference |
+| Records/intervals on contigs absent from the reference (decoys, alt contigs, ...) | dropped and reported |
+
+There is no liftover. Convert inputs to one build before running the pipeline.
+
+## Regions
+
+The comparison is restricted to the intersection of the target BEDs of all targeted
+technologies. Technologies without a BED (WGS) are genome-wide and don't restrict it.
+
+| Parameter | Description |
+| --- | --- |
+| `--regions_bed` | Restrict the comparison further, e.g. to high-confidence regions of a truth set. |
+| `--exclude_bed` | Remove regions, e.g. a blacklist or problematic regions. |
+
 ## Comparison options
 
 | Parameter | Default | Description |

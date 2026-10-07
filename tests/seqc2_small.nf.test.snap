@@ -2,8 +2,21 @@
     "-profile test_seqc2": {
         "content": [
             {
+                "BEDTOOLS_SORT": {
+                    "bedtools": "2.31.1"
+                },
+                "CHECK_REFERENCE_BED": {
+                    "pysam": "0.24.1",
+                    "python": "3.12.15"
+                },
+                "COMMON_REGIONS": {
+                    "bedtools": "2.31.1"
+                },
+                "SAMTOOLS_FAIDX": {
+                    "samtools": 1.24
+                },
                 "Workflow": {
-                    "core-unit-bioinformatics/workflow-nxf-somatic-variantcomp": "v0.2.0-dev"
+                    "core-unit-bioinformatics/workflow-nxf-somatic-variantcomp": "v0.3.0-dev"
                 }
             },
             [
@@ -19,13 +32,24 @@
                 "multiqc/multiqc_report.html",
                 "pipeline_info",
                 "pipeline_info/samplesheet_validated.tsv",
-                "pipeline_info/variantcomp_software_mqc_versions.yml"
+                "pipeline_info/variantcomp_software_mqc_versions.yml",
+                "regions",
+                "regions/common_targets.bed",
+                "regions/common_targets.summary.tsv",
+                "regions/reference_check",
+                "regions/reference_check/wes.bed.reference_check.tsv",
+                "regions/targets",
+                "regions/targets/wes.bed"
             ],
             [
-                "multiqc_citations.txt:md5,4c806e63a283ec1b7e78cdae3a923d4f"
+                "multiqc_citations.txt:md5,4c806e63a283ec1b7e78cdae3a923d4f",
+                "common_targets.bed:md5,41eeb51455f418377a735ecde07a9cd3",
+                "common_targets.summary.tsv:md5,b7c3aea36ddd9c70a0c05915281ef339",
+                "wes.bed.reference_check.tsv:md5,67d73e2ec6a9fda144788bd5acfe90af",
+                "wes.bed:md5,41eeb51455f418377a735ecde07a9cd3"
             ]
         ],
-        "timestamp": "2026-10-07T17:08:23.925287448",
+        "timestamp": "2026-10-07T17:58:25.946816814",
         "meta": {
             "nf-test": "0.9.5",
             "nextflow": "26.04.4"

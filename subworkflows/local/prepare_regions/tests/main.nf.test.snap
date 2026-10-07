@@ -1,0 +1,22 @@
+{
+    "synthetic - common region is the N-way intersection": {
+        "content": [
+            [
+                "common_targets.bed:md5,05beabccb7d0af813ec94b6dad30a3c6"
+            ],
+            [
+                [
+                    {
+                        "id": "common_targets"
+                    },
+                    "common_targets.summary.tsv:md5,354fd9bf32178ede1809d465548a223c"
+                ]
+            ]
+        ],
+        "timestamp": "2026-10-07T17:34:24.570378816",
+        "meta": {
+            "nf-test": "0.9.5",
+            "nextflow": "26.04.4"
+        }
+    }
+}

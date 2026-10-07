@@ -1,0 +1,87 @@
+nextflow_workflow {
+
+    name "Test Subworkflow PREPARE_REGIONS"
+    script "../main.nf"
+    workflow "PREPARE_REGIONS"
+    tag "subworkflows"
+    tag "subworkflows_local"
+    tag "prepare_regions"
+    tag "bedtools/sort"
+
+    test("synthetic - common region is the N-way intersection") {
+
+        when {
+            workflow {
+                """
+                def base = params.pipelines_testdata_base_path + 'synthetic/'
+                def entry = { tech, bed -> [[id: 'S1_' + tech, sample: 'S1', technology: tech], file(base + 'vcf/S1_' + tech + '.vcf.gz'), [], [], [], [], [], bed ? file(base + bed) : []] }
+                input[0] = channel.of(entry.call('wgs', null), entry.call('wes', 'bed/wes.bed'), entry.call('panel', 'bed/panel.bed'))
+                input[1] = channel.value([[id: 'synthetic'], file(base + 'reference/synthetic.fa'), file(base + 'reference/synthetic.fa.fai'), []])
+                input[2] = null
+                input[3] = null
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert workflow.success },
+                { assert path(workflow.out.common_bed[0]).text == 'chr1\t3990\t6000\nchr1\t8000\t9000\nchr2\t2000\t6000\n' },
+                { assert snapshot(workflow.out.common_bed, workflow.out.summary).match() }
+            )
+        }
+    }
+
+    test("synthetic - regions_bed and exclude_bed restrict the common region") {
+
+        when {
+            workflow {
+                """
+                def base = params.pipelines_testdata_base_path + 'synthetic/'
+                def entry = { tech, bed -> [[id: 'S1_' + tech, sample: 'S1', technology: tech], file(base + 'vcf/S1_' + tech + '.vcf.gz'), [], [], [], [], [], bed ? file(base + bed) : []] }
+                def regions = file("${outputDir}/regions.bed")
+                regions.parent.mkdirs()
+                regions.text = '1\\t4000\\t5000\\n2\\t1000\\t3000\\n'   // no-chr names: renamed by the reference check
+                def exclude = file("${outputDir}/exclude.bed")
+                exclude.text = 'chr1\\t4500\\t4600\\n'
+                input[0] = channel.of(entry.call('wgs', null), entry.call('panel', 'bed/panel.bed'))
+                input[1] = channel.value([[id: 'synthetic'], file(base + 'reference/synthetic.fa'), file(base + 'reference/synthetic.fa.fai'), []])
+                input[2] = regions
+                input[3] = exclude
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert workflow.success },
+                { assert path(workflow.out.common_bed[0]).text == 'chr1\t4000\t4500\nchr1\t4600\t5000\nchr2\t2000\t3000\n' }
+            )
+        }
+    }
+
+    test("wgs only - common region is the genome") {
+
+        when {
+            workflow {
+                """
+                def base = params.pipelines_testdata_base_path + 'synthetic/'
+                input[0] = channel.of(
+                    [[id: 'S1_wgs', sample: 'S1', technology: 'wgs'], file(base + 'vcf/S1_wgs.vcf.gz'), [], [], [], [], [], []],
+                    [[id: 'S1_wgs2', sample: 'S1', technology: 'wgs2'], file(base + 'vcf/S1_wgs.vcf.gz'), [], [], [], [], [], []]
+                )
+                input[1] = channel.value([[id: 'synthetic'], file(base + 'reference/synthetic.fa'), file(base + 'reference/synthetic.fa.fai'), []])
+                input[2] = null
+                input[3] = null
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert workflow.success },
+                { assert path(workflow.out.common_bed[0]).text == 'chr1\t0\t30000\nchr2\t0\t20000\nchrM\t0\t16569\n' }
+            )
+        }
+    }
+}

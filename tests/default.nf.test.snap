@@ -2,8 +2,21 @@
     "-profile test": {
         "content": [
             {
+                "BEDTOOLS_SORT": {
+                    "bedtools": "2.31.1"
+                },
+                "CHECK_REFERENCE_BED": {
+                    "pysam": "0.24.1",
+                    "python": "3.12.15"
+                },
+                "COMMON_REGIONS": {
+                    "bedtools": "2.31.1"
+                },
+                "SAMTOOLS_FAIDX": {
+                    "samtools": 1.24
+                },
                 "Workflow": {
-                    "core-unit-bioinformatics/workflow-nxf-somatic-variantcomp": "v0.1.0-dev"
+                    "core-unit-bioinformatics/workflow-nxf-somatic-variantcomp": "v0.3.0-dev"
                 }
             },
             [
@@ -19,13 +32,28 @@
                 "multiqc/multiqc_report.html",
                 "pipeline_info",
                 "pipeline_info/samplesheet_validated.tsv",
-                "pipeline_info/variantcomp_software_mqc_versions.yml"
+                "pipeline_info/variantcomp_software_mqc_versions.yml",
+                "regions",
+                "regions/common_targets.bed",
+                "regions/common_targets.summary.tsv",
+                "regions/reference_check",
+                "regions/reference_check/panel.bed.reference_check.tsv",
+                "regions/reference_check/wes.bed.reference_check.tsv",
+                "regions/targets",
+                "regions/targets/panel.bed",
+                "regions/targets/wes.bed"
             ],
             [
-                "multiqc_citations.txt:md5,4c806e63a283ec1b7e78cdae3a923d4f"
+                "multiqc_citations.txt:md5,4c806e63a283ec1b7e78cdae3a923d4f",
+                "common_targets.bed:md5,05beabccb7d0af813ec94b6dad30a3c6",
+                "common_targets.summary.tsv:md5,354fd9bf32178ede1809d465548a223c",
+                "panel.bed.reference_check.tsv:md5,0643674a92c11c0de6bd2e38df0838c0",
+                "wes.bed.reference_check.tsv:md5,b67b2c488c8979f0236d3db158c375c6",
+                "panel.bed:md5,05beabccb7d0af813ec94b6dad30a3c6",
+                "wes.bed:md5,fbe9a533baa9b14958cddea97db4ea48"
             ]
         ],
-        "timestamp": "2026-10-07T16:41:48.434660436",
+        "timestamp": "2026-10-07T17:52:04.24310376",
         "meta": {
             "nf-test": "0.9.5",
             "nextflow": "26.04.4"

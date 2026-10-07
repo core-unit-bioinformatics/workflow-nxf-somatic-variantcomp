@@ -4,6 +4,8 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 include { MULTIQC                } from '../modules/nf-core/multiqc/main'
+include { PREPARE_REFERENCE      } from '../subworkflows/local/prepare_reference'
+include { PREPARE_REGIONS        } from '../subworkflows/local/prepare_regions'
 include { paramsSummaryMap       } from 'plugin/nf-schema'
 include { paramsSummaryMultiqc   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { softwareVersionsToYAML } from '../subworkflows/nf-core/utils_nfcore_pipeline'
@@ -18,7 +20,11 @@ include { methodsDescriptionText } from '../subworkflows/local/utils_nfcore_vari
 workflow VARIANTCOMP {
 
     take:
-    ch_samplesheet // channel: samplesheet read in from --input
+    ch_samplesheet // channel: samplesheet entries [ meta, vcf, vcf_index, tumor_bam, tumor_bai, normal_bam, normal_bai, target_bed ]
+    fasta          // string: reference FASTA
+    fasta_fai      // string: optional reference .fai
+    regions_bed    // string: optional BED restricting the comparison
+    exclude_bed    // string: optional BED of regions excluded from the comparison
     multiqc_config
     multiqc_logo
     multiqc_methods_description
@@ -49,6 +55,24 @@ workflow VARIANTCOMP {
             newLine: true,
             sort: true
         )
+
+    //
+    // SUBWORKFLOW: reference index
+    //
+    PREPARE_REFERENCE(
+        file(fasta, checkIfExists: true),
+        fasta_fai ? file(fasta_fai, checkIfExists: true) : null
+    )
+
+    //
+    // SUBWORKFLOW: harmonize target BEDs and build the common comparison region
+    //
+    PREPARE_REGIONS(
+        ch_samplesheet,
+        PREPARE_REFERENCE.out.reference,
+        regions_bed ? file(regions_bed, checkIfExists: true) : null,
+        exclude_bed ? file(exclude_bed, checkIfExists: true) : null
+    )
 
     //
     // Collate and save software versions

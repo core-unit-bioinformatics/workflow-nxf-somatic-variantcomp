@@ -39,6 +39,66 @@
                 }
             }
         },
+        "reference_options": {
+            "title": "Reference options",
+            "type": "object",
+            "fa_icon": "fas fa-dna",
+            "description": "Reference genome. All inputs are checked against it.",
+            "required": [
+                "fasta"
+            ],
+            "properties": {
+                "fasta": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "mimetype": "text/plain",
+                    "pattern": "^\\S+\\.(fa|fasta|fna)(\\.gz)?$",
+                    "description": "Reference FASTA (plain or bgzipped) that all VCFs, BEDs and BAMs were created with.",
+                    "fa_icon": "far fa-file-code"
+                },
+                "fasta_fai": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "pattern": "^\\S+\\.fai$",
+                    "description": "Index of the reference FASTA. Created if not given (always for bgzipped FASTA).",
+                    "fa_icon": "far fa-file-code"
+                },
+                "max_ref_mismatch": {
+                    "type": "number",
+                    "default": 0.01,
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Maximum fraction of VCF REF alleles that may differ from the reference before the input is rejected as being on a different build.",
+                    "fa_icon": "fas fa-exclamation-triangle"
+                }
+            }
+        },
+        "region_options": {
+            "title": "Region options",
+            "type": "object",
+            "fa_icon": "fas fa-map",
+            "description": "The comparison is restricted to the intersection of all target BEDs; these options restrict it further.",
+            "properties": {
+                "regions_bed": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "pattern": "^\\S+\\.bed(\\.gz)?$",
+                    "description": "Optional BED: restrict the comparison to these regions (e.g. high-confidence regions of a truth set).",
+                    "fa_icon": "fas fa-crop"
+                },
+                "exclude_bed": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "pattern": "^\\S+\\.bed(\\.gz)?$",
+                    "description": "Optional BED: remove these regions from the comparison (e.g. a blacklist).",
+                    "fa_icon": "fas fa-ban"
+                }
+            }
+        },
         "comparison_options": {
             "title": "Comparison options",
             "type": "object",
@@ -217,7 +277,13 @@
             "$ref": "#/$defs/input_output_options"
         },
         {
+            "$ref": "#/$defs/reference_options"
+        },
+        {
             "$ref": "#/$defs/comparison_options"
+        },
+        {
+            "$ref": "#/$defs/region_options"
         },
         {
             "$ref": "#/$defs/institutional_config_options"
