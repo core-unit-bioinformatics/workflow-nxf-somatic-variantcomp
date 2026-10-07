@@ -20,8 +20,8 @@ process RTGTOOLS_VCFEVAL {
     tuple val(meta), path("*.fp.vcf.gz.tbi")            , emit: fp_tbi
     tuple val(meta), path("*.tp-baseline.vcf.gz")       , emit: baseline_vcf
     tuple val(meta), path("*.tp-baseline.vcf.gz.tbi")   , emit: baseline_tbi
-    tuple val(meta), path("*.snp_roc.tsv.gz")           , emit: snp_roc
-    tuple val(meta), path("*.non_snp_roc.tsv.gz")       , emit: non_snp_roc
+    tuple val(meta), path("*.snp_roc.tsv.gz")           , emit: snp_roc, optional: true
+    tuple val(meta), path("*.non_snp_roc.tsv.gz")       , emit: non_snp_roc, optional: true
     tuple val(meta), path("*.weighted_roc.tsv.gz")      , emit: weighted_roc
     tuple val(meta), path("*.summary.txt")              , emit: summary
     tuple val(meta), path("*.phasing.txt")              , emit: phasing

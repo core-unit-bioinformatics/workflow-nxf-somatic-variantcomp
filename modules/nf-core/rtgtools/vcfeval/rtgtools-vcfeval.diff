@@ -1,0 +1,22 @@
+Changes in component 'nf-core/rtgtools/vcfeval'
+Changes in 'rtgtools/vcfeval/main.nf':
+--- modules/nf-core/rtgtools/vcfeval/main.nf
++++ modules/nf-core/rtgtools/vcfeval/main.nf
+@@ -20,8 +20,8 @@
+     tuple val(meta), path("*.fp.vcf.gz.tbi")            , emit: fp_tbi
+     tuple val(meta), path("*.tp-baseline.vcf.gz")       , emit: baseline_vcf
+     tuple val(meta), path("*.tp-baseline.vcf.gz.tbi")   , emit: baseline_tbi
+-    tuple val(meta), path("*.snp_roc.tsv.gz")           , emit: snp_roc
+-    tuple val(meta), path("*.non_snp_roc.tsv.gz")       , emit: non_snp_roc
++    tuple val(meta), path("*.snp_roc.tsv.gz")           , emit: snp_roc, optional: true
++    tuple val(meta), path("*.non_snp_roc.tsv.gz")       , emit: non_snp_roc, optional: true
+     tuple val(meta), path("*.weighted_roc.tsv.gz")      , emit: weighted_roc
+     tuple val(meta), path("*.summary.txt")              , emit: summary
+     tuple val(meta), path("*.phasing.txt")              , emit: phasing
+
+'modules/nf-core/rtgtools/vcfeval/meta.yml' is unchanged
+'modules/nf-core/rtgtools/vcfeval/environment.yml' is unchanged
+'modules/nf-core/rtgtools/vcfeval/tests/nextflow.config' is unchanged
+'modules/nf-core/rtgtools/vcfeval/tests/main.nf.test.snap' is unchanged
+'modules/nf-core/rtgtools/vcfeval/tests/main.nf.test' is unchanged
+************************************************************
