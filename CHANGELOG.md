@@ -4,6 +4,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Dates follow ISO 8601 (`YYYY-MM-DD`).
 
+## v0.7.0-dev - [unreleased]
+
+### `Added`
+
+- Benchmark subworkflow `BENCHMARK`: `rtg vcfeval` (squash-ploidy, decompose, all records, tumor VAF as score) of every technology against the truth technology per sample; `--comparison_mode all_pairs` adds pairwise comparisons of the other technologies
+- `bin/benchmark_metrics.py` (`BENCHMARK_METRICS`): recall, precision and F1 overall, by variant type, by truth/query VAF bin (`--vaf_bins`) and for exact/position-only matching; per-variant TP/FN/FP table
+- `bin/aggregate_metrics.py` (`AGGREGATE_METRICS`): micro (summed counts) and macro (mean ± sd over samples) aggregation
+- Outputs `benchmark/`
+- Test profiles: rtg-tools workaround for aarch64 (local conda tests on a Raspberry Pi)
+
+### `Fixed`
+
+- SEQC2 test-data script: works when the NCBI md5 list is unreachable (cached copy or warning)
+
 ## v0.6.0-dev - [2026-10-07]
 
 ### `Added`
