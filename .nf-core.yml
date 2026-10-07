@@ -1,42 +1,46 @@
 repository_type: pipeline
-
 nf_core_version: 4.1.0
-
 lint:
   files_unchanged:
-    - CODE_OF_CONDUCT.md
-    - assets/nf-core-variantcomp_logo_light.png
-    - docs/images/nf-core-variantcomp_logo_light.png
-    - docs/images/nf-core-variantcomp_logo_dark.png
-    - .github/ISSUE_TEMPLATE/bug_report.yml
-    - .github/PULL_REQUEST_TEMPLATE.md
-    - assets/email_template.txt
-    - docs/README.md
-    - docs/CONTRIBUTING.md
-    - .prettierignore
-    - .prettierignore
+  - .github/ISSUE_TEMPLATE/bug_report.yml
+  - .github/ISSUE_TEMPLATE/config.yml
+  - .github/PULL_REQUEST_TEMPLATE.md
+  - .prettierignore
+  - CODE_OF_CONDUCT.md
+  - assets/email_template.txt
+  - assets/nf-core-variantcomp_logo_light.png
+  - assets/nf-core-workflow-nxf-somatic-variantcomp_logo_light.png
+  - docs/CONTRIBUTING.md
+  - docs/README.md
+  - docs/images/nf-core-variantcomp_logo_dark.png
+  - docs/images/nf-core-variantcomp_logo_light.png
+  - docs/images/nf-core-workflow-nxf-somatic-variantcomp_logo_dark.png
+  - docs/images/nf-core-workflow-nxf-somatic-variantcomp_logo_light.png
   nextflow_config:
-    - manifest.name
-    - manifest.homePage
+  - manifest.name
+  - manifest.homePage
   multiqc_config:
-    - report_comment
+  - report_comment
   files_exist:
-    - CODE_OF_CONDUCT.md
-    - assets/nf-core-variantcomp_logo_light.png
-    - docs/images/nf-core-variantcomp_logo_light.png
-    - docs/images/nf-core-variantcomp_logo_dark.png
-    - .github/ISSUE_TEMPLATE/config.yml
-    - .github/workflows/awstest.yml
-    - .github/workflows/awsfulltest.yml
-    - assets/email_template.html
-    - assets/sendmail_template.txt
-    - assets/email_template.txt
-    - conf/igenomes.config
-    - conf/igenomes_ignored.config
+  - CODE_OF_CONDUCT.md
+  - assets/nf-core-variantcomp_logo_light.png
+  - docs/images/nf-core-variantcomp_logo_light.png
+  - docs/images/nf-core-variantcomp_logo_dark.png
+  - .github/ISSUE_TEMPLATE/config.yml
+  - .github/workflows/awstest.yml
+  - .github/workflows/awsfulltest.yml
+  - assets/email_template.html
+  - assets/sendmail_template.txt
+  - assets/email_template.txt
+  - conf/igenomes.config
+  - conf/igenomes_ignored.config
+  - assets/nf-core-workflow-nxf-somatic-variantcomp_logo_light.png
+  - docs/images/nf-core-workflow-nxf-somatic-variantcomp_logo_light.png
+  - docs/images/nf-core-workflow-nxf-somatic-variantcomp_logo_dark.png
+  - ro-crate-metadata.json
   readme:
-    - nextflow_badge
-    - nfcore_template_badge
-
+  - nextflow_badge
+  - nfcore_template_badge
 template:
   org: core-unit-bioinformatics
   name: variantcomp
@@ -47,12 +51,12 @@ template:
   force: true
   outdir: workflow-nxf-somatic-variantcomp
   skip_features:
-    - igenomes
-    - fastqc
-    - seqera_platform
-    - gpu
-    - codespaces
-    - github_badges
-    - email
-    - rocrate
+  - igenomes
+  - fastqc
+  - seqera_platform
+  - gpu
+  - codespaces
+  - github_badges
+  - email
+  - rocrate
   is_nfcore: false

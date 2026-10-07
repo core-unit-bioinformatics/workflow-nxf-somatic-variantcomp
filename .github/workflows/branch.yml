@@ -15,11 +15,11 @@ jobs:
     steps:
       # PRs to the nf-core repo main/master branch are only ok if coming from the nf-core repo `dev` or any `patch` branches
       - name: Check PRs
-        if: github.repository == 'core-unit-bioinformatics/variantcomp'
+        if: github.repository == 'core-unit-bioinformatics/workflow-nxf-somatic-variantcomp'
         env:
-          HEAD_REPO:  ${{ github.event.pull_request.head.repo.full_name }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
         run: |
-          { [[ "$HEAD_REPO" == core-unit-bioinformatics/variantcomp ]] && [[ $GITHUB_HEAD_REF == "dev" ]]; } || [[ $GITHUB_HEAD_REF == "patch" ]]
+          { [[ "$HEAD_REPO" == core-unit-bioinformatics/workflow-nxf-somatic-variantcomp ]] && [[ $GITHUB_HEAD_REF == "dev" ]]; } || [[ $GITHUB_HEAD_REF == "patch" ]]
 
       # If the above check failed, build a comment to be posted by the shared poster workflow
       - name: Build PR comment

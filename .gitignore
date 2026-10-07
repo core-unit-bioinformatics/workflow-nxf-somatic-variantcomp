@@ -8,3 +8,8 @@ testing*
 *.pyc
 null/
 .lineage/
+.nf-test/
+.nf-test.log
+__pycache__/
+.pytest_cache/
+.ruff_cache/

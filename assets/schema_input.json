@@ -1,7 +1,7 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$id": "https://raw.githubusercontent.com/core-unit-bioinformatics/variantcomp/master/assets/schema_input.json",
-    "title": "core-unit-bioinformatics/variantcomp pipeline - params.input schema",
+    "$id": "https://raw.githubusercontent.com/core-unit-bioinformatics/workflow-nxf-somatic-variantcomp/main/assets/schema_input.json",
+    "title": "core-unit-bioinformatics/workflow-nxf-somatic-variantcomp pipeline - params.input schema",
     "description": "Schema for the file provided with params.input",
     "type": "array",
     "items": {

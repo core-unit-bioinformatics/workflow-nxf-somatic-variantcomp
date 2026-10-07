@@ -1,6 +1,6 @@
 {
-    "name": "core-unit-bioinformatics/variantcomp",
-    "homePage": "https://github.com/core-unit-bioinformatics/variantcomp",
+    "name": "core-unit-bioinformatics/workflow-nxf-somatic-variantcomp",
+    "homePage": "https://github.com/core-unit-bioinformatics/workflow-nxf-somatic-variantcomp",
     "repos": {
         "https://github.com/nf-core/modules.git": {
             "modules": {

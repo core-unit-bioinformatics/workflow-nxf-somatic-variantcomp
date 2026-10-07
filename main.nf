@@ -1,9 +1,9 @@
 #!/usr/bin/env nextflow
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    core-unit-bioinformatics/variantcomp
+    core-unit-bioinformatics/workflow-nxf-somatic-variantcomp
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    Github : https://github.com/core-unit-bioinformatics/variantcomp
+    Github : https://github.com/core-unit-bioinformatics/workflow-nxf-somatic-variantcomp
 ----------------------------------------------------------------------------------------
 */
 

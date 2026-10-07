@@ -1,7 +1,7 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$id": "https://raw.githubusercontent.com/core-unit-bioinformatics/variantcomp/master/nextflow_schema.json",
-    "title": "core-unit-bioinformatics/variantcomp pipeline parameters",
+    "$id": "https://raw.githubusercontent.com/core-unit-bioinformatics/workflow-nxf-somatic-variantcomp/main/nextflow_schema.json",
+    "title": "core-unit-bioinformatics/workflow-nxf-somatic-variantcomp pipeline parameters",
     "description": "Compare somatic variant calls of the same tumor/normal pairs across sequencing technologies (WGS, WES, panel)",
     "type": "object",
     "$defs": {
