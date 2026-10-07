@@ -19,3 +19,7 @@ select = ["E", "F", "W", "I", "B", "UP"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests/python"]
+
+[tool.ruff.lint.per-file-ignores]
+# long VCF header lines in test-data generators
+"tests/synthetic/make_synthetic_data.py" = ["E501"]
