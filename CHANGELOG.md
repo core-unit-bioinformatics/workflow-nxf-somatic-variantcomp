@@ -4,6 +4,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Dates follow ISO 8601 (`YYYY-MM-DD`).
 
+## v0.8.0-dev - [unreleased]
+
+### `Added`
+
+- Discordance subworkflow `DISCORDANCE`: `bcftools mpileup` read evidence of every alignment at all compared positions (`READ_EVIDENCE`; duplicates kept for amplicon data), classification of every FN/FP (`present_but_filtered`, `germline_in_normal`, `low_coverage`, `subthreshold_evidence`, `no_evidence`, `absent`) and power-adjusted recall (`bin/classify_discordance.py`), annotation with genes and stratifications (`ANNOTATE_VARIANTS`, bedtools)
+- Parameters `--gene_bed`, `--stratification` (sheet with name and BED), `--germline_vaf`, `--evidence_min_alt_reads`, `--power_min_alt_reads`, `--detection_power`
+- Outputs `discordance/`, `benchmark/power.*.tsv`
+- Test data: gene and stratification BEDs in the synthetic set; GENCODE genes and GIAB v3.5 stratifications in the SEQC2 set
+
+### `Changed`
+
+- Reference check keeps all columns of harmonized BEDs (gene names)
+
 ## v0.7.0-dev - [2026-10-07]
 
 ### `Added`
