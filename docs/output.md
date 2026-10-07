@@ -11,6 +11,7 @@ The directories listed below will be created in the results directory after the 
 The pipeline is built using [Nextflow](https://www.nextflow.io/) and processes data using the following steps:
 
 - [Regions](#regions) - Reference check of all target BEDs and the common comparison region
+- [Coverage](#coverage) - Depth of every alignment and per-sample callable regions
 - [Preprocessed VCFs](#preprocessed-vcfs) - Reference check, normalization, harmonization and uniform filtering of every VCF
 - [MultiQC](#multiqc) - Aggregate report describing results and QC from the whole pipeline
 - [Pipeline information](#pipeline-information) - Report metrics generated during the workflow execution
@@ -40,6 +41,26 @@ Every BED is checked against the reference `.fai`:
   absent from the reference are dropped and reported.
 - **Error:** intervals that end beyond their contig indicate a different genome build. The
   pipeline stops with a message naming the file.
+
+### Coverage
+
+<details markdown="1">
+<summary>Output files</summary>
+
+- `coverage/`
+  - `<sample>.callable.bed`: bases of the common region that are callable in all alignments
+    of the sample. Only for samples with alignments for every technology.
+  - `callable_summary.tsv`: per sample, the number of alignments, the mode, the threshold,
+    the size of the common region and of the callable region.
+  - `<sample>/<sample>_<technology>_<tumor|normal>.*`: mosdepth outputs per alignment
+    (`*.mosdepth.summary.txt`, `*.mosdepth.global.dist.txt`, `*.mosdepth.region.dist.txt`,
+    `*.regions.bed.gz` = mean depth per common-region interval,
+    `*.quantized.bed.gz` = `LOW_COVERAGE`/`CALLABLE` bins).
+  - `reference_check/<...>.bam.reference_check.tsv`: reference check of each alignment header.
+
+</details>
+
+The mosdepth results are also shown in the MultiQC report.
 
 ### Preprocessed VCFs
 

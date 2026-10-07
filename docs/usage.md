@@ -80,6 +80,27 @@ technologies. Technologies without a BED (WGS) are genome-wide and don't restric
 | `--regions_bed` | Restrict the comparison further, e.g. to high-confidence regions of a truth set. |
 | `--exclude_bed` | Remove regions, e.g. a blacklist or problematic regions. |
 
+## Coverage and callable regions
+
+If tumor alignments (BAM/CRAM) are given for **every** technology of a sample, the
+comparison for that sample is restricted to the bases that are callable in all of them:
+
+- `mosdepth` computes the depth of every alignment in the common region.
+- In `--callable_mode base` (default), a base is callable if its depth is at least
+  `--min_coverage` (default 10).
+- In `--callable_mode region`, a common-region interval is callable if its mean depth is at
+  least `--min_coverage`. This is the approach of the original OCA+/WES comparison; mean
+  depth can hide low-coverage parts of an interval.
+- With `--require_normal_coverage` (default `true`), the normal alignments must be callable,
+  too.
+- Reads flagged as duplicates are excluded, except for `library_type` `amplicon`, where all
+  reads of an amplicon look like duplicates.
+- Alignment headers are checked against the reference like VCFs and BEDs.
+
+Samples without alignments for every technology keep the common region. The comparison
+still works for them, but variants in poorly covered parts of a target can't be
+distinguished from real discordance.
+
 ## Filters
 
 The input VCFs are **unfiltered** (all calls with the caller's FILTER column). The pipeline

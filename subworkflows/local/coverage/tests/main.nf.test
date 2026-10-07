@@ -1,0 +1,52 @@
+nextflow_workflow {
+
+    name "Test Subworkflow COVERAGE"
+    script "../main.nf"
+    workflow "COVERAGE"
+    tag "subworkflows"
+    tag "subworkflows_local"
+    tag "coverage"
+    tag "mosdepth"
+    tag "samtools/index"
+
+    test("seqc2 small - callable region for the sample with alignments, common region otherwise") {
+
+        when {
+            workflow {
+                """
+                def base = params.pipelines_testdata_base_path + 'seqc2/small/'
+                def entry = { pair, tech, lib, bams ->
+                    def b = { role -> bams ? file(base + 'bam/' + pair + '_' + tech + '_' + role + '.bam') : [] }
+                    def i = { role -> bams && role == 'T' ? file(base + 'bam/' + pair + '_' + tech + '_' + role + '.bam.bai') : [] }
+                    [[id: 'SEQC2_' + pair + '_' + tech, sample: 'SEQC2_' + pair, technology: tech, library_type: lib,
+                      tumor_id: 'TUMOR', normal_id: 'NORMAL'],
+                     file(base + 'vcf/' + pair + '_' + tech + '.mutect2.vcf.gz'), [], b.call('T'), i.call('T'), b.call('N'), i.call('N'), []]
+                }
+                // normal BAMs without index: indexed by the subworkflow
+                input[0] = channel.of(entry.call('IL_1', 'wgs', 'wgs', true), entry.call('IL_1', 'wes', 'capture', true),
+                                      entry.call('FD_1', 'wgs', 'wgs', false), entry.call('FD_1', 'wes', 'capture', false))
+                input[1] = channel.value([[id: 'chr22'], file(base + 'reference/GRCh38.d1.vd1_chr22.fa.gz'),
+                                          file(base + 'reference/GRCh38.d1.vd1_chr22.fa.gz.fai'), file(base + 'reference/GRCh38.d1.vd1_chr22.fa.gz.gzi')])
+                input[2] = channel.value(file(base + 'bed/S07604624_Covered_human_all_v6_plus_UTR_hg38.bed'))
+                input[3] = true
+                input[4] = 'base'
+                input[5] = 10
+                """
+            }
+        }
+
+        then {
+            def regions = workflow.out.regions.collectEntries { item -> [(item[0].id): file(item[1]).name] }
+            def summary = path(workflow.out.callable_summary[0][1]).readLines()
+            assertAll(
+                { assert workflow.success },
+                { assert regions == [
+                    SEQC2_IL_1_wgs: 'SEQC2_IL_1.callable.bed', SEQC2_IL_1_wes: 'SEQC2_IL_1.callable.bed',
+                    SEQC2_FD_1_wgs: 'S07604624_Covered_human_all_v6_plus_UTR_hg38.bed', SEQC2_FD_1_wes: 'S07604624_Covered_human_all_v6_plus_UTR_hg38.bed'] },
+                { assert summary[1].startsWith('SEQC2_IL_1\t4\tbase\t10\t1987915\t') },
+                { assert workflow.out.reports.size() == 4 },
+                { assert snapshot(workflow.out.callable, workflow.out.callable_summary).match() }
+            )
+        }
+    }
+}

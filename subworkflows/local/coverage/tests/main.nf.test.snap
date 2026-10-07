@@ -1,0 +1,29 @@
+{
+    "seqc2 small - callable region for the sample with alignments, common region otherwise": {
+        "content": [
+            [
+                [
+                    {
+                        "id": "SEQC2_IL_1",
+                        "sample": "SEQC2_IL_1"
+                    },
+                    "SEQC2_IL_1.callable.bed:md5,27377c2895beb2e9deda2658873040cb"
+                ]
+            ],
+            [
+                [
+                    {
+                        "id": "SEQC2_IL_1",
+                        "sample": "SEQC2_IL_1"
+                    },
+                    "SEQC2_IL_1.callable.summary.tsv:md5,db59a3854557bd2175d30d4304e740c3"
+                ]
+            ]
+        ],
+        "timestamp": "2026-10-07T19:40:17.23820209",
+        "meta": {
+            "nf-test": "0.9.5",
+            "nextflow": "26.04.4"
+        }
+    }
+}

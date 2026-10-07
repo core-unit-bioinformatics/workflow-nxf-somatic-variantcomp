@@ -99,6 +99,37 @@
                 }
             }
         },
+        "coverage_options": {
+            "title": "Coverage options",
+            "type": "object",
+            "fa_icon": "fas fa-chart-area",
+            "description": "If alignments are given for every technology of a sample, the comparison is restricted to the bases callable in all of them.",
+            "properties": {
+                "min_coverage": {
+                    "type": "integer",
+                    "default": 10,
+                    "minimum": 1,
+                    "description": "Minimum depth for a base (or region) to be callable.",
+                    "fa_icon": "fas fa-layer-group"
+                },
+                "callable_mode": {
+                    "type": "string",
+                    "enum": [
+                        "base",
+                        "region"
+                    ],
+                    "default": "base",
+                    "description": "'base': per-base depth >= min_coverage (mosdepth --quantize). 'region': mean depth of a common-region interval >= min_coverage.",
+                    "fa_icon": "fas fa-ruler-horizontal"
+                },
+                "require_normal_coverage": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Normal alignments (if given) must be callable, too.",
+                    "fa_icon": "fas fa-user-check"
+                }
+            }
+        },
         "filter_options": {
             "title": "Filter options",
             "type": "object",
@@ -320,6 +351,9 @@
         },
         {
             "$ref": "#/$defs/region_options"
+        },
+        {
+            "$ref": "#/$defs/coverage_options"
         },
         {
             "$ref": "#/$defs/filter_options"

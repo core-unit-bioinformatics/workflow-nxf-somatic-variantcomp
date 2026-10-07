@@ -42,10 +42,11 @@
                     "samtools": 1.24
                 },
                 "Workflow": {
-                    "core-unit-bioinformatics/workflow-nxf-somatic-variantcomp": "v0.4.0-dev"
+                    "core-unit-bioinformatics/workflow-nxf-somatic-variantcomp": "v0.5.0-dev"
                 }
             },
             [
+                "coverage",
                 "multiqc",
                 "multiqc/multiqc_data",
                 "multiqc/multiqc_data/llms-full.txt",
@@ -119,7 +120,7 @@
                 "S2_wgs.vcf.reference_check.tsv:md5,87b5af0a0b0372af9e6d78dd0dcd98f8"
             ]
         ],
-        "timestamp": "2026-10-07T18:46:10.629873404",
+        "timestamp": "2026-10-07T20:05:01.720676963",
         "meta": {
             "nf-test": "0.9.5",
             "nextflow": "26.04.4"

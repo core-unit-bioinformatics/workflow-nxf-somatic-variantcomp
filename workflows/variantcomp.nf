@@ -7,6 +7,7 @@ include { MULTIQC                } from '../modules/nf-core/multiqc/main'
 include { PREPARE_REFERENCE      } from '../subworkflows/local/prepare_reference'
 include { PREPARE_REGIONS        } from '../subworkflows/local/prepare_regions'
 include { PREPROCESS_VCF         } from '../subworkflows/local/preprocess_vcf'
+include { COVERAGE               } from '../subworkflows/local/coverage'
 include { paramsSummaryMap       } from 'plugin/nf-schema'
 include { paramsSummaryMultiqc   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { softwareVersionsToYAML } from '../subworkflows/nf-core/utils_nfcore_pipeline'
@@ -76,13 +77,29 @@ workflow VARIANTCOMP {
     )
 
     //
+    // SUBWORKFLOW: coverage and per-sample callable regions (alignments are optional)
+    //
+    COVERAGE(
+        ch_samplesheet,
+        PREPARE_REFERENCE.out.reference,
+        PREPARE_REGIONS.out.common_bed,
+        params.require_normal_coverage,
+        params.callable_mode,
+        params.min_coverage
+    )
+    ch_multiqc_files = ch_multiqc_files.mix(COVERAGE.out.multiqc_files)
+    COVERAGE.out.callable_summary
+        .map { _meta, tsv -> tsv }
+        .collectFile(name: 'callable_summary.tsv', keepHeader: true, skip: 1, sort: true, storeDir: "${outdir}/coverage")
+
+    //
     // SUBWORKFLOW: reference check, normalization, harmonization and uniform filtering
     //
     PREPROCESS_VCF(
         ch_samplesheet,
         PREPARE_REFERENCE.out.reference,
         PREPARE_REFERENCE.out.genome_bed,
-        ch_samplesheet.map { entry -> entry[0] }.combine(PREPARE_REGIONS.out.common_bed)
+        COVERAGE.out.regions
     )
 
     //
