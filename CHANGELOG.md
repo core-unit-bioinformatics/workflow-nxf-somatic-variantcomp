@@ -4,6 +4,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Dates follow ISO 8601 (`YYYY-MM-DD`).
 
+## v0.6.0-dev - [unreleased]
+
+### `Added`
+
+- Coverage subworkflow `COVERAGE`: reference check of alignment headers (`check_reference.py --type bam`, incl. translation of the common region to the alignment's contig names), indexing of alignments without index, `mosdepth` per alignment (duplicates kept for amplicon libraries), per-sample callable regions (`CALLABLE_REGIONS`; `--callable_mode base|region`, `--min_coverage`, `--require_normal_coverage`)
+- The comparison region of a sample is its callable region if alignments are given for all its technologies, else the common region
+- `coverage/` outputs and mosdepth results in MultiQC
+
+### `Changed`
+
+- SEQC2 small test data: BAM slices from two 1-Mb windows of chr22 with many exome calls (23-24 Mb, 50-50.8 Mb), subsampled to 50% with a fixed seed
+
 ## v0.5.0-dev - [2026-10-07]
 
 ### `Added`
