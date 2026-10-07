@@ -23,6 +23,9 @@ nextflow_pipeline {
             assertAll(
                 { assert validated.size() == 7 },
                 { assert validated[0].startsWith('sample\ttechnology\tlibrary_type') },
+                // VCF headers contain bcftools command lines with dates: check records instead
+                { assert path("$outputDir/vcf_preprocessed/S1/S1_wes.compare.vcf.gz").linesGzip.count { line -> !line.startsWith('#') } == 10 },
+                { assert path("$outputDir/vcf_preprocessed/S1/S1_panel.compare.vcf.gz").linesGzip.count { line -> !line.startsWith('#') } == 9 },
                 { assert validated.count { line -> line.contains('\twgs\twgs\t') && line.contains('\ttrue\t') } == 2 },
                 { assert snapshot(
                     // pipeline versions.yml file for multiqc from which Nextflow version is removed because we test pipelines on multiple Nextflow versions

@@ -99,6 +99,42 @@
                 }
             }
         },
+        "filter_options": {
+            "title": "Filter options",
+            "type": "object",
+            "fa_icon": "fas fa-filter",
+            "description": "Uniform filters applied identically to the calls of every technology before the comparison. Values come from the harmonized INFO tags (VC_T_VAF, VC_T_DP, VC_T_ALT), computed from FORMAT/AD for every caller.",
+            "properties": {
+                "filter_pass_only": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Only compare calls with FILTER PASS (or '.').",
+                    "fa_icon": "fas fa-check"
+                },
+                "min_vaf": {
+                    "type": "number",
+                    "default": 0,
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Minimum tumor VAF of a call (0 = off).",
+                    "fa_icon": "fas fa-percentage"
+                },
+                "min_depth": {
+                    "type": "integer",
+                    "default": 0,
+                    "minimum": 0,
+                    "description": "Minimum tumor depth at a call (0 = off).",
+                    "fa_icon": "fas fa-layer-group"
+                },
+                "min_alt_reads": {
+                    "type": "integer",
+                    "default": 0,
+                    "minimum": 0,
+                    "description": "Minimum number of tumor reads supporting the alt allele (0 = off).",
+                    "fa_icon": "fas fa-sort-numeric-up"
+                }
+            }
+        },
         "comparison_options": {
             "title": "Comparison options",
             "type": "object",
@@ -284,6 +320,9 @@
         },
         {
             "$ref": "#/$defs/region_options"
+        },
+        {
+            "$ref": "#/$defs/filter_options"
         },
         {
             "$ref": "#/$defs/institutional_config_options"

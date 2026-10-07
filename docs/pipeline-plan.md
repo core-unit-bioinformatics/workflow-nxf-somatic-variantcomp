@@ -355,6 +355,8 @@ vcf-comp-dev/                                  # workspace (no git)
 | D7 | Annotation | `gene_bed` default, VEP optional |
 | D8 | Layout | Legacy scripts deleted. Workspace holds two subfolders: the pipeline repo and the test-data repo |
 | D9 | SEQC2 scope | WES + WGS only for now (no AmpliSeq) |
+| D10 | Call definition (implementation, 2026-10-07) | Every record of a somatic VCF is a call of the tumor sample: after splitting, GT is set to tumor `0/1` and normal `0/0` (callers fill GT differently, and split multiallelic records can otherwise be lost). VAF/depth/alt counts are computed from FORMAT/AD for every caller (`VC_*` INFO tags), so no caller profiles are needed. |
+| D11 | Normalization order (implementation, 2026-10-07) | Records on non-reference contigs are dropped before the header is rewritten from the `.fai`. Records with a symbolic ALT only are dropped before `norm`, and remaining symbolic alleles of split records are dropped during harmonization. See CLAUDE.md for the full order. |
 
 ## 12. Additional feature (last on the roadmap): known/required variants
 

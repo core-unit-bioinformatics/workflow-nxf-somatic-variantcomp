@@ -1,0 +1,69 @@
+nextflow_workflow {
+
+    name "Test Subworkflow PREPROCESS_VCF"
+    script "../main.nf"
+    workflow "PREPROCESS_VCF"
+    tag "subworkflows"
+    tag "subworkflows_local"
+    tag "preprocess_vcf"
+    tag "bcftools/view"
+    tag "bcftools/annotate"
+    tag "bcftools/reheader"
+    tag "bcftools/norm"
+
+    test("synthetic - normalization, harmonization and filtering follow the design") {
+
+        when {
+            workflow {
+                """
+                def base = params.pipelines_testdata_base_path + 'synthetic/'
+                def entry = { sample, tech -> [[id: sample + '_' + tech, sample: sample, technology: tech,
+                                                tumor_id: sample + '_' + tech + '_T', normal_id: sample + '_' + tech + '_N'],
+                                               file(base + 'vcf/' + sample + '_' + tech + '.vcf.gz'),
+                                               file(base + 'vcf/' + sample + '_' + tech + '.vcf.gz.tbi'), [], [], [], [], []] }
+                def genome = file("${outputDir}/genome.bed")
+                genome.parent.mkdirs()
+                genome.text = 'chr1\\t0\\t30000\\nchr2\\t0\\t20000\\nchrM\\t0\\t16569\\n'
+                def entries = channel.of(entry.call('S1', 'wgs'), entry.call('S1', 'wes'), entry.call('S1', 'panel'), entry.call('S2', 'panel'), entry.call('S2', 'wgs'))
+                input[0] = entries
+                input[1] = channel.value([[id: 'synthetic'], file(base + 'reference/synthetic.fa'), file(base + 'reference/synthetic.fa.fai'), []])
+                input[2] = channel.value(genome)
+                input[3] = entries.map { e -> [e[0], file(base + 'bed/panel.bed')] }
+                """
+            }
+        }
+
+        then {
+            def records = { channel_out, id ->
+                def vcf = channel_out.find { item -> item[0].id == id }[1]
+                path(vcf).linesGzip.findAll { line -> !line.startsWith('#') }.collect { line -> line.tokenize('\t')[0..4].join(':') }
+            }
+            def header = { channel_out, id ->
+                def vcf = channel_out.find { item -> item[0].id == id }[1]
+                path(vcf).linesGzip.findAll { line -> line.startsWith('##contig') || line.startsWith('#CHROM') }
+            }
+            assertAll(
+                { assert workflow.success },
+                // E01 dedup, E03 low VAF FP, E04 MNV atomized, E05 left-aligned, E06, E08, E11, E13; outside region dropped
+                { assert records(workflow.out.compare, 'S1_panel') == [
+                    'chr1:4100:.:A:C', 'chr1:4300:.:C:G', 'chr1:4400:.:A:C', 'chr1:4401:.:C:T', 'chr1:4600:.:A:C',
+                    'chr1:4700:.:G:T', 'chr1:4999:.:GA:G', 'chr1:8500:.:G:T', 'chr2:2500:.:CTAG:C'] },
+                // E02 kept despite <NON_REF>, E04 MNV atomized, E06 split (extra allele kept), E08 filtered, E10 removed, E12 left-aligned
+                { assert records(workflow.out.compare, 'S1_wes') == [
+                    'chr1:4100:.:A:C', 'chr1:4200:.:A:C', 'chr1:4400:.:A:C', 'chr1:4401:.:C:T', 'chr1:4600:.:A:C',
+                    'chr1:4600:.:A:G', 'chr1:4999:.:GA:G', 'chr1:8500:.:G:T', 'chr2:2500:.:CTAG:C', 'chr2:2999:.:G:GCA'] },
+                // E07/E14 outside the region are kept in the normalized VCF only
+                { assert records(workflow.out.normalized, 'S1_wgs').size() == 12 },
+                { assert records(workflow.out.compare, 'S1_wgs').size() == 10 },
+                // S2 panel: 1/2/MT renamed, contig lines from the reference, chrM kept in normalized VCF
+                { assert records(workflow.out.normalized, 'S2_panel') == [
+                    'chr1:4150:.:C:G', 'chr1:5500:.:A:C', 'chr2:4000:.:C:G', 'chr2:4500:.:G:T', 'chrM:100:.:T:A'] },
+                { assert header(workflow.out.normalized, 'S2_panel')[0..2] == [
+                    '##contig=<ID=chr1,length=30000>', '##contig=<ID=chr2,length=20000>', '##contig=<ID=chrM,length=16569>'] },
+                // S2 wgs: normal column came first in the input; tumor is first now
+                { assert header(workflow.out.normalized, 'S2_wgs').last().endsWith('FORMAT\tS2_wgs_T\tS2_wgs_N') },
+                { assert workflow.out.reports.size() == 5 }
+            )
+        }
+    }
+}

@@ -2,6 +2,24 @@
     "-profile test": {
         "content": [
             {
+                "BCFTOOLS_ANNOTATE": {
+                    "bcftools": "1.23.1"
+                },
+                "BCFTOOLS_NORM": {
+                    "bcftools": "1.23.1"
+                },
+                "BCFTOOLS_REHEADER": {
+                    "bcftools": "1.23.1"
+                },
+                "BCFTOOLS_VIEW_CLEAN": {
+                    "bcftools": "1.23.1"
+                },
+                "BCFTOOLS_VIEW_COMPARE": {
+                    "bcftools": "1.23.1"
+                },
+                "BCFTOOLS_VIEW_SELECT": {
+                    "bcftools": "1.23.1"
+                },
                 "BEDTOOLS_SORT": {
                     "bedtools": "2.31.1"
                 },
@@ -9,14 +27,22 @@
                     "pysam": "0.24.1",
                     "python": "3.12.15"
                 },
+                "CHECK_REFERENCE_VCF": {
+                    "pysam": "0.24.1",
+                    "python": "3.12.15"
+                },
                 "COMMON_REGIONS": {
                     "bedtools": "2.31.1"
+                },
+                "HARMONIZE_VCF": {
+                    "pysam": "0.24.1",
+                    "python": "3.12.15"
                 },
                 "SAMTOOLS_FAIDX": {
                     "samtools": 1.24
                 },
                 "Workflow": {
-                    "core-unit-bioinformatics/workflow-nxf-somatic-variantcomp": "v0.3.0-dev"
+                    "core-unit-bioinformatics/workflow-nxf-somatic-variantcomp": "v0.4.0-dev"
                 }
             },
             [
@@ -41,7 +67,41 @@
                 "regions/reference_check/wes.bed.reference_check.tsv",
                 "regions/targets",
                 "regions/targets/panel.bed",
-                "regions/targets/wes.bed"
+                "regions/targets/wes.bed",
+                "vcf_preprocessed",
+                "vcf_preprocessed/S1",
+                "vcf_preprocessed/S1/S1_panel.compare.vcf.gz",
+                "vcf_preprocessed/S1/S1_panel.compare.vcf.gz.tbi",
+                "vcf_preprocessed/S1/S1_panel.normalized.vcf.gz",
+                "vcf_preprocessed/S1/S1_panel.normalized.vcf.gz.tbi",
+                "vcf_preprocessed/S1/S1_wes.compare.vcf.gz",
+                "vcf_preprocessed/S1/S1_wes.compare.vcf.gz.tbi",
+                "vcf_preprocessed/S1/S1_wes.normalized.vcf.gz",
+                "vcf_preprocessed/S1/S1_wes.normalized.vcf.gz.tbi",
+                "vcf_preprocessed/S1/S1_wgs.compare.vcf.gz",
+                "vcf_preprocessed/S1/S1_wgs.compare.vcf.gz.tbi",
+                "vcf_preprocessed/S1/S1_wgs.normalized.vcf.gz",
+                "vcf_preprocessed/S1/S1_wgs.normalized.vcf.gz.tbi",
+                "vcf_preprocessed/S2",
+                "vcf_preprocessed/S2/S2_panel.compare.vcf.gz",
+                "vcf_preprocessed/S2/S2_panel.compare.vcf.gz.tbi",
+                "vcf_preprocessed/S2/S2_panel.normalized.vcf.gz",
+                "vcf_preprocessed/S2/S2_panel.normalized.vcf.gz.tbi",
+                "vcf_preprocessed/S2/S2_wes.compare.vcf.gz",
+                "vcf_preprocessed/S2/S2_wes.compare.vcf.gz.tbi",
+                "vcf_preprocessed/S2/S2_wes.normalized.vcf.gz",
+                "vcf_preprocessed/S2/S2_wes.normalized.vcf.gz.tbi",
+                "vcf_preprocessed/S2/S2_wgs.compare.vcf.gz",
+                "vcf_preprocessed/S2/S2_wgs.compare.vcf.gz.tbi",
+                "vcf_preprocessed/S2/S2_wgs.normalized.vcf.gz",
+                "vcf_preprocessed/S2/S2_wgs.normalized.vcf.gz.tbi",
+                "vcf_preprocessed/reference_check",
+                "vcf_preprocessed/reference_check/S1_panel.vcf.reference_check.tsv",
+                "vcf_preprocessed/reference_check/S1_wes.vcf.reference_check.tsv",
+                "vcf_preprocessed/reference_check/S1_wgs.vcf.reference_check.tsv",
+                "vcf_preprocessed/reference_check/S2_panel.vcf.reference_check.tsv",
+                "vcf_preprocessed/reference_check/S2_wes.vcf.reference_check.tsv",
+                "vcf_preprocessed/reference_check/S2_wgs.vcf.reference_check.tsv"
             ],
             [
                 "multiqc_citations.txt:md5,4c806e63a283ec1b7e78cdae3a923d4f",
@@ -50,10 +110,16 @@
                 "panel.bed.reference_check.tsv:md5,0643674a92c11c0de6bd2e38df0838c0",
                 "wes.bed.reference_check.tsv:md5,b67b2c488c8979f0236d3db158c375c6",
                 "panel.bed:md5,05beabccb7d0af813ec94b6dad30a3c6",
-                "wes.bed:md5,fbe9a533baa9b14958cddea97db4ea48"
+                "wes.bed:md5,fbe9a533baa9b14958cddea97db4ea48",
+                "S1_panel.vcf.reference_check.tsv:md5,aa9ee33e1c3dcbc87cf9d5b26f73396b",
+                "S1_wes.vcf.reference_check.tsv:md5,d20d3a1832d3405529ebae30942ef4da",
+                "S1_wgs.vcf.reference_check.tsv:md5,657ced6b86a61007e5d4f0668db8bbd0",
+                "S2_panel.vcf.reference_check.tsv:md5,5726a46b5c1541dd9c5c89c96db5277b",
+                "S2_wes.vcf.reference_check.tsv:md5,2f4004863dafc40cd45d5f28aa5000b6",
+                "S2_wgs.vcf.reference_check.tsv:md5,87b5af0a0b0372af9e6d78dd0dcd98f8"
             ]
         ],
-        "timestamp": "2026-10-07T17:52:04.24310376",
+        "timestamp": "2026-10-07T18:46:10.629873404",
         "meta": {
             "nf-test": "0.9.5",
             "nextflow": "26.04.4"

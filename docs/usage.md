@@ -80,6 +80,22 @@ technologies. Technologies without a BED (WGS) are genome-wide and don't restric
 | `--regions_bed` | Restrict the comparison further, e.g. to high-confidence regions of a truth set. |
 | `--exclude_bed` | Remove regions, e.g. a blacklist or problematic regions. |
 
+## Filters
+
+The input VCFs are **unfiltered** (all calls with the caller's FILTER column). The pipeline
+applies one set of filters identically to every technology. VAF, depth and alt read counts
+are computed from FORMAT/AD the same way for every caller.
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `--filter_pass_only` | `true` | Only calls with FILTER `PASS` (or `.`) are compared. |
+| `--min_vaf` | `0` (off) | Minimum tumor VAF. |
+| `--min_depth` | `0` (off) | Minimum tumor depth. |
+| `--min_alt_reads` | `0` (off) | Minimum tumor alt read count. |
+
+Filtered calls are kept in the normalized VCFs, so a missed variant can later be classified
+as "present but filtered".
+
 ## Comparison options
 
 | Parameter | Default | Description |

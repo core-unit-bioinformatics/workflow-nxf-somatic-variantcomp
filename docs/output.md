@@ -11,6 +11,7 @@ The directories listed below will be created in the results directory after the 
 The pipeline is built using [Nextflow](https://www.nextflow.io/) and processes data using the following steps:
 
 - [Regions](#regions) - Reference check of all target BEDs and the common comparison region
+- [Preprocessed VCFs](#preprocessed-vcfs) - Reference check, normalization, harmonization and uniform filtering of every VCF
 - [MultiQC](#multiqc) - Aggregate report describing results and QC from the whole pipeline
 - [Pipeline information](#pipeline-information) - Report metrics generated during the workflow execution
 
@@ -39,6 +40,38 @@ Every BED is checked against the reference `.fai`:
   absent from the reference are dropped and reported.
 - **Error:** intervals that end beyond their contig indicate a different genome build. The
   pipeline stops with a message naming the file.
+
+### Preprocessed VCFs
+
+<details markdown="1">
+<summary>Output files</summary>
+
+- `vcf_preprocessed/<sample>/`
+  - `<sample>_<technology>.normalized.vcf.gz(.tbi)`: all records on reference contigs after
+    normalization and harmonization, before filtering and region restriction.
+  - `<sample>_<technology>.compare.vcf.gz(.tbi)`: the calls that enter the comparison: the
+    uniform filters are applied and only records in the comparison region are kept.
+- `vcf_preprocessed/reference_check/<sample>_<technology>.vcf.reference_check.tsv`: result of
+  the reference check per VCF (`status` = `ok`, `fixed` or `error`; renamed contigs, header
+  fixes, records on unknown contigs, REF mismatches, sample names).
+
+</details>
+
+Every VCF goes through the same steps:
+
+1. Reference check (contig names and lengths, REF alleles, sample names).
+2. Tumor and normal columns selected in this order; recompressed with BGZF.
+3. Contigs renamed to the reference (`chr` prefix, `MT`/`chrM`).
+4. Records on non-reference contigs and pure gVCF reference blocks removed.
+5. Contig header lines rewritten from the reference `.fai`.
+6. `bcftools norm`: multiallelic records split, indels left-aligned, MNVs atomized into
+   SNVs, records with a REF mismatch dropped, duplicates removed.
+7. Harmonization: caller-independent INFO tags computed from FORMAT/AD
+   (`VC_T_VAF`, `VC_T_DP`, `VC_T_ALT`, `VC_N_VAF`, `VC_N_DP`, `VC_N_ALT`, `VC_TYPE`,
+   `VC_LEN`). Every record is a call of the tumor (GT tumor `0/1`, normal `0/0`), and
+   remaining symbolic alleles are dropped.
+8. Uniform filters (`--filter_pass_only`, `--min_vaf`, `--min_depth`, `--min_alt_reads`) and
+   restriction to the comparison region (records overlapping it are kept).
 
 ### MultiQC
 

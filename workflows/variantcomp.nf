@@ -6,6 +6,7 @@
 include { MULTIQC                } from '../modules/nf-core/multiqc/main'
 include { PREPARE_REFERENCE      } from '../subworkflows/local/prepare_reference'
 include { PREPARE_REGIONS        } from '../subworkflows/local/prepare_regions'
+include { PREPROCESS_VCF         } from '../subworkflows/local/preprocess_vcf'
 include { paramsSummaryMap       } from 'plugin/nf-schema'
 include { paramsSummaryMultiqc   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { softwareVersionsToYAML } from '../subworkflows/nf-core/utils_nfcore_pipeline'
@@ -72,6 +73,16 @@ workflow VARIANTCOMP {
         PREPARE_REFERENCE.out.reference,
         regions_bed ? file(regions_bed, checkIfExists: true) : null,
         exclude_bed ? file(exclude_bed, checkIfExists: true) : null
+    )
+
+    //
+    // SUBWORKFLOW: reference check, normalization, harmonization and uniform filtering
+    //
+    PREPROCESS_VCF(
+        ch_samplesheet,
+        PREPARE_REFERENCE.out.reference,
+        PREPARE_REFERENCE.out.genome_bed,
+        ch_samplesheet.map { entry -> entry[0] }.combine(PREPARE_REGIONS.out.common_bed)
     )
 
     //

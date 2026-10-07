@@ -96,17 +96,20 @@ VAF/detection-power awareness are essential.
 - **Identical treatment of every technology.** One normalization chain and
   one filter rule set for all VCFs.
 - **Normalization chain:** this order is mandatory; don't reorder or skip a
-  step without discussing it.
-  1. reference check + reheader contigs from the `.fai`
-  2. contig renaming if needed
-  3. select tumor/normal columns
-  4. drop gVCF/reference records (`<*>`, `<NON_REF>`)
-  5. REF check + `-m-any` split + left-align
-  6. atomize MNPs
-  7. deduplicate
-  8. harmonize VAF/DP/AD tags and GT (caller profiles: `dragen`, `mutect2`)
-  9. uniform filtering (keep the unfiltered normalized VCF as well)
-  10. restrict to the common/callable regions
+  step without discussing it. Implemented in `subworkflows/local/preprocess_vcf`.
+  1. reference check (contigs, lengths, REF alleles, sample names)
+  2. select tumor (+ normal) in this order, recompress to BGZF (inputs may be
+     plain gzip)
+  3. contig renaming
+  4. keep reference contigs only; drop records whose only ALT is symbolic
+     (gVCF blocks)
+  5. rewrite contig header lines from the `.fai`
+  6. `-m-any` split + left-align + atomize MNPs + drop REF mismatches +
+     deduplicate (`bcftools norm`)
+  7. harmonize VAF/DP/alt counts from AD (`VC_*` INFO tags), variant type,
+     GT (tumor `0/1`, normal `0/0`); drop remaining symbolic alleles
+  8. uniform filtering + restriction to the common/callable regions (the
+     unfiltered normalized VCF is kept as well)
 - **Matching.**
   - Primary: `rtgtools vcfeval --squash-ploidy` (haplotype-aware).
   - Also report exact-allele (`bcftools isec`) and position-only matches.
