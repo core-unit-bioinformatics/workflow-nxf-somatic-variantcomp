@@ -23,6 +23,7 @@ workflow DISCORDANCE {
     ch_reference    // value channel: [ meta, fasta, fai, gzi ]
     gene_bed        // path: optional gene BED (BED4, name = gene)
     ch_strata       // channel: [ meta(id: name), bed ] stratification BEDs
+    ch_extra_sites  // channel: [ sample, vcf ] further positions for the read evidence (known variants)
 
     main:
     // annotation BEDs: reference check, contig renaming (extra columns are kept)
@@ -45,6 +46,7 @@ workflow DISCORDANCE {
     // compared positions per sample
     def ch_sites = ch_compare
         .map { meta, vcf, _tbi -> [meta.sample, vcf] }
+        .mix(ch_extra_sites)
         .groupTuple()
 
     // alignments (tumor and normal) per entry; amplicon data keeps duplicates (see modules.config)
@@ -121,4 +123,5 @@ workflow DISCORDANCE {
     discordance = CLASSIFY_DISCORDANCE.out.discordance // channel: [ meta(pair), tsv ]
     power       = AGGREGATE_POWER.out.aggregated       // channel: [ meta, tsv ]
     annotated   = ANNOTATE_VARIANTS.out.tsv            // channel: [ meta, tsv ] all compared variants
+    evidence    = READ_EVIDENCE.out.vcf                // channel: [ meta(alignment), vcf, tbi ]
 }

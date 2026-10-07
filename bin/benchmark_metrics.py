@@ -19,6 +19,9 @@ sets instead: `exact` uses (CHROM, POS, REF, ALT), `position` uses (CHROM, POS)
 only. Their difference to `overall` shows how much discordance comes from variant
 representation and how much from different alleles at the same position.
 
+With --regions (one or more BEDs), the `match` strata only use records inside
+all given regions (the same regions vcfeval was restricted to).
+
 recall = TP_baseline / (TP_baseline + FN); precision = TP_call / (TP_call + FP);
 F1 = harmonic mean. Undefined values are written as NA.
 """
@@ -73,9 +76,11 @@ def read_records(path):
     if not path:
         return
     with pysam.VariantFile(path) as vcf:
+        tags = set(vcf.header.info)
         for rec in vcf:
+            info = {t: rec.info.get(t) for t in ("VC_TYPE", "VC_LEN", "VC_T_VAF", "VC_T_DP",
+                                                 "VC_T_ALT") if t in tags}  # fmt: skip
             for alt in rec.alts or ():
-                info = rec.info
                 vtype = info.get("VC_TYPE") or variant_type(rec.ref, alt)
                 yield {
                     "chrom": rec.chrom,
@@ -83,12 +88,32 @@ def read_records(path):
                     "ref": rec.ref,
                     "alt": alt,
                     "type": vtype,
-                    "length": info.get("VC_LEN", len(alt) - len(rec.ref)),
+                    "length": info.get("VC_LEN")
+                    if info.get("VC_LEN") is not None
+                    else len(alt) - len(rec.ref),
                     "vaf": info.get("VC_T_VAF"),
                     "dp": info.get("VC_T_DP"),
                     "alt_count": info.get("VC_T_ALT"),
                     "filter": ";".join(rec.filter.keys()) or ".",
                 }
+
+
+def load_regions(path):
+    regions = {}
+    with open(path) as fh:
+        for line in fh:
+            fields = line.split("\t")
+            if len(fields) >= 3 and not line.startswith(("#", "track", "browser")):
+                regions.setdefault(fields[0], []).append((int(fields[1]), int(fields[2])))
+    return regions
+
+
+def inside(record, region_sets):
+    start, end = record["pos"] - 1, record["pos"] - 1 + len(record["ref"])
+    return all(
+        any(s < end and start < e for s, e in regions.get(record["chrom"], ()))
+        for regions in region_sets
+    )
 
 
 def parse_bins(text):
@@ -133,6 +158,7 @@ def main():
     parser.add_argument("--truth", required=True, help="truth technology")
     parser.add_argument("--query", required=True, help="query technology")
     parser.add_argument("--vaf-bins", default="0,0.05,0.1,0.2,0.5,1")
+    parser.add_argument("--regions", nargs="*", default=[], help="restrict match strata (BEDs)")
     parser.add_argument("--prefix", required=True)
     args = parser.parse_args()
 
@@ -164,6 +190,10 @@ def main():
 
     truth_all = list(read_records(args.truth_vcf))
     query_all = list(read_records(args.query_vcf))
+    if args.regions:
+        region_sets = [load_regions(p) for p in args.regions]
+        truth_all = [r for r in truth_all if inside(r, region_sets)]
+        query_all = [r for r in query_all if inside(r, region_sets)]
     for name, key in (("exact", ("chrom", "pos", "ref", "alt")), ("position", ("chrom", "pos"))):
         truth_set = {tuple(r[k] for k in key) for r in truth_all}
         query_set = {tuple(r[k] for k in key) for r in query_all}

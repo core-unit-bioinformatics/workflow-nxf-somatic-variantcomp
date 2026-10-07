@@ -26,7 +26,7 @@ process CLASSIFY_DISCORDANCE {
     prefix = task.ext.prefix ?: "${meta.id}"
     def truth_tumor = truth_tumor_evidence ? "--truth-tumor-evidence ${truth_tumor_evidence}" : ''
     def query_tumor = query_tumor_evidence ? "--query-tumor-evidence ${query_tumor_evidence}" : ''
-    def normals = normal_evidence ? "--normal-evidence ${normal_evidence.join(' ')}" : ''
+    def normals = normal_evidence ? "--normal-evidence ${[normal_evidence].flatten().join(' ')}" : ''
     """
     classify_discordance.py \\
         --variants ${variants} \\

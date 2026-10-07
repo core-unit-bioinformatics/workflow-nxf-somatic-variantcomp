@@ -120,3 +120,18 @@ def test_aggregate(metrics, tmp_path):
     assert overall["macro_recall_mean"] == "0.3333"
     assert overall["macro_recall_sd"] == "0.0000"
     assert len(read_tsv(f"{prefix}.per_pair.tsv")) == 2 * len(read_tsv(f"{metrics}.metrics.tsv"))
+
+
+def test_match_strata_restricted_to_regions(tmp_path, metrics):
+    # rerun with a region that excludes chr1:300 (truth FN) and chr1:400 (query FP)
+    bed = tmp_path / "regions.bed"
+    bed.write_text("chr1\t0\t250\n")
+    cmd = [sys.executable, str(BIN / "benchmark_metrics.py"), "--sample", "S1", "--truth", "wgs",
+           "--query", "wes", "--prefix", str(tmp_path / "restricted"),
+           "--regions", str(bed)]  # fmt: skip
+    for key, name in (("tp-baseline", "tpb"), ("fn", "fn"), ("tp", "tp"), ("fp", "fp"),
+                      ("truth-vcf", "truth"), ("query-vcf", "query")):  # fmt: skip
+        cmd += [f"--{key}", str(tmp_path / f"{name}.vcf")]
+    subprocess.run(cmd, check=True)
+    exact = row(read_tsv(tmp_path / "restricted.metrics.tsv"), "match", "exact")
+    assert (exact["tp_baseline"], exact["fn"], exact["fp"]) == ("1", "1", "1")

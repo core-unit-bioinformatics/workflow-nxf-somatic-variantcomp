@@ -53,7 +53,7 @@ workflow BENCHMARK {
             .join(RTGTOOLS_VCFEVAL.out.fn_vcf)
             .join(RTGTOOLS_VCFEVAL.out.tp_vcf)
             .join(RTGTOOLS_VCFEVAL.out.fp_vcf)
-            .join(ch_pairs.map { meta, call_vcf, _call_tbi, base_vcf, _base_tbi, _bed -> [meta, base_vcf, call_vcf] })
+            .join(ch_pairs.map { meta, call_vcf, _call_tbi, base_vcf, _base_tbi, _bed -> [meta, base_vcf, call_vcf, []] })
     )
 
     AGGREGATE_METRICS(
@@ -69,6 +69,7 @@ workflow BENCHMARK {
     per_pair   = AGGREGATE_METRICS.out.per_pair   // channel: [ meta, tsv ]
     aggregated = AGGREGATE_METRICS.out.aggregated // channel: [ meta, tsv ]
     summary    = RTGTOOLS_VCFEVAL.out.summary     // channel: [ meta(pair), txt ]
+    sdf        = RTGTOOLS_FORMAT.out.sdf          // channel: [ meta, sdf ]
 }
 
 //

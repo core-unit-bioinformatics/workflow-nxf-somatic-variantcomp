@@ -8,7 +8,7 @@ process BENCHMARK_METRICS {
         : 'quay.io/biocontainers/pysam:0.24.1--py312hf5ad864_0'}"
 
     input:
-    tuple val(meta), path(tp_baseline), path(fn), path(tp), path(fp), path(truth_vcf, stageAs: 'truth/*'), path(query_vcf, stageAs: 'query/*')
+    tuple val(meta), path(tp_baseline), path(fn), path(tp), path(fp), path(truth_vcf, stageAs: 'truth/*'), path(query_vcf, stageAs: 'query/*'), path(regions, stageAs: 'regions/*')
 
     output:
     tuple val(meta), path("${prefix}.metrics.tsv"), emit: metrics
@@ -22,6 +22,7 @@ process BENCHMARK_METRICS {
     script:
     def args = task.ext.args ?: ''
     prefix = task.ext.prefix ?: "${meta.id}"
+    def regions_arg = regions ? "--regions ${[regions].flatten().join(' ')}" : ''
     """
     benchmark_metrics.py \\
         --tp-baseline ${tp_baseline} \\
@@ -34,6 +35,7 @@ process BENCHMARK_METRICS {
         --truth ${meta.truth} \\
         --query ${meta.query} \\
         --prefix ${prefix} \\
+        ${regions_arg} \\
         ${args}
     """
 
