@@ -4,6 +4,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Dates follow ISO 8601 (`YYYY-MM-DD`).
 
+## v0.3.0-dev - [unreleased]
+
+### `Added`
+
+- `tests/seqc2/seqc2_testdata.py` (+ `seqc2_testdata.yaml`): reproducible download (resumable, md5-verified), preparation and run of the SEQC2 HCC1395/HCC1395BL WES + WGS test dataset in `small` (chr22, Pi-sized) and `full` (genome-wide, HPC) mode, with provenance README and checksums
+- Profiles `test_seqc2` (small SEQC2) and `test_full` (full SEQC2)
+- nf-test pipeline test for `-profile test_seqc2`; pytest for the SEQC2 script
+- `docs/testing.md`
+
 ## v0.2.0-dev - [2026-10-07]
 
 ### `Added`
