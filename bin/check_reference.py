@@ -24,7 +24,7 @@ Outputs (prefix given by --prefix):
   <prefix>.regions.bed          (--type bam with --regions) the regions BED
                                 (reference names) translated to the
                                 alignment's contig names, e.g. for mosdepth --by
-  <prefix>.harmonized.bed       (--type bed only) first three columns with
+  <prefix>.harmonized.bed       (--type bed only) all columns with
                                 renamed contigs, intervals on unknown contigs
                                 dropped; input order kept (sort afterwards)
 
@@ -207,10 +207,10 @@ def check_bed(args, reference, report):
             if not line.strip() or line.startswith(("#", "track", "browser")):
                 continue
             fields = line.rstrip("\n").split("\t")
-            intervals.append((fields[0], int(fields[1]), int(fields[2])))
+            intervals.append((fields[0], int(fields[1]), int(fields[2]), fields[3:]))
     report.set("intervals", len(intervals))
-    mapping, unknown = finish_mapping({c for c, _, _ in intervals}, reference, report, args.prefix)
-    dropped = sum(1 for c, _, _ in intervals if mapping[c] is None)
+    mapping, unknown = finish_mapping({c for c, *_ in intervals}, reference, report, args.prefix)
+    dropped = sum(1 for c, *_ in intervals if mapping[c] is None)
     report.set("intervals_on_unknown_contigs", dropped)
     if dropped:
         report.warnings.append(
@@ -220,8 +220,12 @@ def check_bed(args, reference, report):
     if intervals and dropped == len(intervals):
         report.errors.append("no interval is on a reference contig: wrong reference or naming")
     with open(f"{args.prefix}.harmonized.bed", "w") as fh:
-        fh.writelines(f"{mapping[c]}\t{s}\t{e}\n" for c, s, e in intervals if mapping[c])
-    beyond = sum(1 for c, _, e in intervals if mapping[c] and e > reference[mapping[c]])
+        fh.writelines(
+            "\t".join([mapping[c], str(s), str(e), *rest]) + "\n"
+            for c, s, e, rest in intervals
+            if mapping[c]
+        )
+    beyond = sum(1 for c, _, e, _ in intervals if mapping[c] and e > reference[mapping[c]])
     report.set("intervals_beyond_contig_end", beyond)
     if beyond:
         report.errors.append(

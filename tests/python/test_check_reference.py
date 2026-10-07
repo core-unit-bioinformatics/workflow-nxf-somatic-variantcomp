@@ -147,8 +147,11 @@ def test_bed_beyond_contig_end_is_error(tmp_path, reference):
 
 def test_bed_ok(tmp_path, reference):
     bed = tmp_path / "in.bed"
-    bed.write_text("track name=x\nchr1\t0\t100\nchr2\t900\t1000\n")
+    bed.write_text("track name=x\nchr1\t0\t100\tGENE1\nchr2\t900\t1000\tGENE2\n")
     result, report, _, keep = run_check(tmp_path, bed, "bed", reference)
+    assert (
+        tmp_path / "out.harmonized.bed"
+    ).read_text() == "chr1\t0\t100\tGENE1\nchr2\t900\t1000\tGENE2\n"
     assert result.returncode == 0
     assert report["status"] == "ok"
     assert keep == ["chr1", "chr2"]
