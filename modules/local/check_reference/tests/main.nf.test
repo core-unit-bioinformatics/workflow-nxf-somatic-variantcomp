@@ -1,0 +1,108 @@
+nextflow_process {
+
+    name "Test Process CHECK_REFERENCE"
+    script "../main.nf"
+    process "CHECK_REFERENCE"
+    tag "modules"
+    tag "modules_local"
+    tag "check_reference"
+
+    test("vcf - no-chr contig names are renamed") {
+
+        when {
+            process {
+                """
+                def base = params.pipelines_testdata_base_path + 'synthetic/'
+                input[0] = [[id: 'S2_panel'], file(base + 'vcf/S2_panel.vcf.gz', checkIfExists: true)]
+                input[1] = 'vcf'
+                input[2] = [[id: 'synthetic'], file(base + 'reference/synthetic.fa', checkIfExists: true),
+                            file(base + 'reference/synthetic.fa.fai', checkIfExists: true), []]
+                """
+            }
+        }
+
+        then {
+            def report = path(process.out.report[0][1]).readLines()
+            assertAll(
+                { assert process.success },
+                { assert report.contains('status\tfixed') },
+                { assert report.contains('renamed_contigs\t1->chr1,2->chr2,MT->chrM') },
+                { assert report.contains('ref_mismatches\t0') },
+                { assert snapshot(process.out.rename, process.out.keep).match() }
+            )
+        }
+    }
+
+    test("vcf - wrong chrM length in header is fixed") {
+
+        when {
+            process {
+                """
+                def base = params.pipelines_testdata_base_path + 'synthetic/'
+                input[0] = [[id: 'S2_wes'], file(base + 'vcf/S2_wes.vcf.gz', checkIfExists: true)]
+                input[1] = 'vcf'
+                input[2] = [[id: 'synthetic'], file(base + 'reference/synthetic.fa', checkIfExists: true),
+                            file(base + 'reference/synthetic.fa.fai', checkIfExists: true), []]
+                """
+            }
+        }
+
+        then {
+            def report = path(process.out.report[0][1]).readLines()
+            assertAll(
+                { assert process.success },
+                { assert report.contains('status\tfixed') },
+                { assert report.contains('header_length_fixes\tchrM:16570->16569') }
+            )
+        }
+    }
+
+    test("bed - interval beyond contig end fails (different build)") {
+
+        when {
+            process {
+                """
+                def base = params.pipelines_testdata_base_path + 'synthetic/'
+                def bed = file("${outputDir}/wrong_build.bed")
+                bed.parent.mkdirs()
+                bed.text = 'chr1\\t100\\t200\\nchr1\\t29000\\t31000\\n'
+                input[0] = [[id: 'wrong_build'], bed]
+                input[1] = 'bed'
+                input[2] = [[id: 'synthetic'], file(base + 'reference/synthetic.fa', checkIfExists: true),
+                            file(base + 'reference/synthetic.fa.fai', checkIfExists: true), []]
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert process.failed },
+                { assert (process.stdout + process.stderr).any { line -> line.contains('different genome build') } }
+            )
+        }
+    }
+
+    test("vcf - stub") {
+
+        options "-stub"
+
+        when {
+            process {
+                """
+                def base = params.pipelines_testdata_base_path + 'synthetic/'
+                input[0] = [[id: 'S1_wgs'], file(base + 'vcf/S1_wgs.vcf.gz', checkIfExists: true)]
+                input[1] = 'vcf'
+                input[2] = [[id: 'synthetic'], file(base + 'reference/synthetic.fa', checkIfExists: true),
+                            file(base + 'reference/synthetic.fa.fai', checkIfExists: true), []]
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert process.success },
+                { assert snapshot(process.out).match() }
+            )
+        }
+    }
+}

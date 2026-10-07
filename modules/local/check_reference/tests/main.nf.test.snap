@@ -1,0 +1,120 @@
+{
+    "vcf - no-chr contig names are renamed": {
+        "content": [
+            [
+                [
+                    {
+                        "id": "S2_panel"
+                    },
+                    "S2_panel.vcf.rename_chrs.tsv:md5,dcb473847fb66914dcc00f2ce7ab1ec7"
+                ]
+            ],
+            [
+                [
+                    {
+                        "id": "S2_panel"
+                    },
+                    "S2_panel.vcf.keep_contigs.txt:md5,7a96c5e0c82090e4793bee9f38715e02"
+                ]
+            ]
+        ],
+        "timestamp": "2026-10-07T17:26:59.787754335",
+        "meta": {
+            "nf-test": "0.9.5",
+            "nextflow": "26.04.4"
+        }
+    },
+    "vcf - stub": {
+        "content": [
+            {
+                "0": [
+                    [
+                        {
+                            "id": "S1_wgs"
+                        },
+                        "S1_wgs.vcf.reference_check.tsv:md5,766653b6adb4a5cbd2bde22112125ba9"
+                    ]
+                ],
+                "1": [
+                    [
+                        {
+                            "id": "S1_wgs"
+                        },
+                        "S1_wgs.vcf.rename_chrs.tsv:md5,d41d8cd98f00b204e9800998ecf8427e"
+                    ]
+                ],
+                "2": [
+                    [
+                        {
+                            "id": "S1_wgs"
+                        },
+                        "S1_wgs.vcf.keep_contigs.txt:md5,d41d8cd98f00b204e9800998ecf8427e"
+                    ]
+                ],
+                "3": [
+                    
+                ],
+                "4": [
+                    [
+                        "CHECK_REFERENCE",
+                        "python",
+                        "3.12.15"
+                    ]
+                ],
+                "5": [
+                    [
+                        "CHECK_REFERENCE",
+                        "pysam",
+                        "0.24.1"
+                    ]
+                ],
+                "bed": [
+                    
+                ],
+                "keep": [
+                    [
+                        {
+                            "id": "S1_wgs"
+                        },
+                        "S1_wgs.vcf.keep_contigs.txt:md5,d41d8cd98f00b204e9800998ecf8427e"
+                    ]
+                ],
+                "rename": [
+                    [
+                        {
+                            "id": "S1_wgs"
+                        },
+                        "S1_wgs.vcf.rename_chrs.tsv:md5,d41d8cd98f00b204e9800998ecf8427e"
+                    ]
+                ],
+                "report": [
+                    [
+                        {
+                            "id": "S1_wgs"
+                        },
+                        "S1_wgs.vcf.reference_check.tsv:md5,766653b6adb4a5cbd2bde22112125ba9"
+                    ]
+                ],
+                "versions_pysam": [
+                    [
+                        "CHECK_REFERENCE",
+                        "pysam",
+                        "0.24.1"
+                    ]
+                ],
+                "versions_python": [
+                    [
+                        "CHECK_REFERENCE",
+                        "python",
+                        "3.12.15"
+                    ]
+                ]
+            }
+        ],
+        "timestamp": "2026-10-07T17:31:48.572941821",
+        "meta": {
+            "nf-test": "0.9.5",
+            "nextflow": "26.04.4"
+        }
+    }
+}
