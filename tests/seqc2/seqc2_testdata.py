@@ -454,22 +454,40 @@ class Dataset:
             fh.writelines("\t".join(r) + "\n" for r in rows)
         return path
 
-    def write_params(self, fasta, truth, genes, strat):
+    def write_known_variants(self, truth):
+        """known_variants.tsv: SEQC2 truth (benchmark, all samples) + demo required list."""
+        known = self.out / "known"
+        known.mkdir(exist_ok=True)
+        req = self.cfg["known_required"]
+        lines = ["chrom\tpos\tref\talt\tgene\tlabel"]
+        lines += ["\t".join(str(x) for x in v) for v in req["variants"]
+                  if not self.contigs or v[0] in self.contigs]  # fmt: skip
+        (known / "required_demo.tsv").write_text("\n".join(lines) + "\n")
+        rows = [
+            "name\tsample\tmode\tvariants\tregions",
+            "seqc2_truth\tall\tbenchmark\t"
+            f"{truth['snv'].relative_to(self.out)},{truth['indel'].relative_to(self.out)}\t"
+            f"{truth['regions'].relative_to(self.out)}",
+        ]
+        if req["sample"].replace("SEQC2_", "") in self.pairs:
+            rows.append(f"required_demo\t{req['sample']}\trequired\tknown/required_demo.tsv\tn/a")
+        path = self.out / "known_variants.tsv"
+        path.write_text("\n".join(rows) + "\n")
+        return path
+
+    def write_params(self, fasta, truth, genes, strat, known):
         params = {
             "input": "samplesheet.tsv",
             "truth_technology": "wgs",
             "fasta": str(fasta.relative_to(self.out)),
             "gene_bed": str(genes.relative_to(self.out)),
             "stratification": str(strat.relative_to(self.out)),
-            "known_variants_snv": str(truth["snv"].relative_to(self.out)),
-            "known_variants_indel": str(truth["indel"].relative_to(self.out)),
-            "known_variants_regions": str(truth["regions"].relative_to(self.out)),
+            "known_variants": str(known.relative_to(self.out)),
         }
         path = self.out / "params.yaml"
         with path.open("w") as fh:
             fh.write("# Pipeline parameters, paths relative to this folder.\n")
-            fh.write("# 'seqc2_testdata.py run' resolves them; not all keys may be used by\n")
-            fh.write("# the current pipeline version (known_variants_* are for a later feature).\n")
+            fh.write("# 'seqc2_testdata.py run' resolves them.\n")
             yaml.safe_dump(params, fh, sort_keys=False)
         return path
 
@@ -513,6 +531,7 @@ class Dataset:
             "| `truth/` | SEQC2 somatic reference call set v1.2.1 + high-confidence regions |",
             "| `annotation/` | Genes (GENCODE v46 basic) and GIAB v3.5 stratifications |",
             "| `stratification.tsv` | Stratification sheet (name, BED) for `--stratification` |",
+            "| `known_variants.tsv`, `known/` | Known-variant sheet for `--known_variants` |",
             "| `checksums.md5` | md5 of every file in this folder |",
             "",
             "## Sources",
@@ -538,7 +557,8 @@ class Dataset:
         bams = self.prepare_bams(wes_bed)
         genes, strat = self.prepare_annotation()
         self.write_samplesheet(vcfs, bams, wes_bed)
-        self.write_params(fasta, truth, genes, strat)
+        known = self.write_known_variants(truth)
+        self.write_params(fasta, truth, genes, strat, known)
         self.write_provenance(args)
         log.info("Done: %s", self.out)
 

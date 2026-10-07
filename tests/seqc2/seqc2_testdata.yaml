@@ -35,6 +35,16 @@ annotation:
       low_mappability: "Mappability/GRCh38_lowmappabilityall.bed.gz"
       all_difficult: "Union/GRCh38_alldifficultregions.bed.gz"
 
+# Known-variant lists (--known_variants): the SEQC2 truth set as 'benchmark' for all
+# samples, and a small demo 'required' list (two variants found by WGS and WES of IL_1,
+# one filtered in WES) to show the PASS/FAIL report
+known_required:
+  sample: SEQC2_IL_1
+  variants:
+    - [chr22, 50177152, C, T, PANX2, demo_1]
+    - [chr22, 50243801, T, C, TUBGCP6, demo_2]
+    - [chr22, 23164333, C, T, RAB36, demo_3]
+
 # Per-run somatic calls: MuTect2 (GATK 3.8) on BWA alignments. The VCFs are
 # unfiltered (all records kept, FILTER column set) and use sample names TUMOR/NORMAL.
 vcf_pattern: "analysis/SNVs/vcfs/{tech}/{tech}_{pair}.bwa.muTect2.vcf.gz"

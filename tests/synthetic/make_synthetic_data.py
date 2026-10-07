@@ -21,6 +21,9 @@ Edge cases (see ``design.tsv`` for the full list):
 - duplicated record (panel)
 - FILTER != PASS for a true variant (wes)
 - variants outside the common target region
+- known-variant lists for S1 (``known_variants.tsv``): a 'required' list (one
+  variant found everywhere, one filtered in wes, one outside the common region)
+  and the designed true variants as a 'benchmark' truth set
 - gene BED (``bed/genes.bed``) and stratification BEDs for the homopolymer and the
   dinucleotide repeat (``stratification.tsv``)
 - sample S2: contigs without ``chr`` prefix and no contig header lines
@@ -354,6 +357,34 @@ def write_vcf(path, sample, tech, records, quirks):
     return tumor_id, normal_id
 
 
+def write_known_variants(out, d):
+    """Known-variant lists for S1: a 'required' list and a 'benchmark' truth set."""
+    known = out / "known"
+    known.mkdir(exist_ok=True)
+    wgs = {(r["chrom"], r["pos"]): r for r in d.records[("S1", "wgs")]}
+
+    def line(pos, chrom="chr1", gene=".", label="."):
+        r = wgs[(chrom, pos)]
+        return f"{chrom}\t{pos}\t{r['ref']}\t{r['alts'][0]}\t{gene}\t{label}\t{r['vaf']}\n"
+
+    header = "chrom\tpos\tref\talt\tgene\tlabel\tvaf\n"
+    # E01 found everywhere, E08 filtered in wes, E07 outside the common region
+    (known / "required_S1.tsv").write_text(
+        header + line(4100, gene="GENE_A", label="E01") + line(4700, gene="GENE_B", label="E08")
+        + line(15000, label="E07")
+    )  # fmt: skip
+    # designed true variants of S1 in the common region (as an external truth set)
+    truth = [
+        r for (c, p), r in sorted(wgs.items()) if (c, p) not in {("chr1", 15000), ("chr1", 7000)}
+    ]
+    (known / "truth_S1.tsv").write_text(header + "".join(line(r["pos"], r["chrom"]) for r in truth))
+    (out / "known_variants.tsv").write_text(
+        "name\tsample\tmode\tvariants\tregions\n"
+        "required_demo\tS1\trequired\tknown/required_S1.tsv\tn/a\n"
+        "designed_truth\tS1\tbenchmark\tknown/truth_S1.tsv\tbed/panel.bed\n"
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--outdir", required=True, type=Path, help="output directory")
@@ -424,6 +455,8 @@ def main():
         )
         writer.writeheader()
         writer.writerows(d.design)
+
+    write_known_variants(out, d)
 
 
 if __name__ == "__main__":
