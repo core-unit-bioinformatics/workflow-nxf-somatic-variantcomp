@@ -94,11 +94,26 @@ def download(url, dest, md5=None):
     return dest
 
 
-def fetch_md5_table(url):
-    """Read a SEQC2 md5 list; returns {basename: md5}."""
-    out = subprocess.run(["curl", "-fsSL", "--retry", "5", url], check=True, capture_output=True)
+def fetch_md5_table(url, cache_file):
+    """Read a SEQC2 md5 list; returns {basename: md5}.
+
+    The list is cached; if the server is unreachable, the cached copy is used.
+    Without either, files are downloaded/used without md5 verification.
+    """
+    cache_file = Path(cache_file)
+    out = subprocess.run(["curl", "-fsSL", "--retry", "3", url], capture_output=True)
+    if out.returncode == 0:
+        cache_file.parent.mkdir(parents=True, exist_ok=True)
+        cache_file.write_bytes(out.stdout)
+        text = out.stdout.decode()
+    elif cache_file.exists():
+        log.warning("could not fetch %s, using cached copy %s", url, cache_file)
+        text = cache_file.read_text()
+    else:
+        log.warning("could not fetch %s: files will NOT be md5-verified", url)
+        return {}
     table = {}
-    for line in out.stdout.decode().splitlines():
+    for line in text.splitlines():
         parts = line.split()
         if len(parts) == 2:
             table[Path(parts[1]).name] = parts[0]
@@ -231,7 +246,7 @@ class Dataset:
     # VCFs ----------------------------------------------------------------------
 
     def prepare_vcfs(self):
-        md5 = fetch_md5_table(self.url(self.cfg["vcf_md5"]))
+        md5 = fetch_md5_table(self.url(self.cfg["vcf_md5"]), self.cache / self.cfg["vcf_md5"])
         vcf_dir = self.out / "vcf"
         vcf_dir.mkdir(parents=True, exist_ok=True)
         result = {}
