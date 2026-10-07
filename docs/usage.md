@@ -120,6 +120,48 @@ tandem_repeat	giab/GRCh38_AllTandemRepeats.bed.gz
 segmental_duplication	giab/GRCh38_segdups.bed.gz
 ```
 
+## Known variants
+
+`--known_variants` takes a tab-separated sheet of variant lists that are checked in
+addition to the comparison between technologies:
+
+```tsv title="known_variants.tsv"
+name	sample	mode	variants	regions
+clinical	P01	required	known/P01_clinical.tsv	n/a
+seqc2_truth	all	benchmark	truth/sSNV.vcf.gz,truth/sINDEL.vcf.gz	truth/High-Confidence_Regions.bed
+```
+
+| Column | Description |
+| --- | --- |
+| `name` | Name of the list (unique). |
+| `sample` | Samplesheet sample, or `all` for every sample. |
+| `mode` | `required` or `benchmark` (see below). |
+| `variants` | One or more comma-separated VCF or TSV files. TSV columns: `chrom`, `pos` (1-based), `ref`, `alt`, optional `gene`, `label`, `vaf`. |
+| `regions` | Optional BED (`n/a` if none), e.g. the confident regions of a truth set. |
+
+Every list is checked against the reference (contig names are renamed if needed; a REF
+mismatch is an error) and normalized like the VCFs.
+
+**`required`**: a small list of variants (e.g. fewer than 10 manually checked, clinically
+relevant variants) that **every technology must find**. For every technology the pipeline
+reports per variant:
+
+| Status | Meaning |
+| --- | --- |
+| `PASS` | Called and passing the uniform filters in the comparison region. |
+| `FAIL_filtered` | Called, but failed FILTER or the uniform thresholds. |
+| `FAIL_outside_region` | Not in the comparison region (common targets / callable region). |
+| `FAIL_not_called` | In the region, but not called. Read evidence (if alignments are given) shows whether reads support it. |
+
+Every FAIL is logged as a warning and shown in the MultiQC report. With
+`--fail_on_missing_required`, the pipeline stops with an error.
+
+**`benchmark`**: an external truth set, e.g. the SEQC2 reference call set or a GIAB
+benchmark (such as HG008, if you sequence it yourself). Every technology, including the truth
+technology, is compared with it by `rtg vcfeval` within `regions` ∩ the comparison region,
+with the same metrics as the main benchmark. If the list contains a VAF (VCF `INFO/TVAF`,
+`VAF` or `AF`, or the TSV column `vaf`), recall is also stratified by it.
+
 ## Filters
 
 The input VCFs are **unfiltered** (all calls with the caller's FILTER column). The pipeline

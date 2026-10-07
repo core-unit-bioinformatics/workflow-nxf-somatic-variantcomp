@@ -15,6 +15,7 @@ The pipeline is built using [Nextflow](https://www.nextflow.io/) and processes d
 - [Preprocessed VCFs](#preprocessed-vcfs) - Reference check, normalization, harmonization and uniform filtering of every VCF
 - [Benchmark](#benchmark) - Recall, precision and F1 of every technology against the truth technology
 - [Discordance](#discordance) - Why variants differ: classification, read evidence, genes and stratifications
+- [Known variants](#known-variants) - Required variants (PASS/FAIL per technology) and benchmarks against external truth sets
 - [Report](#report) - Enrichment statistics, gene summary and plots
 - [MultiQC](#multiqc) - Aggregate report describing results and QC from the whole pipeline
 - [Pipeline information](#pipeline-information) - Report metrics generated during the workflow execution
@@ -181,6 +182,27 @@ with power ≥ `--detection_power` count. This separates "the technology could n
 seen it" (depth/VAF) from "it should have seen it".
 
 Read evidence needs the alignments to use the reference contig names.
+
+### Known variants
+
+<details markdown="1">
+<summary>Output files</summary>
+
+- `known_variants/`
+  - `required_summary.tsv`: per list, sample and technology, the number of required
+    variants, how many passed and `all_passed` (`yes`/`no`).
+  - `required_variants.tsv`: every required variant per technology, with `status`
+    (`PASS`, `FAIL_filtered`, `FAIL_outside_region`, `FAIL_not_called`), FILTER, VAF,
+    depth, alt reads, read evidence and calls at the same position with other alleles.
+  - `required/<list>/`: the same per list and sample.
+  - `benchmark/known_benchmark.aggregated.tsv`, `benchmark/known_benchmark.per_pair.tsv`:
+    metrics of every technology against each external truth set (same format as the main
+    benchmark; `truth` is the list name).
+  - `benchmark/<sample>/`: per-pair metrics, variant tables and vcfeval output.
+  - `lists/`: the normalized known-variant VCFs per sample.
+  - `reference_check/`: reference check of the list regions.
+
+</details>
 
 ### Report
 

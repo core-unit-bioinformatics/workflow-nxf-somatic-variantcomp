@@ -11,6 +11,8 @@ include { COVERAGE               } from '../subworkflows/local/coverage'
 include { BENCHMARK              } from '../subworkflows/local/benchmark'
 include { DISCORDANCE            } from '../subworkflows/local/discordance'
 include { VARIANTCOMP_REPORT     } from '../modules/local/variantcomp_report/main'
+include { PREPARE_KNOWN_VARIANTS } from '../subworkflows/local/prepare_known_variants'
+include { KNOWN_VARIANTS         } from '../subworkflows/local/known_variants'
 include { paramsSummaryMap       } from 'plugin/nf-schema'
 include { paramsSummaryMultiqc   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { softwareVersionsToYAML } from '../subworkflows/nf-core/utils_nfcore_pipeline'
@@ -27,6 +29,7 @@ workflow VARIANTCOMP {
     take:
     ch_samplesheet // channel: samplesheet entries [ meta, vcf, vcf_index, tumor_bam, tumor_bai, normal_bam, normal_bai, target_bed ]
     ch_strata      // channel: stratification BEDs [ meta(id: name), bed ]
+    ch_known       // channel: known variant lists [ meta(id: name, sample, mode), [ files ], regions ]
     fasta          // string: reference FASTA
     fasta_fai      // string: optional reference .fai
     regions_bed    // string: optional BED restricting the comparison
@@ -118,6 +121,11 @@ workflow VARIANTCOMP {
     )
 
     //
+    // SUBWORKFLOW: known variant lists on the reference, per sample
+    //
+    PREPARE_KNOWN_VARIANTS(ch_known, ch_samplesheet, PREPARE_REFERENCE.out.reference)
+
+    //
     // SUBWORKFLOW: read evidence, classification and annotation of discordant variants
     //
     DISCORDANCE(
@@ -127,8 +135,57 @@ workflow VARIANTCOMP {
         BENCHMARK.out.variants,
         PREPARE_REFERENCE.out.reference,
         gene_bed ? file(gene_bed, checkIfExists: true) : null,
-        ch_strata
+        ch_strata,
+        PREPARE_KNOWN_VARIANTS.out.sites
     )
+
+    //
+    // SUBWORKFLOW: known variants ('required' check, 'benchmark' against an external truth)
+    //
+    KNOWN_VARIANTS(
+        PREPARE_KNOWN_VARIANTS.out.per_sample,
+        PREPROCESS_VCF.out.normalized,
+        PREPROCESS_VCF.out.compare,
+        COVERAGE.out.regions,
+        DISCORDANCE.out.evidence,
+        BENCHMARK.out.sdf
+    )
+    def ch_required = KNOWN_VARIANTS.out.required_variants
+        .map { _meta, tsv -> tsv }
+        .collectFile(name: 'required_variants.tsv', keepHeader: true, skip: 1, sort: true, storeDir: "${outdir}/known_variants")
+    def ch_required_summary = KNOWN_VARIANTS.out.required_summary
+        .map { meta, tsv -> tsv.readLines().drop(1).collect { line -> "${meta.name}\t${line}" }.join('\n') }
+        .collectFile(
+            name: 'required_summary.tsv', sort: true, newLine: true, storeDir: "${outdir}/known_variants",
+            seed: 'list\tsample\ttechnology\trequired\tpassed\tfailed\tall_passed'
+        )
+    ch_required
+        .map { tsv -> tsv.readLines() }
+        .subscribe { lines ->
+            def header = lines[0].tokenize('\t')
+            def failed = lines.drop(1).collect { line -> [header, line.split('\t', -1).toList()].transpose().collectEntries() }
+                .findAll { row -> row.status != 'PASS' }
+            failed.each { row ->
+                log.warn("Required variant ${row.label} ${row.chrom}:${row.pos} ${row.ref}>${row.alt} (${row.gene}) not found in ${row.sample} ${row.technology}: ${row.status}")
+            }
+            if (failed && params.fail_on_missing_required) {
+                error("${failed.size()} required variant(s) not found, see ${outdir}/known_variants/required_variants.tsv (--fail_on_missing_required)")
+            }
+        }
+    ch_multiqc_files = ch_multiqc_files.mix(
+        ch_required_summary.map { tsv ->
+            def header = "# id: 'variantcomp_required'\n# section_name: 'Required variants'\n" +
+                "# description: 'Known variants that must be found in every technology (--known_variants, mode required).'\n" +
+                "# plot_type: 'table'\n"
+            def lines = tsv.readLines()
+            def table = lines.withIndex().collect { line, i -> i == 0 ? 'id\t' + line : "${line.tokenize('\t')[0..2].join(' ')}\t${line}" }
+            def mqc = file("${workflow.workDir}/tmp/variantcomp_required_mqc.tsv")
+            mqc.parent.mkdirs()
+            mqc.text = header + table.join('\n') + '\n'
+            mqc
+        }
+    )
+
 
     //
     // MODULE: statistics (enrichment, genes, classes), plots and MultiQC sections

@@ -264,6 +264,30 @@
                 }
             }
         },
+        "known_variant_options": {
+            "title": "Known variant options",
+            "type": "object",
+            "fa_icon": "fas fa-clipboard-check",
+            "description": "Lists of known variants: clinically required variants that every technology must find, or external truth sets.",
+            "properties": {
+                "known_variants": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "schema": "assets/schema_known_variants.json",
+                    "mimetype": "text/tab-separated-values",
+                    "pattern": "^\\S+\\.tsv$",
+                    "description": "Tab-separated sheet with columns name, sample (or 'all'), mode ('required' or 'benchmark'), variants (comma-separated VCF/TSV files) and regions (BED or 'n/a').",
+                    "fa_icon": "fas fa-list"
+                },
+                "fail_on_missing_required": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Stop the pipeline with an error if a required variant is not found in every technology (it is always reported).",
+                    "fa_icon": "fas fa-exclamation-circle"
+                }
+            }
+        },
         "institutional_config_options": {
             "title": "Institutional config options",
             "type": "object",
@@ -422,6 +446,9 @@
         },
         {
             "$ref": "#/$defs/discordance_options"
+        },
+        {
+            "$ref": "#/$defs/known_variant_options"
         },
         {
             "$ref": "#/$defs/region_options"

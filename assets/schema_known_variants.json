@@ -1,0 +1,41 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://raw.githubusercontent.com/core-unit-bioinformatics/workflow-nxf-somatic-variantcomp/main/assets/schema_known_variants.json",
+    "title": "core-unit-bioinformatics/workflow-nxf-somatic-variantcomp pipeline - params.known_variants schema",
+    "description": "Tab-separated sheet of known variant lists. Relative paths are resolved against the sheet's directory.",
+    "type": "array",
+    "items": {
+        "type": "object",
+        "properties": {
+            "name": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_.-]+$",
+                "errorMessage": "name must be provided and may only contain A-Z, a-z, 0-9, '_', '.' and '-'",
+                "meta": ["id"]
+            },
+            "sample": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+                "errorMessage": "sample must be a samplesheet sample or 'all'",
+                "meta": ["sample"]
+            },
+            "mode": {
+                "type": "string",
+                "enum": ["required", "benchmark"],
+                "errorMessage": "mode must be 'required' (every variant must be found in every technology) or 'benchmark' (external truth set)",
+                "meta": ["mode"]
+            },
+            "variants": {
+                "type": "string",
+                "pattern": "^\\S+\\.(vcf|vcf\\.gz|bcf|tsv)(,\\S+\\.(vcf|vcf\\.gz|bcf|tsv))*$",
+                "errorMessage": "variants must be one or more comma-separated VCF/TSV files"
+            },
+            "regions": {
+                "type": "string",
+                "pattern": "^(n/a|\\S+\\.bed(\\.gz)?)$",
+                "errorMessage": "regions must be a BED file or 'n/a' (e.g. confident regions of a truth set)"
+            }
+        },
+        "required": ["name", "sample", "mode", "variants"]
+    }
+}

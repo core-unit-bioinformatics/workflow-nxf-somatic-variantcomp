@@ -33,6 +33,7 @@ workflow PIPELINE_INITIALISATION {
     input             //  string: Path to input samplesheet
     truth_technology  //  string: Technology used as ground truth
     stratification    //  string: Optional stratification sheet (name, bed)
+    known_variants    //  string: Optional known-variant sheet (name, sample, mode, variants, regions)
     help              // boolean: Display help message and exit
     help_full         // boolean: Show the full help message
     show_hidden       // boolean: Show hidden parameters in the help message
@@ -118,9 +119,44 @@ workflow PIPELINE_INITIALISATION {
         ch_strata = channel.fromList(strata)
     }
 
+    //
+    // Optional known-variant sheet: [ meta(id: name, sample, mode), [ variant files ], regions or [] ]
+    //
+    def ch_known = channel.empty()
+    if (known_variants) {
+        def base_dir = file(known_variants).parent
+        def samples = entries.collect { entry -> entry[0].sample }.unique()
+        def known = samplesheetToList(known_variants, "${projectDir}/assets/schema_known_variants.json")
+            .collect { row ->
+                def files = row[1].tokenize(',').collect { path -> resolveSamplesheetPath(path, base_dir) }
+                [row[0], files, resolveSamplesheetPath(row[2], base_dir)]
+            }
+        def known_errors = []
+        known.each { item ->
+            if (item[0].sample != 'all' && !(item[0].sample in samples)) {
+                known_errors << "List '${item[0].id}': sample '${item[0].sample}' is not in the samplesheet"
+            }
+            (item[1] + (item[2] ? [item[2]] : [])).each { path ->
+                if (!path.exists()) {
+                    known_errors << "List '${item[0].id}': file not found: ${path.toUriString()}"
+                }
+            }
+        }
+        known.groupBy { item -> item[0].id }.each { name, items ->
+            if (items.size() > 1) {
+                known_errors << "List name '${name}' is used more than once"
+            }
+        }
+        if (known_errors) {
+            error("Invalid known-variant sheet '${known_variants}':\n  - " + known_errors.join("\n  - "))
+        }
+        ch_known = channel.fromList(known)
+    }
+
     emit:
     samplesheet = ch_samplesheet
     strata      = ch_strata
+    known       = ch_known
     versions    = ch_versions
 }
 

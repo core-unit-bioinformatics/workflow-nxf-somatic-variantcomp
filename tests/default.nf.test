@@ -42,6 +42,12 @@ nextflow_pipeline {
                 { assert annotated.find { r -> r.query == 'panel' && r.pos == '2999' }.tandem_repeat == 'yes' },
                 { assert annotated.find { r -> r.query == 'panel' && r.pos == '4999' }.homopolymer == 'yes' },
                 { assert annotated.every { r -> r.gene.startsWith('GENE_') } },
+                // known variants: E01 passes everywhere, E08 filtered in wes, E07 outside the region
+                { assert path("$outputDir/known_variants/required_summary.tsv").readLines().contains('required_demo\tS1\twes\t3\t1\t2\tno') },
+                { assert path("$outputDir/known_variants/required_variants.tsv").text.contains('chr1\t4700\tG\tT\tFAIL_filtered') },
+                // external truth = designed truth: wgs is perfect, wes/panel as against wgs
+                { assert overallCounts("$outputDir/known_variants/benchmark/S1/S1_designed_truth_vs_wgs.metrics.tsv") == ['10', '0', '10', '0'] },
+                { assert overallCounts("$outputDir/known_variants/benchmark/S1/S1_designed_truth_vs_panel.metrics.tsv") == ['8', '2', '8', '1'] },
                 { assert validated.count { line -> line.contains('\twgs\twgs\t') && line.contains('\ttrue\t') } == 2 },
                 { assert snapshot(
                     // pipeline versions.yml file for multiqc from which Nextflow version is removed because we test pipelines on multiple Nextflow versions
