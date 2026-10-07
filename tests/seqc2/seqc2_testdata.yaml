@@ -1,0 +1,55 @@
+# Configuration of the SEQC2 HCC1395/HCC1395BL test dataset (WES + WGS).
+# Used by tests/seqc2/seqc2_testdata.py. All sources are public (SRA SRP162370).
+# Fang et al. 2021, Nat Biotechnol 39:1151, doi:10.1038/s41587-021-00993-6
+
+base_url: "https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/seqc/Somatic_Mutation_WG"
+
+reference:
+  # GRCh38 used for the SEQC2 BWA alignments; has a remote .fai, so contigs can be
+  # extracted without downloading the full 2.9 GB FASTA
+  fasta: "technical/reference_genome/GRCh38/GRCh38.d1.vd1.fa"
+  name: "GRCh38.d1.vd1"
+
+# Agilent SureSelect Human All Exon v6 + UTR, lifted over to hg38 (BED6)
+wes_bed: "technical/reference_genome/Exome_Target_bed/S07604624_Covered_human_all_v6_plus_UTR.liftover.to.hg38.bed6.gz"
+
+# SEQC2 somatic reference call set v1.2.1 (for the known-variants benchmark feature)
+truth:
+  snv: "release/latest/high-confidence_sSNV_in_HC_regions_v1.2.1.vcf.gz"
+  indel: "release/latest/high-confidence_sINDEL_in_HC_regions_v1.2.1.vcf.gz"
+  regions: "release/latest/High-Confidence_Regions_v1.2.bed"
+
+# Per-run somatic calls: MuTect2 (GATK 3.8) on BWA alignments. The VCFs are
+# unfiltered (all records kept, FILTER column set) and use sample names TUMOR/NORMAL.
+vcf_pattern: "analysis/SNVs/vcfs/{tech}/{tech}_{pair}.bwa.muTect2.vcf.gz"
+vcf_md5: "analysis/SNVs/vcfs/all.md5"
+caller: "mutect2-gatk3.8"
+tumor_id: "TUMOR"
+normal_id: "NORMAL"
+
+# BWA alignments (indices are named *.bai, not *.bam.bai)
+bam_pattern: "data/{tech}/{tech}_{center}_{role}_{rep}.bwa.dedup.bam"
+bai_pattern: "data/{tech}/{tech}_{center}_{role}_{rep}.bwa.dedup.bai"
+
+# Center/replicate pairs with both WES and WGS (each is used as a pseudo-sample;
+# all come from the same DNA batch of HCC1395 / HCC1395BL)
+available_pairs: [EA_1, FD_1, FD_2, FD_3, IL_1, IL_2, IL_3, LL_1, NC_1, NV_1, NV_2, NV_3]
+
+technologies:
+  wgs: {library_type: wgs, folder: WGS}
+  wes: {library_type: capture, folder: WES}
+
+modes:
+  # Small: runs on a laptop / Raspberry Pi. chr22 only; read data as region slices.
+  small:
+    pairs: [IL_1, FD_1, NV_1]
+    contigs: [chr22]
+    bam_pairs: [IL_1]
+    # reads are extracted only for WES targets (+/- padding) inside this window
+    bam_window: "chr22:29500000-30500000"
+    bam_padding: 100
+  # Full: genome-wide, for an HPC. Full BAMs are 10-160 GB each.
+  full:
+    pairs: [EA_1, FD_1, FD_2, FD_3, IL_1, IL_2, IL_3, LL_1, NC_1, NV_1, NV_2, NV_3]
+    contigs: null
+    bam_pairs: []

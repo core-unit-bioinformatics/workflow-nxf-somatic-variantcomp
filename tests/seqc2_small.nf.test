@@ -1,0 +1,33 @@
+nextflow_pipeline {
+
+    name "Test pipeline on the small SEQC2 dataset"
+    script "../main.nf"
+    tag "pipeline"
+    tag "seqc2"
+    profile "test_seqc2"
+
+    test("-profile test_seqc2") {
+
+        when {
+            params {
+                outdir = "$outputDir"
+            }
+        }
+
+        then {
+            def stable_path = getAllFilesFromDir(params.outdir, relative: true, includeDir: true, ignore: ['pipeline_info/*.{html,json,txt}'])
+            def stable_content = getAllFilesFromDir(params.outdir, ignoreFile: 'tests/.nftignore')
+            def validated = path("$outputDir/pipeline_info/samplesheet_validated.tsv").readLines()
+            assert workflow.success
+            assertAll(
+                { assert validated.size() == 7 },
+                { assert validated.count { line -> line.startsWith('SEQC2_') } == 6 },
+                { assert snapshot(
+                    removeNextflowVersion("$outputDir/pipeline_info/variantcomp_software_mqc_versions.yml"),
+                    stable_path,
+                    stable_content
+                ).match() }
+            )
+        }
+    }
+}

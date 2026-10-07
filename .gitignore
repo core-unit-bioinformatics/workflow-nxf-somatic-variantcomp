@@ -3,8 +3,8 @@ work/
 data/
 results/
 .DS_Store
-testing/
-testing*
+/testing/
+/testing*
 *.pyc
 null/
 .lineage/
