@@ -4,6 +4,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Dates follow ISO 8601 (`YYYY-MM-DD`).
 
+## v0.5.0-dev - [unreleased]
+
+### `Added`
+
+- VCF preprocessing subworkflow `PREPROCESS_VCF`: reference check incl. sample names, tumor/normal selection and BGZF recompression, contig renaming, removal of non-reference contigs and gVCF reference blocks, contig header from the `.fai`, `bcftools norm` (split, left-align, atomize, REF check, deduplicate), harmonization, uniform filters and restriction to the comparison region
+- `bin/harmonize_vcf.py` (local module `HARMONIZE_VCF`): caller-independent `VC_*` INFO tags from FORMAT/AD, variant type and indel length, tumor GT `0/1`, removal of symbolic alleles
+- Filter parameters `--filter_pass_only`, `--min_vaf`, `--min_depth`, `--min_alt_reads`
+- Reference FASTA is decompressed once if gzip-compressed; genome BED of all reference contigs
+- Outputs `vcf_preprocessed/`
+
 ## v0.4.0-dev - [2026-10-07]
 
 ### `Added`
