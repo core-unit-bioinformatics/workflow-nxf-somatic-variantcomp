@@ -74,25 +74,104 @@ VAF/detection-power awareness are essential.
       sample × technology × variant.
     - `benchmark`: an external truth set (SEQC2 v1.2.1, GIAB HG008).
       Recall/precision per technology within its confident regions.
+14. **Sheets are CSV** (samplesheet, stratification sheet, known-variant
+    sheet). This overrides the CUBI TSV default for this project (user
+    decision, 2026-10-08).
+15. **No index columns** in the samplesheet. A VCF index (`.tbi`/`.csi`) or
+    alignment index (`.bai`/`.csi`/`.crai`) next to the file is used;
+    otherwise the pipeline creates it (`bcftools index`, `samtools index`).
+16. Review and follow the general guidelines below for all code: nf-core
+    modules for tools, logic in scripts, inline comments, strict checks,
+    detailed documentation with tested inputs and tool citations.
 
-## Design principles
+## General nf-core workflow development guidelines
 
-- **Existing tools first.** Order of preference:
+These guidelines are project-independent and can be reused for other
+nf-core-style pipelines.
+
+### Architecture: modules run tools, scripts hold logic
+
+- **One tool per module.** Every process runs one tool (or one script). Prefer,
+  in this order:
   1. an nf-core module (`nf-core modules install`);
-  2. bcftools / bedtools / samtools / mosdepth / rtg-tools commands in a
-     local module;
-  3. a small custom script.
+  2. an nf-core module adapted with `nf-core modules patch` (the patch is
+     tracked in the module folder);
+  3. a local module that runs one tool command (bcftools, bedtools, samtools,
+     mosdepth, rtg-tools, ...) without pipes into other tools;
+  4. a local module that only calls a script from `bin/`.
+- **Don't pipe tools into each other inside a module** (e.g. `bcftools mpileup |
+  bcftools norm`). Split the chain into modules connected by channels, so each
+  step can be configured, tested and replaced on its own.
+- **Logic lives in scripts, not in module code.** Anything beyond calling a
+  tool (decisions, parsing, statistics, merging tables, building report
+  files) goes into a script in `bin/`. The module only stages files and calls
+  the script. Module `script:` blocks contain no awk programs, loops over
+  files or conditional logic beyond assembling arguments.
+- **All tool and script options are configurable.** Modules pass
+  `task.ext.args` (and `ext.args2`, ...); defaults are set in
+  `conf/modules.config`, so users can change them with a config file
+  without touching code.
+- **Before writing custom code**, check whether an existing tool or plugin
+  does the job (e.g. `bcftools norm --check-ref`, `bcftools +fixref`,
+  `bcftools +fill-tags`, `bedtools multiinter`). If a custom script is still
+  needed, document in its docstring which tools were considered and why
+  they are not enough.
 
-  Before writing custom code, check whether a bcftools command or plugin
-  (`norm`, `isec`, `+fill-tags`, `+setGT`, `annotate`, `query`) already does
-  the job.
-- **Python, not R.** Custom scripts live in `bin/`:
-  - `#!/usr/bin/env python3` shebang, executable, argparse;
-  - PEP8 (ruff, configured in `pyproject.toml`);
-  - no workflow-engine logic;
-  - unit-tested with pytest (`tests/python/`).
+### Checks and errors
 
-  Plots use matplotlib (+ upsetplot), statistics use scipy/pandas.
+- **Minimise logic in Nextflow code.** Workflows and subworkflows connect
+  channels; they don't validate inputs, parse files or decide about data.
+  Validation (samplesheet cross-row checks, file existence, consistency of
+  inputs, pass/fail decisions) is done by Python scripts in processes.
+- **Be strict.** If a value is needed downstream, check that it exists and is
+  valid, and stop with an error if not. An error is better than a wrong
+  result. Never silently fall back to a default that changes results; if a
+  fallback is intended (e.g. VAF from AF when AD is missing), log it and
+  count it in a report.
+- **Error messages must help debugging.** They name the file, the record or
+  row, the expected and the observed value, and what the user can do
+  (e.g. `ERROR: S1_wes.vcf.gz: sample 'TUMOR1' not found (samples in the VCF:
+  TUMOR, NORMAL); check tumor_id in the samplesheet`). Scripts exit with a
+  non-zero status on errors and print `ERROR:` / `WARNING:` / `INFO:`
+  prefixed messages to stderr.
+- Scripts log what they did: which fields were used, how many records were
+  read, kept, dropped (with the reason) and written.
+
+### Code style and comments
+
+- **Python, not R.** Scripts live in `bin/`: `#!/usr/bin/env python3`
+  shebang, executable, argparse, PEP8 (ruff, configured in
+  `pyproject.toml`), no workflow-engine logic, unit-tested with pytest
+  (`tests/python/`). Plots use matplotlib, statistics scipy/pandas.
+- **Inline comments everywhere.** Every block of code executed by the
+  pipeline (Python scripts and the shell code of modules) has comments that
+  describe what the next line(s) do exactly, not only the overall design.
+  Example: `# keep only records whose only ALT is a symbolic allele
+  (gVCF reference blocks) for removal`.
+- Shell code in modules: one tool call per module, each option on its own
+  line, with a comment for non-obvious options.
+
+### Documentation
+
+- `docs/usage.md` documents every input and parameter; `docs/output.md`
+  every output file and every column of the main tables.
+- **Document the logic, not only the interface.** If a step picks values
+  from several possible sources (e.g. VAF from FORMAT/AD, else FORMAT/AF),
+  the documentation describes each source, the order of preference, the
+  checks and what happens when a value is missing.
+- **Tested inputs.** The documentation lists exactly which inputs were tested
+  (e.g. caller, caller version, VCF version, test dataset) and which are
+  expected to work but untested, and the formal input requirements (VCF
+  version, required FORMAT/INFO fields, sample columns, contig naming).
+- **Tools and citations.** README and `docs/output.md` name, for every step,
+  the tools used. `CITATIONS.md` and the MultiQC methods description cite
+  every tool and dataset with its authors and publication (or repository and
+  version if there is none). Credit the authors of all tools used.
+- The README contains an nf-core-style overview figure (metro map) of the
+  pipeline (`docs/images/`), kept up to date with the workflow.
+
+## Project design principles
+
 - **Identical treatment of every technology.** One normalization chain and
   one filter rule set for all VCFs.
 - **Normalization chain:** this order is mandatory; don't reorder or skip a
@@ -135,13 +214,13 @@ VAF/detection-power awareness are essential.
   resources come in via params. It must run offline on an HPC (PBS Pro +
   Singularity).
 - **Samplesheet:**
-  - `.tsv` with a `sample` column, `n/a` for empty fields, validated with
-    nf-schema;
+  - `.csv` with a `sample` column, `n/a` (or empty) for empty optional
+    fields; per-column formats validated with nf-schema, cross-row checks in
+    a Python script;
   - columns: `sample`, `technology`, `library_type`, `tumor_id`,
-    `normal_id`, `caller`, `vcf`, `vcf_index`, `tumor_bam`, `tumor_bai`,
-    `normal_bam`, `normal_bai`, `target_bed`.
-- **Configs** are `.yaml` (params files) or `.config` (Nextflow). No `.csv`
-  for new files. `.toml` is only used for `pyproject.toml`.
+    `normal_id`, `caller`, `vcf`, `tumor_bam`, `normal_bam`, `target_bed`.
+- **Configs** are `.yaml` (params files) or `.config` (Nextflow).
+  `.toml` is only used for `pyproject.toml`.
 
 ## Git and versioning
 
@@ -176,6 +255,8 @@ VAF/detection-power awareness are essential.
   - **T1**: `-profile test`, SEQC2 small slices (prepared by
     `tests/seqc2/`), stored in the test-data repo, runs on the Pi.
   - **T2**: `-profile test_full`, full SEQC2 WES + WGS on the HPC.
+- nf-test shares conda environments via `tests/nextflow.config`
+  (`NFT_CONDA_CACHE`).
 - Run before every commit that touches pipeline code:
   - `nf-core pipelines lint`
   - the relevant `nf-test test`
