@@ -25,21 +25,31 @@ therefore require:
 5. Classification and annotation of every discordant variant (type, gene, repeat
    context, coverage, filter status, read evidence)
 
-Workflow steps:
+## Pipeline summary
 
-1. Input and reference consistency checks (contig names and lengths, REF alleles, sample
-   names; safe fixes, hard errors on a build mismatch)
-2. Target BEDs: harmonization and N-way intersection
-3. Coverage and per-sample callable regions (`mosdepth`, optional BAMs)
-4. VCF normalization and harmonization (`bcftools`: split, left-align, atomize, deduplicate;
-   VAF/depth from AD for every caller) and uniform filters
-5. Comparison with the truth technology (`rtg vcfeval`) and metrics: recall, precision, F1
-   overall, by variant type, by VAF; power-adjusted recall
-6. Discordance: classification of every missed or extra call (filtered, germline, low
-   coverage, read evidence), genes and stratifications (repeats, segdups, ...)
-7. Statistics (enrichment of indels, low VAF, repeats, genes) and MultiQC report
-8. Known variants: clinically required variants (PASS/FAIL per technology) and external truth
-   sets (e.g. SEQC2, GIAB)
+![Metro map of workflow-nxf-somatic-variantcomp](docs/images/variantcomp_metro_map.png)
+
+Every step runs one tool (mostly nf-core modules) or one script of `bin/`; the options
+of every step are set in `conf/modules.config`.
+
+| Step | What is done | Tools |
+| --- | --- | --- |
+| 1. Input checks | samplesheet, stratification and known-variant sheets (cross-row checks); missing VCF/BAM indices are created | `check_sheets.py`, nf-schema, `bcftools index`, `samtools index` |
+| 2. Reference | reference index, genome BED | `samtools faidx`, `gawk` |
+| 3. Reference check of every input | contig names and lengths of VCFs, BEDs and BAMs; safe fixes (renaming, header lengths), errors on a build mismatch; REF-allele mismatch rate | `bcftools view -h`, `bcftools query`, `samtools idxstats`, `bcftools norm --check-ref`, `check_reference.py` |
+| 4. Target regions | N-way intersection of all target BEDs, optional `--regions_bed` / `--exclude_bed` | `bedtools sort`, `bedtools multiinter`, `gawk`, `bedtools merge`, `bedtools intersect`, `bedtools subtract`, `region_summary.py` |
+| 5. Coverage (optional, with BAMs) | depth per alignment; bases callable in all alignments of a sample | `mosdepth`, `mosdepth_callable.py`, `bedtools sort`, `bedtools multiinter`, `bedtools intersect` |
+| 6. VCF normalization | tumor (+ normal) selection, contig renaming, gVCF block removal, contig header from the reference, split / left-align / atomize / deduplicate | `bcftools view`, `bcftools annotate`, `bcftools reheader`, `bcftools norm` |
+| 7. Harmonization | VAF, depth and alt reads from FORMAT/AD (else AF + DP), variant type, GT | `harmonize_vcf.py` (pysam) |
+| 8. Uniform filters | same filters and comparison region for every technology | `bcftools view` |
+| 9. Comparison | haplotype-aware matching against the truth technology; exact-allele and position matches | `rtg vcfeval`, `bcftools isec`, `benchmark_metrics.py`, `aggregate_metrics.py` |
+| 10. Discordance | read evidence at every compared position, class of every FN/FP, detection power | `bcftools query`, `bcftools mpileup` + `call`, `bcftools norm`, `classify_discordance.py` |
+| 11. Annotation | genes and stratifications (repeats, homopolymers, ...) of every compared variant | `bedtools sort`, `bedtools map`, `bedtools intersect`, `annotate_variants.py` |
+| 12. Known variants (optional) | required clinical variants (PASS/FAIL per technology), external truth sets | `known_variants.py`, `bcftools norm`, `bcftools isec`, `rtg vcfeval`, `known_summary.py` |
+| 13. Statistics and report | enrichment (Fisher's exact test, Benjamini-Hochberg), gene table, plots, report | `variantcomp_report.py` (pandas, SciPy, Matplotlib), MultiQC |
+
+All tools and datasets, with their authors and publications, are listed in
+[`CITATIONS.md`](CITATIONS.md). The figure is drawn by `scripts/make_metro_map.py`.
 
 Outputs are described in [`docs/output.md`](docs/output.md), parameters in
 [`docs/usage.md`](docs/usage.md), HPC/offline use in [`docs/hpc.md`](docs/hpc.md) and testing
