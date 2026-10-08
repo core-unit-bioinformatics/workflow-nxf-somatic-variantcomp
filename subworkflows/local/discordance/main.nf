@@ -64,7 +64,6 @@ workflow DISCORDANCE {
 
     READ_EVIDENCE(
         ch_alignments
-            .filter { _meta, _bam, bai -> bai }
             .map { meta, bam, bai -> [meta.sample, meta, bam, bai] }
             .combine(ch_sites, by: 0)
             .map { _sample, meta, bam, bai, sites -> [meta, bam, bai, sites] },

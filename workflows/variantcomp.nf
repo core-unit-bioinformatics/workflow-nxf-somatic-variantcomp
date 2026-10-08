@@ -6,6 +6,7 @@
 include { MULTIQC                } from '../modules/nf-core/multiqc/main'
 include { PREPARE_REFERENCE      } from '../subworkflows/local/prepare_reference'
 include { PREPARE_REGIONS        } from '../subworkflows/local/prepare_regions'
+include { PREPARE_ALIGNMENTS     } from '../subworkflows/local/prepare_alignments'
 include { PREPROCESS_VCF         } from '../subworkflows/local/preprocess_vcf'
 include { COVERAGE               } from '../subworkflows/local/coverage'
 include { BENCHMARK              } from '../subworkflows/local/benchmark'
@@ -27,7 +28,7 @@ include { methodsDescriptionText } from '../subworkflows/local/utils_nfcore_vari
 workflow VARIANTCOMP {
 
     take:
-    ch_samplesheet // channel: samplesheet entries [ meta, vcf, vcf_index, tumor_bam, tumor_bai, normal_bam, normal_bai, target_bed ]
+    ch_samplesheet_input // channel: samplesheet entries [ meta, vcf, vcf_index, tumor_bam, tumor_index, normal_bam, normal_index, target_bed ]
     ch_strata      // channel: stratification BEDs [ meta(id: name), bed ]
     ch_known       // channel: known variant lists [ meta(id: name, sample, mode), [ files ], regions ]
     fasta          // string: reference FASTA
@@ -46,25 +47,10 @@ workflow VARIANTCOMP {
     def ch_multiqc_files = channel.empty()
 
     //
-    // Record the validated samplesheet (resolved paths) for provenance
+    // SUBWORKFLOW: alignment indices (created where missing)
     //
-    def samplesheet_columns = ['sample', 'technology', 'library_type', 'tumor_id', 'normal_id', 'caller', 'is_truth',
-                               'vcf', 'vcf_index', 'tumor_bam', 'tumor_bai', 'normal_bam', 'normal_bai', 'target_bed']
-    ch_samplesheet
-        .map { entry ->
-            def meta = entry[0]
-            def values = ['sample', 'technology', 'library_type', 'tumor_id', 'normal_id', 'caller', 'is_truth']
-                .collect { key -> meta[key] == null ? 'n/a' : meta[key].toString() }
-            values += entry[1..-1].collect { path -> path ? path.toUriString() : 'n/a' }
-            values.join('\t')
-        }
-        .collectFile(
-            name: 'samplesheet_validated.tsv',
-            storeDir: "${outdir}/pipeline_info",
-            seed: samplesheet_columns.join('\t'),
-            newLine: true,
-            sort: true
-        )
+    PREPARE_ALIGNMENTS(ch_samplesheet_input)
+    def ch_samplesheet = PREPARE_ALIGNMENTS.out.samplesheet
 
     //
     // SUBWORKFLOW: reference index

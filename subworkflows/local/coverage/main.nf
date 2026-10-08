@@ -7,7 +7,6 @@
 //
 
 include { CHECK_REFERENCE as CHECK_REFERENCE_BAM } from '../../../modules/local/check_reference/main'
-include { SAMTOOLS_INDEX                         } from '../../../modules/nf-core/samtools/index/main'
 include { MOSDEPTH                               } from '../../../modules/nf-core/mosdepth/main'
 include { CALLABLE_REGIONS                       } from '../../../modules/local/callable_regions/main'
 
@@ -34,15 +33,8 @@ workflow COVERAGE {
         alignments
     }
 
-    // index alignments given without index
-    def ch_to_index = ch_alignments.branch { _meta, _bam, bai ->
-        indexed: bai
-        missing: true
-    }
-    SAMTOOLS_INDEX(ch_to_index.missing.map { meta, bam, _bai -> [meta, bam] })
-    def ch_indexed = ch_to_index.indexed.mix(
-        ch_to_index.missing.map { meta, bam, _bai -> [meta, bam] }.join(SAMTOOLS_INDEX.out.index)
-    )
+    // all alignments are indexed (PREPARE_ALIGNMENTS)
+    def ch_indexed = ch_alignments
 
     // reference check of the @SQ header; common region translated to the alignment's contig names
     CHECK_REFERENCE_BAM(ch_indexed.map { meta, bam, _bai -> [meta, bam] }, 'bam', ch_reference, common_bed)

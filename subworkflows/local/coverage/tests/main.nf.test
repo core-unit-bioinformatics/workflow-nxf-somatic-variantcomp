@@ -7,7 +7,6 @@ nextflow_workflow {
     tag "subworkflows_local"
     tag "coverage"
     tag "mosdepth"
-    tag "samtools/index"
 
     test("seqc2 small - callable region for the sample with alignments, common region otherwise") {
 
@@ -17,12 +16,12 @@ nextflow_workflow {
                 def base = params.pipelines_testdata_base_path + 'seqc2/small/'
                 def entry = { pair, tech, lib, bams ->
                     def b = { role -> bams ? file(base + 'bam/' + pair + '_' + tech + '_' + role + '.bam') : [] }
-                    def i = { role -> bams && role == 'T' ? file(base + 'bam/' + pair + '_' + tech + '_' + role + '.bam.bai') : [] }
+                    def i = { role -> bams ? file(base + 'bam/' + pair + '_' + tech + '_' + role + '.bam.bai') : [] }
                     [[id: 'SEQC2_' + pair + '_' + tech, sample: 'SEQC2_' + pair, technology: tech, library_type: lib,
                       tumor_id: 'TUMOR', normal_id: 'NORMAL'],
                      file(base + 'vcf/' + pair + '_' + tech + '.mutect2.vcf.gz'), [], b.call('T'), i.call('T'), b.call('N'), i.call('N'), []]
                 }
-                // normal BAMs without index: indexed by the subworkflow
+                // alignments are indexed (missing indices are created by PREPARE_ALIGNMENTS)
                 input[0] = channel.of(entry.call('IL_1', 'wgs', 'wgs', true), entry.call('IL_1', 'wes', 'capture', true),
                                       entry.call('FD_1', 'wgs', 'wgs', false), entry.call('FD_1', 'wes', 'capture', false))
                 input[1] = channel.value([[id: 'chr22'], file(base + 'reference/GRCh38.d1.vd1_chr22.fa.gz'),
