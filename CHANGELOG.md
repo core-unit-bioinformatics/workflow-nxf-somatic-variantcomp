@@ -4,6 +4,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Dates follow ISO 8601 (`YYYY-MM-DD`).
 
+## v0.12.0-dev - [unreleased]
+
+### `Changed`
+
+- **Breaking:** samplesheet, stratification sheet and known-variant sheet are CSV (comma-separated); known-variant lists may be CSV or TSV; several variant files of a list are separated by `;`
+- **Breaking:** the samplesheet has no index columns any more (`vcf_index`, `tumor_bai`, `normal_bai`): index files next to the data files are used (`.tbi`/`.csi`, `.bai`/`.bam.bai`/`.csi`, `.crai`); missing alignment indices are created once with `samtools index` (`PREPARE_ALIGNMENTS`) for coverage and read evidence
+- Sheet validation moved from Nextflow code to `bin/check_sheets.py` (`CHECK_SHEETS`): all problems are reported at once with line numbers; Nextflow only stages the files (missing files stop the run with the path)
+- Validated sheets are published as `pipeline_info/*.validated.csv`
+- ruff: long lines are left to `ruff format` (E501 ignored)
+
 ## v0.11.0-dev - [2026-10-08]
 
 ### `Added`
