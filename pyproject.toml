@@ -1,6 +1,6 @@
 [project]
 name = "workflow-nxf-somatic-variantcomp"
-version = "0.11.0-dev"
+version = "0.12.0-dev"
 description = "Compare somatic variant calls of the same tumor/normal pairs across sequencing technologies (WGS, WES, panel)"
 readme = "README.md"
 license = { file = "LICENSE" }
