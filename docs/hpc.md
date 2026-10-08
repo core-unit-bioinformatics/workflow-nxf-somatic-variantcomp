@@ -53,12 +53,12 @@ singularity {
 ```
 
 ```yaml title="params.yaml"
-input: /path/to/project/samplesheet.tsv
+input: /path/to/project/samplesheet.csv
 fasta: /path/to/reference/hg19.fa
 truth_technology: wgs
 gene_bed: /path/to/annotation/genes.bed
-stratification: /path/to/annotation/stratification.tsv
-known_variants: /path/to/project/known_variants.tsv
+stratification: /path/to/annotation/stratification.csv
+known_variants: /path/to/project/known_variants.csv
 outdir: /path/to/project/results/variantcomp
 ```
 

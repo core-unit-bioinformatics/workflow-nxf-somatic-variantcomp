@@ -11,48 +11,57 @@ described in [`pipeline-plan.md`](pipeline-plan.md).
 
 ## Samplesheet input
 
-The samplesheet is a **tab-separated** file (`.tsv`) with a header row and one row per
+The samplesheet is a **comma-separated** file (`.csv`) with a header row and one row per
 sample and technology:
 
 ```bash
---input '[path to samplesheet.tsv]' --truth_technology wgs
+--input '[path to samplesheet.csv]' --truth_technology wgs
 ```
 
-```tsv title="samplesheet.tsv"
-sample	technology	library_type	tumor_id	normal_id	caller	vcf	vcf_index	tumor_bam	tumor_bai	normal_bam	normal_bai	target_bed
-P01	wgs	wgs	P01_T	P01_N	dragen-4.4.4	vcf/P01_wgs.hard-filtered.vcf.gz	n/a	n/a	n/a	n/a	n/a	n/a
-P01	wes	capture	P01_T	P01_N	dragen-4.4.4	vcf/P01_wes.hard-filtered.vcf.gz	n/a	n/a	n/a	n/a	n/a	bed/exome_v2.bed
-P01	panel	amplicon	P01_T	P01_N	dragen-4.4.4	vcf/P01_panel.hard-filtered.vcf.gz	n/a	n/a	n/a	n/a	n/a	bed/panel_v1.bed
+```csv title="samplesheet.csv"
+sample,technology,library_type,tumor_id,normal_id,caller,vcf,tumor_bam,normal_bam,target_bed
+P01,wgs,wgs,P01_T,P01_N,dragen-4.4.4,vcf/P01_wgs.hard-filtered.vcf.gz,bam/P01_T_wgs.bam,bam/P01_N_wgs.bam,n/a
+P01,wes,capture,P01_T,P01_N,dragen-4.4.4,vcf/P01_wes.hard-filtered.vcf.gz,bam/P01_T_wes.bam,bam/P01_N_wes.bam,bed/exome_v2.bed
+P01,panel,amplicon,P01_T,P01_N,dragen-4.4.4,vcf/P01_panel.hard-filtered.vcf.gz,n/a,n/a,bed/panel_v1.bed
 ```
 
 | Column | Required | Description |
 | --- | --- | --- |
 | `sample` | yes | Patient/case identifier, identical for all technologies of the same tumor/normal pair. Allowed characters: `A-Z a-z 0-9 _ . -`. |
 | `technology` | yes | Technology label, e.g. `wgs`, `wes`, `panel-oca`. Allowed characters: `a-z 0-9 -`. |
-| `library_type` | yes | `wgs`, `capture` or `amplicon`. Controls how coverage is computed later on (duplicates are kept for amplicon data). |
+| `library_type` | yes | `wgs`, `capture` or `amplicon`. Controls how coverage is computed (duplicates are kept for amplicon data). |
 | `tumor_id` | yes | Name of the tumor sample column in the VCF. |
-| `normal_id` | yes | Name of the normal sample column in the VCF, `n/a` for tumor-only calls. |
+| `normal_id` | yes | Name of the normal sample column in the VCF; empty or `n/a` for tumor-only calls. |
 | `caller` | no | Variant caller and version, e.g. `dragen-4.4.4` (default `unknown`). Reported only. |
-| `vcf` | yes | **Unfiltered** somatic VCF (all records, FILTER column set by the caller), e.g. DRAGEN `*.hard-filtered.vcf.gz`. |
-| `vcf_index` | no | `.tbi`/`.csi` index of the VCF. |
-| `tumor_bam`, `tumor_bai` | no | Tumor alignment (BAM/CRAM) and index. Enables coverage-based callable regions and read-evidence checks. |
-| `normal_bam`, `normal_bai` | no | Normal alignment and index. |
-| `target_bed` | for `capture`/`amplicon` | Target regions of the technology. `n/a` = genome-wide (WGS). |
+| `vcf` | yes | **Unfiltered** somatic VCF (all records, FILTER column set by the caller), e.g. DRAGEN `*.hard-filtered.vcf.gz`. Plain, gzip or bgzip compressed, or BCF. |
+| `tumor_bam`, `normal_bam` | no | Tumor and normal alignment (BAM or CRAM). Enable coverage-based callable regions and read-evidence checks. |
+| `target_bed` | for `capture`/`amplicon` | Target regions of the technology. Empty or `n/a` = genome-wide (WGS). |
 
-Rules:
+**Index files are not listed.** The pipeline looks for them next to the data file:
 
-- Empty optional fields are written as `n/a`.
-- Relative paths are resolved against the directory of the samplesheet, so a
-  project folder with samplesheet, VCFs and BEDs can be moved as a whole. Absolute
-  paths and URLs are used as given.
+| File | Index files that are used (first found) | If none is found |
+| --- | --- | --- |
+| VCF | `<vcf>.tbi`, `<vcf>.csi` | not needed: the first preprocessing step (`bcftools view`) reads the VCF without index and writes a new bgzipped VCF with index. Plain gzip VCFs can't be indexed anyway. |
+| BAM | `<bam>.bai`, `<bam>.csi`, `<name>.bai` (`x.bam` → `x.bai`) | created with `samtools index` |
+| CRAM | `<cram>.crai`, `<name>.crai` | created with `samtools index` |
+
+Rules (checked by `bin/check_sheets.py`; all problems are reported at once):
+
+- Empty optional fields are left empty or written as `n/a`.
+- Relative paths are resolved against the directory of the samplesheet, so a project
+  folder with samplesheet, VCFs and BEDs can be moved as a whole. Absolute paths and URLs
+  are used as given. Missing files stop the pipeline with the missing path.
 - At least two technologies are needed, and every sample needs a row for the truth
   technology and at least one other technology.
 - Each `sample`/`technology` combination may occur only once.
 - All rows of a technology must use the same `target_bed` and `library_type`.
-- All checks run before any process starts. All problems are reported at once.
+- `capture` and `amplicon` technologies need a `target_bed`.
+- A `normal_bam` needs a `tumor_bam` and a `normal_id`.
+- Columns of earlier versions (`vcf_index`, `tumor_bai`, `normal_bai`) are rejected with a
+  message; tab-separated sheets are rejected.
 
 The validated samplesheet with resolved paths is written to
-`<outdir>/pipeline_info/samplesheet_validated.tsv`.
+`<outdir>/pipeline_info/samplesheet.validated.csv`.
 
 ## Reference genome
 
@@ -106,29 +115,29 @@ distinguished from real discordance.
 | Parameter | Default | Description |
 | --- | --- | --- |
 | `--gene_bed` | – | BED4 with gene names in column 4, e.g. derived from GENCODE. |
-| `--stratification` | – | Tab-separated sheet with columns `name` and `bed` (relative paths resolved against the sheet), e.g. GIAB stratifications for homopolymers, tandem repeats, segmental duplications, low mappability. |
+| `--stratification` | – | Comma-separated sheet with columns `name` and `bed` (relative paths resolved against the sheet), e.g. GIAB stratifications for homopolymers, tandem repeats, segmental duplications, low mappability. |
 | `--germline_vaf` | `0.1` | Normal VAF from which a discordant variant is classified as `germline_in_normal`. |
 | `--evidence_min_alt_reads` | `2` | Alt reads in a normal needed for `germline_in_normal`. |
 | `--power_min_alt_reads` | `3` | Alt reads a caller needs (power model). |
 | `--detection_power` | `0.95` | Power from which a truth variant counts as detectable. |
 | `--low_vaf` | `0.1` | VAF threshold of the low-VAF feature in the enrichment tests. |
 
-```tsv title="stratification.tsv"
-name	bed
-homopolymer	giab/GRCh38_AllHomopolymers_ge7bp_imperfectge11bp_slop5.bed.gz
-tandem_repeat	giab/GRCh38_AllTandemRepeats.bed.gz
-segmental_duplication	giab/GRCh38_segdups.bed.gz
+```csv title="stratification.csv"
+name,bed
+homopolymer,giab/GRCh38_AllHomopolymers_ge7bp_imperfectge11bp_slop5.bed.gz
+tandem_repeat,giab/GRCh38_AllTandemRepeats.bed.gz
+segmental_duplication,giab/GRCh38_segdups.bed.gz
 ```
 
 ## Known variants
 
-`--known_variants` takes a tab-separated sheet of variant lists that are checked in
+`--known_variants` takes a comma-separated sheet of variant lists that are checked in
 addition to the comparison between technologies:
 
-```tsv title="known_variants.tsv"
-name	sample	mode	variants	regions
-clinical	P01	required	known/P01_clinical.tsv	n/a
-seqc2_truth	all	benchmark	truth/sSNV.vcf.gz,truth/sINDEL.vcf.gz	truth/High-Confidence_Regions.bed
+```csv title="known_variants.csv"
+name,sample,mode,variants,regions
+clinical,P01,required,known/P01_clinical.csv,n/a
+seqc2_truth,all,benchmark,truth/sSNV.vcf.gz;truth/sINDEL.vcf.gz,truth/High-Confidence_Regions.bed
 ```
 
 | Column | Description |
@@ -136,7 +145,7 @@ seqc2_truth	all	benchmark	truth/sSNV.vcf.gz,truth/sINDEL.vcf.gz	truth/High-Confi
 | `name` | Name of the list (unique). |
 | `sample` | Samplesheet sample, or `all` for every sample. |
 | `mode` | `required` or `benchmark` (see below). |
-| `variants` | One or more comma-separated VCF or TSV files. TSV columns: `chrom`, `pos` (1-based), `ref`, `alt`, optional `gene`, `label`, `vaf`. |
+| `variants` | One or more VCF, CSV or TSV files separated by `;`. CSV/TSV columns: `chrom`, `pos` (1-based), `ref`, `alt`, optional `gene`, `label`, `vaf`. |
 | `regions` | Optional BED (`n/a` if none), e.g. the confident regions of a truth set. |
 
 Every list is checked against the reference (contig names are renamed if needed; a REF
@@ -191,7 +200,7 @@ as "present but filtered".
 The typical command for running the pipeline is as follows:
 
 ```bash
-nextflow run core-unit-bioinformatics/workflow-nxf-somatic-variantcomp --input ./samplesheet.tsv --truth_technology wgs --outdir ./results -profile singularity
+nextflow run core-unit-bioinformatics/workflow-nxf-somatic-variantcomp --input ./samplesheet.csv --truth_technology wgs --outdir ./results -profile singularity
 ```
 
 This will launch the pipeline with the `singularity` configuration profile. See below for more information about profiles.
@@ -221,7 +230,7 @@ nextflow run core-unit-bioinformatics/workflow-nxf-somatic-variantcomp -profile 
 with:
 
 ```yaml title="params.yaml"
-input: './samplesheet.tsv'
+input: './samplesheet.csv'
 truth_technology: 'wgs'
 outdir: './results/'
 <...>

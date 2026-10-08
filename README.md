@@ -47,13 +47,13 @@ in [`docs/testing.md`](docs/testing.md).
 
 ## Usage
 
-The samplesheet is a tab-separated file with one row per sample and technology.
-Its full specification will follow in `docs/usage.md`.
+The samplesheet is a comma-separated file with one row per sample and technology,
+described in [`docs/usage.md`](docs/usage.md).
 
 ```bash
 nextflow run core-unit-bioinformatics/workflow-nxf-somatic-variantcomp \
    -profile <conda/singularity/.../institute> \
-   --input samplesheet.tsv \
+   --input samplesheet.csv \
    --fasta genome.fa \
    --truth_technology wgs \
    --outdir <OUTDIR>

@@ -79,7 +79,7 @@ the single entry point:
 
 | Subcommand | Does |
 | --- | --- |
-| `prepare` | Download (resumable, md5-verified where SEQC2 publishes checksums, cached in `<outdir>/.downloads`), subset, index, and write `samplesheet.tsv`, `params.yaml`, `checksums.md5` and `README.md` with full provenance |
+| `prepare` | Download (resumable, md5-verified where SEQC2 publishes checksums, cached in `<outdir>/.downloads`), subset, index, and write `samplesheet.csv`, `params.yaml`, `checksums.md5` and `README.md` with full provenance |
 | `run` | Run the workflow on a prepared dataset: resolve `params.yaml`, create a run folder, call `nextflow run` with `-resume` |
 | `all` | `prepare` + `run` |
 
