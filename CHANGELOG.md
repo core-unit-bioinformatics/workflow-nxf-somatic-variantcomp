@@ -4,6 +4,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Dates follow ISO 8601 (`YYYY-MM-DD`).
 
+## v0.13.1-dev - [unreleased]
+
+### `Changed`
+
+- Metro map redrawn: one box per subworkflow, one numbered row per step with its tools, one line per use case (always; target BEDs; alignments; genes/stratifications; required known variants; external truth set)
+- README: step table with a detailed explanation of every step, generated from the same data as the map (`scripts/make_metro_map.py --markdown`)
+
 ## v0.13.0-dev - [2026-10-08]
 
 ### `Changed`
