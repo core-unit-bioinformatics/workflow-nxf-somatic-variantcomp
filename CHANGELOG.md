@@ -4,6 +4,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Dates follow ISO 8601 (`YYYY-MM-DD`).
 
+## v0.13.0-dev - [unreleased]
+
+### `Changed`
+
+- Tools run in nf-core modules, logic in `bin/` scripts (one tool per module, no tool pipes in local modules, all options in `conf/modules.config`):
+  - reference check: facts from `bcftools view -h` / `bcftools query` (VCF), the BED itself and `samtools idxstats` (BAM); decisions in `check_reference.py contigs`; REF alleles from the `bcftools norm --check-ref x` log (patched nf-core module emits the log) and `check_reference.py ref-alleles`
+  - target regions: `bedtools multiinter` + `gawk` + `bedtools merge` (subworkflow `BED_INTERSECT_ALL`), `bedtools intersect` / `subtract`; summary by `region_summary.py`
+  - callable regions: nf-core `mosdepth`, `mosdepth_callable.py`, `bedtools sort`, `BED_INTERSECT_ALL`, `bedtools intersect`
+  - read evidence: `bcftools query` (sites), nf-core `bcftools mpileup` (+ `call --keep-alts`), `bcftools norm`
+  - annotation: `annotate_variants.py to-bed`, `bedtools sort`, `bedtools map` (genes), `bedtools intersect -c` (strata), `annotate_variants.py merge`
+  - exact and position matches: nf-core `bcftools isec` (`--collapse none` / `all`)
+  - known variants: the required-variant summary and MultiQC table are written by `known_summary.py` instead of Groovy code; `known_variants.py prepare` no longer reads the FASTA (REF alleles are checked by `bcftools norm`)
+  - removed local modules `read_evidence`, `annotate_variants`, `common_regions`, `callable_regions`
+- `harmonize_vcf.py`: documented field selection (AD, else AF + DP), new INFO tags `VC_T_SRC` / `VC_N_SRC`, a per-VCF summary (`*.harmonize_summary.tsv`); errors instead of silent skipping for unsplit records, invalid AD/AF/DP and tumor records without VAF (`--max-missing-vaf`, default 0); records without reads (AD 0,0) get an undefined VAF (`zero_depth`, counted) and `FORMAT/AF = nan` counts as missing (both occur in the SEQC2 MuTect2 3.8 VCFs)
+- Stricter scripts with inline comments and `ERROR:`/`WARNING:`/`INFO:` messages naming file, record and expected value: `classify_discordance.py` (comparison identity, status values, harmonized and pileup VCF headers), `aggregate_metrics.py` (duplicate rows, value ranges), `known_variants.py` (TSV values, VAF tag, technologies of `--evidence`), `variantcomp_report.py` (columns, status and class values), `check_reference.py` (mixed naming styles, inputs without any reference contig)
+- `known_variants/required_variants.tsv` and `required_summary.tsv` start with the list name (`list` column)
+- Stratification columns of `variants.annotated.tsv` are in name order
+
+### `Fixed`
+
+- Position-only matches (`match` / `position`) are counted per position: an extra allele at a shared position is no longer an FP
+- A single target BED (or none: WGS only) no longer fails the region intersection (`bedtools multiinter` needs two files; a single BED is only merged)
+- `bedtools intersect` of the callable and `--regions_bed` regions uses `-sorted` with the reference index, so the output stays in reference order
+
+### `Added`
+
+- Unit tests for `mosdepth_callable.py`, `region_summary.py`, `annotate_variants.py`, `known_summary.py` and the new checks (98 pytest tests)
+- nf-core-style metro map (`docs/images/variantcomp_metro_map.svg/png`, `scripts/make_metro_map.py`) and per-step tool table in the README
+- Tool and dataset citations in `CITATIONS.md` and the MultiQC methods description
+- Documentation of the VCF requirements, the tested inputs and the harmonization rules (`docs/usage.md`), tools per output folder (`docs/output.md`)
+
 ## v0.12.0-dev - [2026-10-08]
 
 ### `Changed`
