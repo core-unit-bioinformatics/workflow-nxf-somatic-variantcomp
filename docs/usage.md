@@ -63,6 +63,91 @@ Rules (checked by `bin/check_sheets.py`; all problems are reported at once):
 The validated samplesheet with resolved paths is written to
 `<outdir>/pipeline_info/samplesheet.validated.csv`.
 
+## VCF requirements
+
+Every VCF must meet these requirements; the pipeline checks them and stops with an error
+naming the file and record otherwise.
+
+| Requirement | Details | Checked by |
+| --- | --- | --- |
+| Format | VCF 4.1–4.3 (or BCF), plain, gzip or bgzip compressed; read by HTSlib | `bcftools view` |
+| Sample columns | the tumor column (`tumor_id`) and, for paired calls, the normal column (`normal_id`); other columns are removed | `check_reference.py`, `bcftools view -s` |
+| Reference | contigs and lengths of the configured reference (safe renaming, see below); REF alleles match the FASTA (≤ `--max_ref_mismatch`) | `check_reference.py`, `bcftools norm --check-ref x` |
+| Allele depths | `FORMAT/AD` (Number=R: ref, alt) for the tumor, or `FORMAT/AF` + `FORMAT/DP`; every tumor record needs a VAF (see [Harmonization](#harmonization-of-vaf-depth-and-alt-reads)) | `harmonize_vcf.py` |
+| FILTER | the caller's FILTER column; `PASS` (or `.`) = passed; the uniform filters are applied on top | `bcftools view` |
+| Unfiltered | all records written by the caller, including filtered ones (e.g. DRAGEN `*.hard-filtered.vcf.gz`, which despite its name contains all calls with FILTER set) | – |
+| Somatic | every record is a somatic call of the tumor; the GT of the input is not used | `harmonize_vcf.py` |
+
+gVCF reference blocks (`<NON_REF>`, `<*>` as only ALT) are removed; symbolic structural
+variant alleles (`<DEL>`, ...) are dropped and counted. Multiallelic records are split,
+MNVs atomized and indels left-aligned before matching.
+
+### Tested inputs
+
+| Input | Caller and version | VCF version | Data | Test |
+| --- | --- | --- | --- | --- |
+| SEQC2 somatic VCFs (HCC1395 / HCC1395BL, sites IL_1 and FD_1, WES and WGS, chr22 slice) | GATK MuTect2 3.8-0-ge9d806836 | VCFv4.2, FORMAT/AD, FORMAT/AF (Number=1), FORMAT/DP | `tests/seqc2/` (T1 on the Pi; T2 full data on the HPC) | `-profile test_seqc2` |
+| SEQC2 high-confidence somatic call set v1.2.1 as external truth (known variants, mode `benchmark`) | – (sites-only VCF) | VCFv4.2 | `tests/seqc2/` | `-profile test_seqc2` |
+| Synthetic DRAGEN-like VCFs with edge cases (duplicates, MNVs, multiallelics, gVCF blocks, `1`/`MT` contig names, wrong chrM header length, normal-first sample order) | synthetic, modelled on DRAGEN somatic output | VCFv4.2, FORMAT/AD, FORMAT/AF (Number=A), FORMAT/DP | test-data repo `synthetic/` | `-profile test` |
+| Known-variant lists | – | CSV / TSV lists, sites-only VCF | test-data repo `synthetic/known/` | `-profile test` |
+
+**Not tested yet:** real DRAGEN v4.4.4 somatic VCFs (the target use case). They are
+expected to work: DRAGEN writes `FORMAT/AD`, `FORMAT/AF` and `FORMAT/DP` per sample, tumor
+and normal columns named after the sample IDs, and all calls with FILTER set. Other callers
+that write `FORMAT/AD` (e.g. GATK Mutect2 4.x, VarDict, LoFreq with AD) are expected to work
+but are untested. Callers without `FORMAT/AD` or `FORMAT/AF` + `FORMAT/DP` (e.g. Strelka2,
+which writes tier counts `AU/CU/GU/TU` and `TAR/TIR`) are **not supported**; the pipeline
+stops with an error.
+
+## Harmonization of VAF, depth and alt reads
+
+Callers store read counts differently, so the pipeline computes the values used for
+filtering, VAF strata, detection power and the tables in one way for every VCF
+(`bin/harmonize_vcf.py`, after splitting and left-alignment). The results are written as
+INFO tags: `VC_T_VAF`, `VC_T_DP`, `VC_T_ALT`, `VC_T_SRC` for the tumor and `VC_N_*` for the
+normal, plus `VC_TYPE` (SNV, MNV, INS, DEL, COMPLEX) and `VC_LEN` (length difference).
+
+For each sample, the first rule that applies is used:
+
+| Rule | Condition | VAF | Depth | Alt reads | `VC_*_SRC` |
+| --- | --- | --- | --- | --- | --- |
+| 1 | `FORMAT/AD` has a ref and an alt value | `AD[1] / sum(AD)` | `FORMAT/DP` if present, else `sum(AD)` | `AD[1]` | `AD` |
+| 2 | no usable AD, but `FORMAT/AF` and `FORMAT/DP` | `AF` | `DP` | `round(AF × DP)` | `AF_DP` |
+| 3 | neither | missing | `DP` if present | missing | – |
+
+If AD is `0,0` (no reads, e.g. filtered GATK MuTect2 3.8 calls), the VAF is undefined: it
+is left missing (the caller's AF is not used), alt reads are 0, and the record is counted
+as `zero_depth`, with a warning. These records don't count against `--max-missing-vaf`.
+
+Why these choices:
+
+- VAF uses `sum(AD)` as denominator, so numerator and denominator count the same reads.
+  Callers often count only informative reads in AD (DRAGEN, Mutect2), so `DP` can be larger
+  than `sum(AD)`; using `DP` would underestimate the VAF.
+- Depth prefers `FORMAT/DP`, because it is the coverage the caller reports and is what the
+  `--min_depth` filter is meant to act on.
+- The caller's own `FORMAT/AF` is not used when AD is available: callers estimate it
+  differently (e.g. Mutect2 reports a model-based estimate), which would make VAFs of
+  different technologies incomparable.
+
+Checks:
+
+- Every record must have exactly one ALT (the input is split before); `AD` must have two
+  values after splitting; AD and DP must not be negative; AF must be within [0, 1].
+- `FORMAT/AF = nan` is treated as missing (GATK MuTect2 3.8 writes it for a normal without
+  alt reads); it is counted (`*_af_nan` in the summary). AD is used where present.
+- Every tumor record needs a VAF (rule 1 or 2). The allowed fraction of tumor records
+  without VAF is set by `ext.args = '--max-missing-vaf 0'` of `HARMONIZE_VCF` in
+  `conf/modules.config`. A normal without reads at a site is allowed (counted only).
+- Rule 2 is reported as a warning with the number of records.
+
+The counts per rule and sample are written to
+`vcf_preprocessed/<sample>/<sample>_<technology>.normalized.harmonize_summary.tsv`.
+
+The tumor GT is set to `0/1` and the normal GT to `0/0`: every record of a somatic VCF is a
+tumor call, and callers fill GT differently (splitting a multiallelic record can leave
+`0/0` for an allele).
+
 ## Reference genome
 
 All inputs must be on the reference given with `--fasta` (plain or bgzipped; a `.fai` can be

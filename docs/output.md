@@ -20,6 +20,19 @@ The pipeline is built using [Nextflow](https://www.nextflow.io/) and processes d
 - [MultiQC](#multiqc) - Aggregate report describing results and QC from the whole pipeline
 - [Pipeline information](#pipeline-information) - Report metrics generated during the workflow execution
 
+Tools that produce each output folder (citations in [`CITATIONS.md`](../CITATIONS.md)):
+
+| Folder | Tools |
+| --- | --- |
+| `regions/` | `check_reference.py`, `bedtools sort`, `bedtools multiinter`, `gawk`, `bedtools merge`, `bedtools intersect`, `bedtools subtract`, `region_summary.py` |
+| `coverage/` | `samtools idxstats`, `check_reference.py`, `mosdepth`, `mosdepth_callable.py`, `bedtools sort`, `bedtools multiinter`, `bedtools intersect`, `region_summary.py` |
+| `vcf_preprocessed/` | `bcftools view`, `bcftools query`, `check_reference.py`, `bcftools annotate`, `bcftools reheader`, `bcftools norm`, `harmonize_vcf.py` |
+| `benchmark/` | `rtg vcfeval`, `bcftools isec`, `benchmark_metrics.py`, `aggregate_metrics.py` |
+| `discordance/` | `bcftools query`, `bcftools mpileup` + `bcftools call`, `bcftools norm`, `classify_discordance.py`, `annotate_variants.py`, `bedtools sort`, `bedtools map`, `bedtools intersect` |
+| `known_variants/` | `known_variants.py`, `bcftools norm`, `check_reference.py`, `bcftools isec`, `rtg vcfeval`, `benchmark_metrics.py`, `known_summary.py` |
+| `report/` | `variantcomp_report.py` (pandas, SciPy, Matplotlib) |
+| `multiqc/` | MultiQC |
+
 ### Regions
 
 <details markdown="1">
@@ -76,9 +89,17 @@ The mosdepth results are also shown in the MultiQC report.
     normalization and harmonization, before filtering and region restriction.
   - `<sample>_<technology>.compare.vcf.gz(.tbi)`: the calls that enter the comparison: the
     uniform filters are applied and only records in the comparison region are kept.
-- `vcf_preprocessed/reference_check/<sample>_<technology>.vcf.reference_check.tsv`: result of
-  the reference check per VCF (`status` = `ok`, `fixed` or `error`; renamed contigs, header
-  fixes, records on unknown contigs, REF mismatches, sample names).
+  - `<sample>_<technology>.normalized.harmonize_summary.tsv`: how often each harmonization
+    rule was used per sample (`T_source_AD`, `T_source_AF_DP`, `T_source_none`, depth from
+    `DP` or `sum(AD)`, ...), records read, written and dropped (symbolic ALT); see
+    [usage: harmonization](usage.md#harmonization-of-vaf-depth-and-alt-reads).
+- `vcf_preprocessed/reference_check/`
+  - `<sample>_<technology>.vcf.reference_check.tsv`: contig check per VCF (`status` = `ok`,
+    `fixed` or `error`; renamed contigs, header length fixes, records on unknown contigs,
+    sample names).
+  - `<sample>_<technology>.ref_alleles.tsv`: REF-allele check, from the `bcftools norm`
+    summary (records, REF mismatches removed by `--check-ref x`, mismatch rate, threshold).
+  - `<sample>_<technology>.norm.log`: the `bcftools norm` log.
 
 </details>
 
@@ -91,10 +112,11 @@ Every VCF goes through the same steps:
 5. Contig header lines rewritten from the reference `.fai`.
 6. `bcftools norm`: multiallelic records split, indels left-aligned, MNVs atomized into
    SNVs, records with a REF mismatch dropped, duplicates removed.
-7. Harmonization: caller-independent INFO tags computed from FORMAT/AD
-   (`VC_T_VAF`, `VC_T_DP`, `VC_T_ALT`, `VC_N_VAF`, `VC_N_DP`, `VC_N_ALT`, `VC_TYPE`,
-   `VC_LEN`). Every record is a call of the tumor (GT tumor `0/1`, normal `0/0`), and
-   remaining symbolic alleles are dropped.
+7. Harmonization: caller-independent INFO tags computed from FORMAT/AD, else FORMAT/AF +
+   FORMAT/DP (`VC_T_VAF`, `VC_T_DP`, `VC_T_ALT`, `VC_T_SRC`, the same `VC_N_*` for the
+   normal, `VC_TYPE`, `VC_LEN`); the rules are described in
+   [usage](usage.md#harmonization-of-vaf-depth-and-alt-reads). Every record is a call of the
+   tumor (GT tumor `0/1`, normal `0/0`), and remaining symbolic alleles are dropped.
 8. Uniform filters (`--filter_pass_only`, `--min_vaf`, `--min_depth`, `--min_alt_reads`) and
    restriction to the comparison region (records overlapping it are kept).
 
@@ -134,7 +156,7 @@ of the compare VCFs), so different representations of the same variant still mat
 | `variant_type` | `SNV`, `INDEL` | SNV includes atomized MNVs; INDEL includes insertions, deletions and complex variants. |
 | `truth_vaf` | VAF bins (`--vaf_bins`) | Recall by the VAF of the truth call. Shows the detection limit of the query technology. |
 | `query_vaf` | VAF bins | Precision by the VAF of the query call. Low-VAF false positives show up here. |
-| `match` | `exact`, `position` | Set comparison of the two VCFs by `CHROM/POS/REF/ALT` and by `CHROM/POS` only. Differences to `overall` show how much discordance is representation or a different allele at the same position. |
+| `match` | `exact`, `position` | Set comparison of the two VCFs (`bcftools isec`) by `CHROM/POS/REF/ALT` (counted per allele) and by `CHROM/POS` only (counted per position: several alleles at one position count once). Differences to `overall` show how much discordance is representation or a different allele at the same position. |
 
 `recall = TP_baseline / (TP_baseline + FN)`, `precision = TP_call / (TP_call + FP)`, and
 `F1` is their harmonic mean. Undefined values are `NA`.
@@ -183,6 +205,12 @@ seen it" (depth/VAF) from "it should have seen it".
 
 Read evidence needs the alignments to use the reference contig names.
 
+There is no separate `outside_callable` class: both technologies of a sample are compared
+in the same region (common targets, intersected with the callable region of the sample), so
+a call of the other technology outside that region is in its normalized VCF but not
+compared, and is reported as `present_but_filtered` (`other_filter` shows its FILTER;
+`other_in_normalized` = `yes`).
+
 ### Known variants
 
 <details markdown="1">
@@ -200,7 +228,9 @@ Read evidence needs the alignments to use the reference contig names.
     benchmark; `truth` is the list name).
   - `benchmark/<sample>/`: per-pair metrics, variant tables and vcfeval output.
   - `lists/`: the normalized known-variant VCFs per sample.
-  - `reference_check/`: reference check of the list regions.
+  - `reference_check/`: reference check of the list regions (`*.reference_check.tsv`) and
+    of the REF alleles of the listed variants (`*.ref_alleles.tsv`; any mismatch is an
+    error).
 
 </details>
 
