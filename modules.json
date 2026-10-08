@@ -10,9 +10,25 @@
                         "git_sha": "feef37435aea56816adf4b3bde1fc76aac327a8d",
                         "installed_by": ["modules"]
                     },
+                    "bcftools/isec": {
+                        "branch": "master",
+                        "git_sha": "feef37435aea56816adf4b3bde1fc76aac327a8d",
+                        "installed_by": ["modules"]
+                    },
+                    "bcftools/mpileup": {
+                        "branch": "master",
+                        "git_sha": "140a5c4d654dfb1e609334d2543bdfe22f8288db",
+                        "installed_by": ["modules"]
+                    },
                     "bcftools/norm": {
                         "branch": "master",
                         "git_sha": "3cdacf0655d26d724d465874ac76cfef79cc4732",
+                        "installed_by": ["modules"],
+                        "patch": "modules/nf-core/bcftools/norm/bcftools-norm.diff"
+                    },
+                    "bcftools/query": {
+                        "branch": "master",
+                        "git_sha": "feef37435aea56816adf4b3bde1fc76aac327a8d",
                         "installed_by": ["modules"]
                     },
                     "bcftools/reheader": {
@@ -25,9 +41,39 @@
                         "git_sha": "feef37435aea56816adf4b3bde1fc76aac327a8d",
                         "installed_by": ["modules"]
                     },
+                    "bedtools/intersect": {
+                        "branch": "master",
+                        "git_sha": "6d46786420b4d7bc88eba026eb389c0c5535d120",
+                        "installed_by": ["modules"]
+                    },
+                    "bedtools/map": {
+                        "branch": "master",
+                        "git_sha": "6d46786420b4d7bc88eba026eb389c0c5535d120",
+                        "installed_by": ["modules"]
+                    },
+                    "bedtools/merge": {
+                        "branch": "master",
+                        "git_sha": "6d46786420b4d7bc88eba026eb389c0c5535d120",
+                        "installed_by": ["modules"]
+                    },
+                    "bedtools/multiinter": {
+                        "branch": "master",
+                        "git_sha": "6d46786420b4d7bc88eba026eb389c0c5535d120",
+                        "installed_by": ["modules"]
+                    },
                     "bedtools/sort": {
                         "branch": "master",
                         "git_sha": "6d46786420b4d7bc88eba026eb389c0c5535d120",
+                        "installed_by": ["modules"]
+                    },
+                    "bedtools/subtract": {
+                        "branch": "master",
+                        "git_sha": "6d46786420b4d7bc88eba026eb389c0c5535d120",
+                        "installed_by": ["modules"]
+                    },
+                    "gawk": {
+                        "branch": "master",
+                        "git_sha": "7844e96252d0693fb2331969a1c9790eb831b0f6",
                         "installed_by": ["modules"]
                     },
                     "gunzip": {
@@ -57,6 +103,11 @@
                         "patch": "modules/nf-core/rtgtools/vcfeval/rtgtools-vcfeval.diff"
                     },
                     "samtools/faidx": {
+                        "branch": "master",
+                        "git_sha": "9339809fcb90af8a8b7051e6cd914894d5c52002",
+                        "installed_by": ["modules"]
+                    },
+                    "samtools/idxstats": {
                         "branch": "master",
                         "git_sha": "9339809fcb90af8a8b7051e6cd914894d5c52002",
                         "installed_by": ["modules"]

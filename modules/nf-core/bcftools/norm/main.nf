@@ -14,6 +14,7 @@ process BCFTOOLS_NORM {
     output:
     tuple val(meta), path("*.{vcf,vcf.gz,bcf,bcf.gz}"), emit: vcf
     tuple val(meta), path("*.{tbi,csi}"), emit: index, optional: true
+    tuple val(meta), path("*.norm.log"), emit: log
     tuple val("${task.process}"), val('bcftools'), eval("bcftools --version | sed '1!d; s/^.*bcftools //'"), topic: versions, emit: versions_bcftools
 
     when:
@@ -40,7 +41,8 @@ process BCFTOOLS_NORM {
         --output ${prefix}.${extension} \\
         ${args} \\
         --threads ${task.cpus} \\
-        ${vcf}
+        ${vcf} \\
+        2> >(tee ${prefix}.norm.log >&2)
     """
 
     stub:
@@ -70,6 +72,7 @@ process BCFTOOLS_NORM {
     def create_cmd = extension.endsWith(".gz") ? "echo '' | gzip >" : "touch"
     def create_index = index ? "touch ${prefix}.${extension}.${index}" : ""
     """
+    touch ${prefix}.norm.log
     ${create_cmd} ${prefix}.${extension}
     ${create_index}
     """
