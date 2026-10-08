@@ -21,11 +21,11 @@ Edge cases (see ``design.tsv`` for the full list):
 - duplicated record (panel)
 - FILTER != PASS for a true variant (wes)
 - variants outside the common target region
-- known-variant lists for S1 (``known_variants.tsv``): a 'required' list (one
+- known-variant lists for S1 (``known_variants.csv``): a 'required' list (one
   variant found everywhere, one filtered in wes, one outside the common region)
   and the designed true variants as a 'benchmark' truth set
 - gene BED (``bed/genes.bed``) and stratification BEDs for the homopolymer and the
-  dinucleotide repeat (``stratification.tsv``)
+  dinucleotide repeat (``stratification.csv``)
 - sample S2: contigs without ``chr`` prefix and no contig header lines
   (panel), wrong chrM length in the header (wes), normal column before tumor
   column (wgs)
@@ -365,11 +365,11 @@ def write_known_variants(out, d):
 
     def line(pos, chrom="chr1", gene=".", label="."):
         r = wgs[(chrom, pos)]
-        return f"{chrom}\t{pos}\t{r['ref']}\t{r['alts'][0]}\t{gene}\t{label}\t{r['vaf']}\n"
+        return f"{chrom},{pos},{r['ref']},{r['alts'][0]},{gene},{label},{r['vaf']}\n"
 
-    header = "chrom\tpos\tref\talt\tgene\tlabel\tvaf\n"
+    header = "chrom,pos,ref,alt,gene,label,vaf\n"
     # E01 found everywhere, E08 filtered in wes, E07 outside the common region
-    (known / "required_S1.tsv").write_text(
+    (known / "required_S1.csv").write_text(
         header + line(4100, gene="GENE_A", label="E01") + line(4700, gene="GENE_B", label="E08")
         + line(15000, label="E07")
     )  # fmt: skip
@@ -377,11 +377,11 @@ def write_known_variants(out, d):
     truth = [
         r for (c, p), r in sorted(wgs.items()) if (c, p) not in {("chr1", 15000), ("chr1", 7000)}
     ]
-    (known / "truth_S1.tsv").write_text(header + "".join(line(r["pos"], r["chrom"]) for r in truth))
-    (out / "known_variants.tsv").write_text(
-        "name\tsample\tmode\tvariants\tregions\n"
-        "required_demo\tS1\trequired\tknown/required_S1.tsv\tn/a\n"
-        "designed_truth\tS1\tbenchmark\tknown/truth_S1.tsv\tbed/panel.bed\n"
+    (known / "truth_S1.csv").write_text(header + "".join(line(r["pos"], r["chrom"]) for r in truth))
+    (out / "known_variants.csv").write_text(
+        "name,sample,mode,variants,regions\n"
+        "required_demo,S1,required,known/required_S1.csv,n/a\n"
+        "designed_truth,S1,benchmark,known/truth_S1.csv,bed/panel.bed\n"
     )
 
 
@@ -416,8 +416,8 @@ def main():
     for name, (chrom, start, motif) in strata.items():
         bed = out / "bed" / f"stratification_{name}.bed"
         bed.write_text(f"{chrom}\t{start - 2}\t{start - 1 + len(motif) + 1}\n")
-        rows.append(f"{name}\tbed/{bed.name}\n")
-    (out / "stratification.tsv").write_text("name\tbed\n" + "".join(rows))
+        rows.append(f"{name},bed/{bed.name}\n")
+    (out / "stratification.csv").write_text("name,bed\n" + "".join(rows))
 
     d = Designer(ref)
     design_variants(d)
@@ -434,18 +434,15 @@ def main():
                 library_type=TECHS[tech]["library_type"],
                 tumor_id=tumor_id,
                 normal_id=normal_id,
-                caller="dragen",
+                caller="synthetic-dragen-like",
                 vcf=f"vcf/{vcf.name}",
-                vcf_index=f"vcf/{vcf.name}.tbi",
                 tumor_bam="n/a",
-                tumor_bai="n/a",
                 normal_bam="n/a",
-                normal_bai="n/a",
                 target_bed=f"bed/{bed}" if bed else "n/a",
             )
         )
-    with (out / "samplesheet.tsv").open("w", newline="") as fh:
-        writer = csv.DictWriter(fh, fieldnames=list(rows[0]), delimiter="\t", lineterminator="\n")
+    with (out / "samplesheet.csv").open("w", newline="") as fh:
+        writer = csv.DictWriter(fh, fieldnames=list(rows[0]), lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
 

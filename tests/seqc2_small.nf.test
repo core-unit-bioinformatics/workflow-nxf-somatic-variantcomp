@@ -17,7 +17,7 @@ nextflow_pipeline {
         then {
             def stable_path = getAllFilesFromDir(params.outdir, relative: true, includeDir: true, ignore: ['pipeline_info/*.{html,json,txt}'])
             def stable_content = getAllFilesFromDir(params.outdir, ignoreFile: 'tests/.nftignore')
-            def validated = path("$outputDir/pipeline_info/samplesheet_validated.tsv").readLines()
+            def validated = path("$outputDir/pipeline_info/samplesheet.validated.csv").readLines()
             assert workflow.success
             assertAll(
                 { assert validated.size() == 7 },

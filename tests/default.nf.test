@@ -17,8 +17,8 @@ nextflow_pipeline {
             def stable_path = getAllFilesFromDir(params.outdir, relative: true, includeDir: true, ignore: ['pipeline_info/*.{html,json,txt}'])
             // stable_content: All files in ${params.outdir}/ with stable content
             def stable_content = getAllFilesFromDir(params.outdir, ignoreFile: 'tests/.nftignore')
-            // samplesheet_validated.tsv holds absolute paths: check its structure instead of its content
-            def validated = path("$outputDir/pipeline_info/samplesheet_validated.tsv").readLines()
+            // samplesheet.validated.csv holds absolute paths: check its structure instead of its content
+            def validated = path("$outputDir/pipeline_info/samplesheet.validated.csv").readLines()
             def annotatedLines = path("$outputDir/discordance/variants.annotated.tsv").readLines()
             def annotatedHeader = annotatedLines[0].tokenize('\t')
             def annotated = annotatedLines[1..-1].collect { line -> [annotatedHeader, line.split('\t', -1).toList()].transpose().collectEntries() }
@@ -28,7 +28,7 @@ nextflow_pipeline {
             assert workflow.success
             assertAll(
                 { assert validated.size() == 7 },
-                { assert validated[0].startsWith('sample\ttechnology\tlibrary_type') },
+                { assert validated[0].startsWith('sample,technology,library_type') },
                 // VCF headers contain bcftools command lines with dates: check records instead
                 { assert path("$outputDir/vcf_preprocessed/S1/S1_wes.compare.vcf.gz").linesGzip.count { line -> !line.startsWith('#') } == 10 },
                 { assert path("$outputDir/vcf_preprocessed/S1/S1_panel.compare.vcf.gz").linesGzip.count { line -> !line.startsWith('#') } == 9 },
@@ -48,7 +48,7 @@ nextflow_pipeline {
                 // external truth = designed truth: wgs is perfect, wes/panel as against wgs
                 { assert overallCounts("$outputDir/known_variants/benchmark/S1/S1_designed_truth_vs_wgs.metrics.tsv") == ['10', '0', '10', '0'] },
                 { assert overallCounts("$outputDir/known_variants/benchmark/S1/S1_designed_truth_vs_panel.metrics.tsv") == ['8', '2', '8', '1'] },
-                { assert validated.count { line -> line.contains('\twgs\twgs\t') && line.contains('\ttrue\t') } == 2 },
+                { assert validated.count { line -> line.contains(',wgs,wgs,') && line.contains(',true,') } == 2 },
                 { assert snapshot(
                     // pipeline versions.yml file for multiqc from which Nextflow version is removed because we test pipelines on multiple Nextflow versions
                     removeNextflowVersion("$outputDir/pipeline_info/variantcomp_software_mqc_versions.yml"),

@@ -38,6 +38,9 @@
                     "pysam": "0.24.1",
                     "python": "3.12.15"
                 },
+                "CHECK_KNOWN": {
+                    "python": "3.12.15"
+                },
                 "CHECK_REFERENCE_ANNOTATION": {
                     "pysam": "0.24.1",
                     "python": "3.12.15"
@@ -52,6 +55,12 @@
                 },
                 "CHECK_REFERENCE_VCF": {
                     "pysam": "0.24.1",
+                    "python": "3.12.15"
+                },
+                "CHECK_SAMPLESHEET": {
+                    "python": "3.12.15"
+                },
+                "CHECK_STRATIFICATION": {
                     "python": "3.12.15"
                 },
                 "CLASSIFY_DISCORDANCE": {
@@ -102,7 +111,7 @@
                     "scipy": "1.14.1"
                 },
                 "Workflow": {
-                    "core-unit-bioinformatics/workflow-nxf-somatic-variantcomp": "v0.9.0-dev"
+                    "core-unit-bioinformatics/workflow-nxf-somatic-variantcomp": "v0.11.0-dev"
                 }
             },
             [
@@ -288,7 +297,9 @@
                 "multiqc/multiqc_plots/svg/variantcomp_required.svg",
                 "multiqc/multiqc_report.html",
                 "pipeline_info",
-                "pipeline_info/samplesheet_validated.tsv",
+                "pipeline_info/known.validated.csv",
+                "pipeline_info/samplesheet.validated.csv",
+                "pipeline_info/stratification.validated.csv",
                 "pipeline_info/variantcomp_software_mqc_versions.yml",
                 "regions",
                 "regions/common_targets.bed",
@@ -367,7 +378,7 @@
                 "genes.reference_check.tsv:md5,02101e14aaaba89fe892f33dfc493b24",
                 "homopolymer.reference_check.tsv:md5,cebf9443a8702fcf5192f235bc487e3e",
                 "tandem_repeat.reference_check.tsv:md5,65b548f5185d8fd3571d01400d46a1e0",
-                "variants.annotated.tsv:md5,c7bd5b24162fcdec2b64463d044a78f9",
+                "variants.annotated.tsv:md5,0c20e8fc9941a1f1774edb59d2bbe03e",
                 "S1_designed_truth_vs_panel.metrics.tsv:md5,5e7de9b1a05c872f512664aeef7f2920",
                 "S1_designed_truth_vs_panel.variants.tsv:md5,b8814816530aa80443fbcd6396d8fe70",
                 "S1_designed_truth_vs_wes.metrics.tsv:md5,00e43d67ad8682673b4727dd22f433e0",
@@ -377,10 +388,10 @@
                 "known_benchmark.aggregated.tsv:md5,5a912352347ab359ab402e516dd2baa6",
                 "known_benchmark.per_pair.tsv:md5,11b27459b987f6af4ec023c03cdc7314",
                 "designed_truth.regions.reference_check.tsv:md5,0643674a92c11c0de6bd2e38df0838c0",
-                "required_demo_S1.known_summary.tsv:md5,168fd5352d8bf76f32bdd902fd3c84d9",
-                "required_demo_S1.known_variants.tsv:md5,fde9facc09bdb190e8b3712af2591980",
-                "required_summary.tsv:md5,dfb6f866e7e7ed89a14ffe0ed586a56e",
-                "required_variants.tsv:md5,fde9facc09bdb190e8b3712af2591980",
+                "required_demo_S1.known_summary.tsv:md5,d38c6634583d1692bba28c87ca8c8c38",
+                "required_demo_S1.known_variants.tsv:md5,69182b776372f25cf536619c0101ca1c",
+                "required_summary.tsv:md5,cc5e94e33d9c70c72976c642e834283a",
+                "required_variants.tsv:md5,69182b776372f25cf536619c0101ca1c",
                 "multiqc_citations.txt:md5,4c806e63a283ec1b7e78cdae3a923d4f",
                 "multiqc_variantcomp_classes.txt:md5,3f6fa632b34ad39705b4d9029ed6c3b8",
                 "multiqc_variantcomp_metrics.txt:md5,14a45859c9eb439069469ed1b242c37b",
@@ -404,7 +415,7 @@
                 "S2_wgs.vcf.reference_check.tsv:md5,87b5af0a0b0372af9e6d78dd0dcd98f8"
             ]
         ],
-        "timestamp": "2026-10-08T01:13:40.857374009",
+        "timestamp": "2026-10-08T09:51:58.97710199",
         "meta": {
             "nf-test": "0.9.5",
             "nextflow": "26.04.4"

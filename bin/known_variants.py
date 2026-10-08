@@ -69,8 +69,10 @@ def read_known(path, vaf_tag=None):
                     yield rec.chrom, rec.pos, rec.ref, alt, str(gene), str(label), vaf
         return
     with open_text(path) as fh:
+        # CSV or TSV list, by file extension
+        delimiter = "\t" if str(path).endswith((".tsv", ".tsv.gz")) else ","
         reader = csv.DictReader((line for line in fh if not line.startswith("##")),
-                                delimiter="\t")  # fmt: skip
+                                delimiter=delimiter)  # fmt: skip
         header = [h.lower().lstrip("#") for h in reader.fieldnames or []]
         missing = [c for c in TSV_REQUIRED if c not in header]
         if missing:

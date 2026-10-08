@@ -7,7 +7,7 @@ Subcommands:
            provides checksums), subset them for the chosen mode, and write a
            ready-to-run dataset folder: reference, target BED, unfiltered
            MuTect2 VCFs, optional BAM slices, the SEQC2 truth set,
-           samplesheet.tsv, checksums.md5 and README.md (provenance).
+           samplesheet.csv, checksums.md5 and README.md (provenance).
   run      run the workflow on a prepared dataset folder.
   all      prepare + run.
 
@@ -33,6 +33,7 @@ Examples:
 """
 
 import argparse
+import csv
 import datetime
 import gzip
 import hashlib
@@ -321,9 +322,9 @@ class Dataset:
                     chrom = line.split("\t", 1)[0]
                     if self.keep_contig(chrom):
                         fout.write(line)
-            rows.append(f"{name}\tannotation/stratification/{name}.bed\n")
-        strat = self.out / "stratification.tsv"
-        strat.write_text("name\tbed\n" + "".join(rows))
+            rows.append(f"{name},annotation/stratification/{name}.bed\n")
+        strat = self.out / "stratification.csv"
+        strat.write_text("name,bed\n" + "".join(rows))
         return genes, strat
 
     # BAMs ----------------------------------------------------------------------
@@ -414,11 +415,8 @@ class Dataset:
             "normal_id",
             "caller",
             "vcf",
-            "vcf_index",
             "tumor_bam",
-            "tumor_bai",
             "normal_bam",
-            "normal_bai",
             "target_bed",
         ]
         rows = []
@@ -428,8 +426,8 @@ class Dataset:
                 tbam = bams.get((pair, tech, "T"))
                 nbam = bams.get((pair, tech, "N"))
 
-                def rel(p, suffix=""):
-                    return str(Path(str(p) + suffix).relative_to(self.out)) if p else "n/a"
+                def rel(p):
+                    return str(Path(p).relative_to(self.out)) if p else "n/a"
 
                 rows.append(
                     [
@@ -440,44 +438,42 @@ class Dataset:
                         self.cfg["normal_id"],
                         self.cfg["caller"],
                         str(vcf),
-                        f"{vcf}.tbi",
                         rel(tbam),
-                        rel(tbam, ".bai"),
                         rel(nbam),
-                        rel(nbam, ".bai"),
                         str(wes_bed.relative_to(self.out)) if tech == "wes" else "n/a",
                     ]
                 )
-        path = self.out / "samplesheet.tsv"
-        with path.open("w") as fh:
-            fh.write("\t".join(header) + "\n")
-            fh.writelines("\t".join(r) + "\n" for r in rows)
+        path = self.out / "samplesheet.csv"
+        with path.open("w", newline="") as fh:
+            writer = csv.writer(fh, lineterminator="\n")
+            writer.writerow(header)
+            writer.writerows(rows)
         return path
 
     def write_known_variants(self, truth):
-        """known_variants.tsv: SEQC2 truth (benchmark, all samples) + demo required list."""
+        """known_variants.csv: SEQC2 truth (benchmark, all samples) + demo required list."""
         known = self.out / "known"
         known.mkdir(exist_ok=True)
         req = self.cfg["known_required"]
-        lines = ["chrom\tpos\tref\talt\tgene\tlabel"]
-        lines += ["\t".join(str(x) for x in v) for v in req["variants"]
+        lines = ["chrom,pos,ref,alt,gene,label"]
+        lines += [",".join(str(x) for x in v) for v in req["variants"]
                   if not self.contigs or v[0] in self.contigs]  # fmt: skip
-        (known / "required_demo.tsv").write_text("\n".join(lines) + "\n")
+        (known / "required_demo.csv").write_text("\n".join(lines) + "\n")
         rows = [
-            "name\tsample\tmode\tvariants\tregions",
-            "seqc2_truth\tall\tbenchmark\t"
-            f"{truth['snv'].relative_to(self.out)},{truth['indel'].relative_to(self.out)}\t"
+            "name,sample,mode,variants,regions",
+            "seqc2_truth,all,benchmark,"
+            f"{truth['snv'].relative_to(self.out)};{truth['indel'].relative_to(self.out)},"
             f"{truth['regions'].relative_to(self.out)}",
         ]
         if req["sample"].replace("SEQC2_", "") in self.pairs:
-            rows.append(f"required_demo\t{req['sample']}\trequired\tknown/required_demo.tsv\tn/a")
-        path = self.out / "known_variants.tsv"
+            rows.append(f"required_demo,{req['sample']},required,known/required_demo.csv,n/a")
+        path = self.out / "known_variants.csv"
         path.write_text("\n".join(rows) + "\n")
         return path
 
     def write_params(self, fasta, truth, genes, strat, known):
         params = {
-            "input": "samplesheet.tsv",
+            "input": "samplesheet.csv",
             "truth_technology": "wgs",
             "fasta": str(fasta.relative_to(self.out)),
             "gene_bed": str(genes.relative_to(self.out)),
@@ -522,7 +518,7 @@ class Dataset:
             "",
             "| Path | Content |",
             "|---|---|",
-            "| `samplesheet.tsv` | Pipeline samplesheet (paths relative to this folder) |",
+            "| `samplesheet.csv` | Pipeline samplesheet (paths relative to this folder) |",
             "| `params.yaml` | Pipeline parameters (paths relative to this folder) |",
             "| `reference/` | Reference FASTA (+ .fai/.gzi) |",
             "| `bed/` | WES target BED (Agilent SureSelect v6 + UTR, hg38 liftover), merged |",
@@ -530,8 +526,8 @@ class Dataset:
             "| `bam/` | BAM slices (WES targets +/- padding in the BAM windows, subsampled) |",
             "| `truth/` | SEQC2 somatic reference call set v1.2.1 + high-confidence regions |",
             "| `annotation/` | Genes (GENCODE v46 basic) and GIAB v3.5 stratifications |",
-            "| `stratification.tsv` | Stratification sheet (name, BED) for `--stratification` |",
-            "| `known_variants.tsv`, `known/` | Known-variant sheet for `--known_variants` |",
+            "| `stratification.csv` | Stratification sheet (name, BED) for `--stratification` |",
+            "| `known_variants.csv`, `known/` | Known-variant sheet for `--known_variants` |",
             "| `checksums.md5` | md5 of every file in this folder |",
             "",
             "## Sources",
