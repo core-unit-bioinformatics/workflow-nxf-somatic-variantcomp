@@ -80,7 +80,8 @@ def run(tmp_path):
         [sys.executable, str(BIN / "classify_discordance.py"), "--variants",
          str(tmp_path / "variants.tsv"), "--truth-normalized", truth_norm, "--query-normalized",
          query_norm, "--truth-tumor-evidence", truth_tumor, "--query-tumor-evidence", query_tumor,
-         "--normal-evidence", normal, "--prefix", str(prefix)],
+         "--normal-evidence", normal, "--prefix", str(prefix), "--sample", "S1", "--truth", "wgs",
+         "--query", "wes"],
         check=True,
     )  # fmt: skip
     with open(f"{prefix}.discordance.tsv") as fh:
@@ -120,3 +121,42 @@ def test_detection_power_function():
     assert classify_discordance.detection_power(100, 0.3, 3) == pytest.approx(1.0)
     # P(X >= 1) for n=10, p=0.1
     assert classify_discordance.detection_power(10, 0.1, 1) == pytest.approx(1 - 0.9**10)
+
+
+def classify(tmp_path, variants, normalized, *extra):
+    """Run the script on a variant table and one normalized VCF (for truth and query)."""
+    vcf = write(tmp_path / "norm.vcf", normalized)
+    return subprocess.run(
+        [sys.executable, str(BIN / "classify_discordance.py"), "--variants",
+         write(tmp_path / "v.tsv", variants), "--truth-normalized", vcf, "--query-normalized", vcf,
+         "--prefix", str(tmp_path / "x"), "--sample", "S1", "--truth", "wgs", "--query", "wes", *extra],
+        capture_output=True, text=True,
+    )  # fmt: skip
+
+
+def test_row_of_another_comparison_fails(tmp_path):
+    table = "\t".join(VARIANT_COLUMNS) + "\nS2\twgs\twes\tFN\tchr1\t1\tA\tC\t0.3\tNA\n"
+    result = classify(tmp_path, table, CALL_HEADER)
+    assert result.returncode == 1
+    assert "row of S2 wgs vs wes, expected S1 wgs vs wes" in result.stderr
+
+
+def test_invalid_status_fails(tmp_path):
+    table = "\t".join(VARIANT_COLUMNS) + "\nS1\twgs\twes\tTN\tchr1\t1\tA\tC\t0.3\tNA\n"
+    result = classify(tmp_path, table, CALL_HEADER)
+    assert result.returncode == 1
+    assert "status 'TN' is not TP, FN or FP" in result.stderr
+
+
+def test_unharmonized_vcf_fails(tmp_path):
+    table = "\t".join(VARIANT_COLUMNS) + "\n"
+    result = classify(tmp_path, table, "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n")
+    assert result.returncode == 1
+    assert "INFO/VC_T_VAF is not defined" in result.stderr
+
+
+def test_empty_table_keeps_comparison_identity(tmp_path):
+    result = classify(tmp_path, "\t".join(VARIANT_COLUMNS) + "\n", CALL_HEADER)
+    assert result.returncode == 0, result.stderr
+    power = (tmp_path / "x.power.tsv").read_text().splitlines()[1]
+    assert power.startswith("S1\twgs\twes\tpower_adjusted\tdetectable\tNA")

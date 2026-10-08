@@ -8,10 +8,14 @@ process CHECK_REFERENCE {
         : 'quay.io/biocontainers/pysam:0.24.1--py312hf5ad864_0'}"
 
     input:
-    tuple val(meta), path(input)
-    val type // 'vcf', 'bed' or 'bam'
-    tuple val(meta2), path(fasta), path(fai), path(gzi)
-    path regions // optional (bam): BED in reference names, translated to the alignment's names
+    // facts extracted by tools before this step:
+    //   type 'vcf': [ header (bcftools view -h), record contigs (bcftools query -f '%CHROM\n') ]
+    //   type 'bed': the BED itself
+    //   type 'bam': samtools idxstats output
+    tuple val(meta), path(facts, stageAs: 'facts/*')
+    val type
+    tuple val(meta2), path(fai)
+    path regions // optional ('bam'): reference-named BED to translate to the alignment's contig names
 
     output:
     tuple val(meta), path("*.reference_check.tsv"), emit: report
@@ -20,22 +24,29 @@ process CHECK_REFERENCE {
     tuple val(meta), path("*.harmonized.bed"), emit: bed, optional: true
     tuple val(meta), path("*.regions.bed"), emit: regions, optional: true
     tuple val("${task.process}"), val('python'), eval("python --version | sed 's/Python //'"), topic: versions, emit: versions_python
-    tuple val("${task.process}"), val('pysam'), eval("python -c 'import pysam; print(pysam.__version__)'"), topic: versions, emit: versions_pysam
 
     when:
     task.ext.when == null || task.ext.when
 
     script:
+    // ext.args: e.g. '--samples TUMOR,NORMAL' for VCFs (set in conf/modules.config)
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}.${type}"
+    def files = [facts].flatten()
+    // the script option for each kind of extracted fact
+    def facts_args = type == 'vcf'
+        ? "--vcf-header ${files[0]} --record-contigs ${files[1]}"
+        : type == 'bed' ? "--bed ${files[0]}" : "--idxstats ${files[0]}"
     def regions_arg = regions ? "--regions ${regions}" : ''
     """
-    check_reference.py \\
-        --input ${input} \\
+    # decide on contig names/lengths (and sample names for VCFs); writes the rename map,
+    # the contigs to keep and the report; exits 1 on a build mismatch or missing samples
+    check_reference.py contigs \\
         --type ${type} \\
+        --name ${meta.id} \\
         --fai ${fai} \\
-        --fasta ${fasta} \\
         --prefix ${prefix} \\
+        ${facts_args} \\
         ${regions_arg} \\
         ${args}
     """

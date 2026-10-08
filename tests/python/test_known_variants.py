@@ -48,8 +48,7 @@ def test_prepare_tsv_renames_and_sorts(tmp_path, ref):
         f"chr1\t100\t{seq[99]}\t{alt_of(seq[99])}\tKRAS\tG12D\n"
     )
     out = tmp_path / "known.vcf.gz"
-    result = run("prepare", "--input", str(tsv), "--fasta", str(fasta), "--fai",
-                 f"{fasta}.fai", "--output", str(out))  # fmt: skip
+    result = run("prepare", "--input", str(tsv), "--fai", f"{fasta}.fai", "--output", str(out))
     assert result.returncode == 0, result.stderr
     recs = list(pysam.VariantFile(str(out)))
     assert [(r.chrom, r.pos, r.id, r.info["KV_GENE"]) for r in recs] == [
@@ -57,15 +56,28 @@ def test_prepare_tsv_renames_and_sorts(tmp_path, ref):
     ]  # fmt: skip
 
 
-def test_prepare_wrong_ref_fails(tmp_path, ref):
+def test_prepare_unknown_contig_and_position_fail(tmp_path, ref):
     fasta, seq = ref
     tsv = tmp_path / "known.tsv"
-    wrong = alt_of(seq[99])
-    tsv.write_text(f"chrom\tpos\tref\talt\nchr1\t100\t{wrong}\t{seq[99]}\n")
-    result = run("prepare", "--input", str(tsv), "--fasta", str(fasta), "--fai",
-                 f"{fasta}.fai", "--output", str(tmp_path / "k.vcf.gz"))  # fmt: skip
+    tsv.write_text(
+        f"chrom\tpos\tref\talt\tlabel\nchrX\t100\tA\tC\tv1\nchr1\t2500\tA\tC\tv2\nchr1\t10\t{seq[9]}\t<DEL>\tv3\n"
+    )
+    result = run(
+        "prepare",
+        "--input",
+        str(tsv),
+        "--fai",
+        f"{fasta}.fai",
+        "--output",
+        str(tmp_path / "k.vcf.gz"),
+    )
     assert result.returncode != 0
-    assert "REF does not match the reference" in result.stderr
+    for message in (
+        "contig 'chrX' is not in the reference",
+        "position beyond the end of chr1",
+        "REF/ALT must be",
+    ):
+        assert message in result.stderr
 
 
 def test_check_statuses(tmp_path, ref):
@@ -75,8 +87,12 @@ def test_check_statuses(tmp_path, ref):
     tsv.write_text("chrom\tpos\tref\talt\n" + "".join(
         f"chr1\t{p}\t{r}\t{a}\n" for p, (r, a) in variants.items()))  # fmt: skip
     known = tmp_path / "known.vcf.gz"
-    assert run("prepare", "--input", str(tsv), "--fasta", str(fasta), "--fai", f"{fasta}.fai",
-               "--output", str(known)).returncode == 0  # fmt: skip
+    assert (
+        run(
+            "prepare", "--input", str(tsv), "--fai", f"{fasta}.fai", "--output", str(known)
+        ).returncode
+        == 0
+    )
 
     def call(pos, filt="PASS"):
         r, a = variants[pos]
@@ -103,3 +119,35 @@ def test_check_statuses(tmp_path, ref):
     with open(f"{prefix}.known_summary.tsv") as fh:
         summary = next(csv.DictReader(fh, delimiter="\t"))
     assert (summary["required"], summary["passed"], summary["all_passed"]) == ("4", "1", "no")
+
+
+@pytest.mark.parametrize(
+    ("row", "message"),
+    [
+        ("chr1\tx10\tA\tC\t0.3", "line 2: pos 'x10' is not a positive integer"),
+        ("chr1\t10\tA\tC\thigh", "line 2: vaf 'high' is not a number"),
+        ("chr1\t10\tA\tC\t1.4", "line 2: vaf 1.4 is outside [0, 1]"),
+    ],
+)
+def test_prepare_invalid_tsv_values_fail(tmp_path, ref, row, message):
+    tsv = tmp_path / "known.tsv"
+    tsv.write_text("chrom\tpos\tref\talt\tvaf\n" + row + "\n")
+    result = run("prepare", "--input", str(tsv), "--fai", f"{ref[0]}.fai", "--output", str(tmp_path / "k.vcf.gz"))
+    assert result.returncode == 1
+    assert message in result.stderr
+
+
+def test_check_evidence_of_unknown_technology_fails(tmp_path, ref):
+    known = tmp_path / "known.vcf"
+    known.write_text(CALL_HEADER.replace("#CHROM", '##INFO=<ID=KV_GENE,Number=1,Type=String,Description="g">\n'
+                                         '##INFO=<ID=KV_LABEL,Number=1,Type=String,Description="l">\n#CHROM')
+                     + "chr1\t10\tv1\tA\tC\t.\t.\tKV_GENE=G\n")  # fmt: skip
+    calls = tmp_path / "calls.vcf"
+    calls.write_text(CALL_HEADER)
+    bed = tmp_path / "r.bed"
+    bed.write_text("chr1\t0\t100\n")
+    result = run("check", "--known", str(known), "--sample", "S1", "--technology", "wes",
+                 "--normalized", str(calls), "--compare", str(calls), "--regions", str(bed),
+                 "--evidence", f"wgs={calls}", "--prefix", str(tmp_path / "x"))  # fmt: skip
+    assert result.returncode == 1
+    assert "--evidence 'wgs=" in result.stderr and "technology of --technology (wes)" in result.stderr

@@ -14,11 +14,15 @@ nextflow_workflow {
             workflow {
                 """
                 def base = params.pipelines_testdata_base_path + 'synthetic/'
+                def genome = file("${outputDir}/genome.bed")
+                genome.parent.mkdirs()
+                genome.text = 'chr1\\t0\\t30000\\nchr2\\t0\\t20000\\nchrM\\t0\\t16569\\n'
                 def entry = { tech, bed -> [[id: 'S1_' + tech, sample: 'S1', technology: tech], file(base + 'vcf/S1_' + tech + '.vcf.gz'), [], [], [], [], [], bed ? file(base + bed) : []] }
                 input[0] = channel.of(entry.call('wgs', null), entry.call('wes', 'bed/wes.bed'), entry.call('panel', 'bed/panel.bed'))
                 input[1] = channel.value([[id: 'synthetic'], file(base + 'reference/synthetic.fa'), file(base + 'reference/synthetic.fa.fai'), []])
-                input[2] = null
+                input[2] = channel.value(genome)
                 input[3] = null
+                input[4] = null
                 """
             }
         }
@@ -38,6 +42,9 @@ nextflow_workflow {
             workflow {
                 """
                 def base = params.pipelines_testdata_base_path + 'synthetic/'
+                def genome = file("${outputDir}/genome.bed")
+                genome.parent.mkdirs()
+                genome.text = 'chr1\\t0\\t30000\\nchr2\\t0\\t20000\\nchrM\\t0\\t16569\\n'
                 def entry = { tech, bed -> [[id: 'S1_' + tech, sample: 'S1', technology: tech], file(base + 'vcf/S1_' + tech + '.vcf.gz'), [], [], [], [], [], bed ? file(base + bed) : []] }
                 def regions = file("${outputDir}/regions.bed")
                 regions.parent.mkdirs()
@@ -46,8 +53,9 @@ nextflow_workflow {
                 exclude.text = 'chr1\\t4500\\t4600\\n'
                 input[0] = channel.of(entry.call('wgs', null), entry.call('panel', 'bed/panel.bed'))
                 input[1] = channel.value([[id: 'synthetic'], file(base + 'reference/synthetic.fa'), file(base + 'reference/synthetic.fa.fai'), []])
-                input[2] = regions
-                input[3] = exclude
+                input[2] = channel.value(genome)
+                input[3] = regions
+                input[4] = exclude
                 """
             }
         }
@@ -66,13 +74,17 @@ nextflow_workflow {
             workflow {
                 """
                 def base = params.pipelines_testdata_base_path + 'synthetic/'
+                def genome = file("${outputDir}/genome.bed")
+                genome.parent.mkdirs()
+                genome.text = 'chr1\\t0\\t30000\\nchr2\\t0\\t20000\\nchrM\\t0\\t16569\\n'
                 input[0] = channel.of(
                     [[id: 'S1_wgs', sample: 'S1', technology: 'wgs'], file(base + 'vcf/S1_wgs.vcf.gz'), [], [], [], [], [], []],
                     [[id: 'S1_wgs2', sample: 'S1', technology: 'wgs2'], file(base + 'vcf/S1_wgs.vcf.gz'), [], [], [], [], [], []]
                 )
                 input[1] = channel.value([[id: 'synthetic'], file(base + 'reference/synthetic.fa'), file(base + 'reference/synthetic.fa.fai'), []])
-                input[2] = null
+                input[2] = channel.value(genome)
                 input[3] = null
+                input[4] = null
                 """
             }
         }

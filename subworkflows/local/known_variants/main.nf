@@ -4,7 +4,10 @@
 
 include { KNOWN_CHECK                                } from '../../../modules/local/known_check/main'
 include { RTGTOOLS_VCFEVAL as KNOWN_VCFEVAL          } from '../../../modules/nf-core/rtgtools/vcfeval/main'
+include { BCFTOOLS_ISEC as KNOWN_ISEC_EXACT           } from '../../../modules/nf-core/bcftools/isec/main'
+include { BCFTOOLS_ISEC as KNOWN_ISEC_POSITION        } from '../../../modules/nf-core/bcftools/isec/main'
 include { BENCHMARK_METRICS as KNOWN_METRICS         } from '../../../modules/local/benchmark_metrics/main'
+include { KNOWN_SUMMARY                              } from '../../../modules/local/known_summary/main'
 include { AGGREGATE_METRICS as KNOWN_AGGREGATE       } from '../../../modules/local/aggregate_metrics/main'
 
 workflow KNOWN_VARIANTS {
@@ -66,12 +69,19 @@ workflow KNOWN_VARIANTS {
             [meta, comp, ctbi, kvcf, ktbi, kbed, region]
         }
     KNOWN_VCFEVAL(ch_bench, ch_sdf)
+    // record matching (truth list first, then the technology's calls)
+    def ch_isec_input = ch_bench.map { meta, comp, ctbi, kvcf, ktbi, _kbed, _region -> [meta, [kvcf, comp], [ktbi, ctbi], [], [], []] }
+    KNOWN_ISEC_EXACT(ch_isec_input)
+    KNOWN_ISEC_POSITION(ch_isec_input)
     KNOWN_METRICS(
         KNOWN_VCFEVAL.out.baseline_vcf
             .join(KNOWN_VCFEVAL.out.fn_vcf)
             .join(KNOWN_VCFEVAL.out.tp_vcf)
             .join(KNOWN_VCFEVAL.out.fp_vcf)
-            .join(ch_bench.map { meta, comp, _ctbi, kvcf, _ktbi, kbed, region -> [meta, kvcf, comp, [kbed, region].flatten()] })
+            .join(KNOWN_ISEC_EXACT.out.results)
+            .join(KNOWN_ISEC_POSITION.out.results)
+            // the isec counts are restricted to the list regions and the comparison region
+            .join(ch_bench.map { meta, _comp, _ctbi, _kvcf, _ktbi, kbed, region -> [meta, [kbed, region].flatten()] })
     )
     KNOWN_AGGREGATE(
         KNOWN_METRICS.out.metrics
@@ -80,9 +90,23 @@ workflow KNOWN_VARIANTS {
             .map { files -> [[id: 'known_benchmark'], files] }
     )
 
+    // all required checks in one summary; warnings for every missing variant, error with
+    // --fail_on_missing_required (known_summary.py)
+    KNOWN_SUMMARY(
+        KNOWN_CHECK.out.variants
+            .join(KNOWN_CHECK.out.summary)
+            .map { meta, variants, summary -> [meta.name, variants, summary] }
+            .toSortedList { a, b -> a[1].name <=> b[1].name }
+            .filter { items -> items }
+            .map { items ->
+                [[id: 'known'], items.collect { item -> item[0] }, items.collect { item -> item[1] }, items.collect { item -> item[2] }]
+            }
+    )
+
     emit:
-    required_variants  = KNOWN_CHECK.out.variants         // channel: [ meta, tsv ]
-    required_summary   = KNOWN_CHECK.out.summary          // channel: [ meta, tsv ]
+    required_variants  = KNOWN_SUMMARY.out.variants       // channel: [ meta, tsv ]
+    required_summary   = KNOWN_SUMMARY.out.summary        // channel: [ meta, tsv ]
+    multiqc            = KNOWN_SUMMARY.out.multiqc        // channel: path
     benchmark_metrics  = KNOWN_METRICS.out.metrics        // channel: [ meta, tsv ]
     benchmark_per_pair = KNOWN_AGGREGATE.out.per_pair     // channel: [ meta, tsv ]
     benchmark          = KNOWN_AGGREGATE.out.aggregated   // channel: [ meta, tsv ]

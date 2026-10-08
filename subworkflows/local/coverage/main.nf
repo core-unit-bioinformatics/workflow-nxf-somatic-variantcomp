@@ -1,26 +1,42 @@
 //
 // Coverage of all alignments in the common region and per-sample callable regions
 //
+//  1. reference check of every alignment (contigs and lengths from samtools idxstats,
+//     decision in check_reference.py); the common region is translated to the
+//     alignment's contig names for mosdepth --by
+//  2. mosdepth per alignment (--quantize: LOW_COVERAGE / CALLABLE bins; --by: mean depth
+//     per common-region interval)
+//  3. callable intervals per alignment (mosdepth_callable.py: label or mean-depth
+//     threshold, contigs renamed to the reference), sorted (bedtools sort)
+//  4. per sample: intersection of the callable intervals of all its alignments
+//     (BED_INTERSECT_ALL), restricted to the common region (bedtools intersect -sorted)
+//  5. summary per sample (region_summary.py)
+//
 // A sample gets a callable region if every technology of the sample has a tumor
-// alignment; the callable region is covered with >= min_coverage in all of them
-// (and in the normals, if include_normal). Other samples keep the common region.
+// alignment; other samples keep the common region.
 //
 
-include { CHECK_REFERENCE as CHECK_REFERENCE_BAM } from '../../../modules/local/check_reference/main'
-include { MOSDEPTH                               } from '../../../modules/nf-core/mosdepth/main'
-include { CALLABLE_REGIONS                       } from '../../../modules/local/callable_regions/main'
+include { SAMTOOLS_IDXSTATS                         } from '../../../modules/nf-core/samtools/idxstats/main'
+include { CHECK_REFERENCE as CHECK_REFERENCE_BAM    } from '../../../modules/local/check_reference/main'
+include { MOSDEPTH                                  } from '../../../modules/nf-core/mosdepth/main'
+include { MOSDEPTH_CALLABLE                         } from '../../../modules/local/mosdepth_callable/main'
+include { BEDTOOLS_SORT as BEDTOOLS_SORT_CALLABLE   } from '../../../modules/nf-core/bedtools/sort/main'
+include { BED_INTERSECT_ALL                         } from '../bed_intersect_all/main'
+include { BEDTOOLS_INTERSECT as BEDTOOLS_INTERSECT_COMMON } from '../../../modules/nf-core/bedtools/intersect/main'
+include { REGION_SUMMARY as REGION_SUMMARY_CALLABLE } from '../../../modules/local/region_summary/main'
 
 workflow COVERAGE {
 
     take:
-    ch_samplesheet // channel: samplesheet entries [ meta, vcf, vcf_index, tumor_bam, tumor_bai, normal_bam, normal_bai, target_bed ]
+    ch_samplesheet // channel: samplesheet entries [ meta, vcf, vcf_index, tumor_bam, tumor_index, normal_bam, normal_index, target_bed ] (alignments indexed)
     ch_reference   // value channel: [ meta, fasta, fai, gzi ]
-    common_bed     // value channel: common comparison region (reference contig names)
+    common_bed     // value channel: common comparison region (reference contig names; sorted, merged)
     include_normal // boolean: normal alignments must be callable, too
-    callable_mode  // string: 'base' or 'region'
-    min_coverage   // integer
 
     main:
+    def ch_fai = ch_reference.map { meta, _fasta, fai, _gzi -> [meta, fai] }
+
+    // alignments: [ meta(id, entry_id, role, sample, ...), alignment, index ]
     def ch_alignments = ch_samplesheet.flatMap { entry ->
         def meta = entry[0]
         def alignments = []
@@ -33,17 +49,25 @@ workflow COVERAGE {
         alignments
     }
 
-    // all alignments are indexed (PREPARE_ALIGNMENTS)
-    def ch_indexed = ch_alignments
+    // 1. reference check of the alignment's contigs; common region in the alignment's names
+    SAMTOOLS_IDXSTATS(ch_alignments)
+    CHECK_REFERENCE_BAM(SAMTOOLS_IDXSTATS.out.idxstats, 'bam', ch_fai, common_bed)
 
-    // reference check of the @SQ header; common region translated to the alignment's contig names
-    CHECK_REFERENCE_BAM(ch_indexed.map { meta, bam, _bai -> [meta, bam] }, 'bam', ch_reference, common_bed)
-
+    // 2. depth per alignment
     MOSDEPTH(
-        ch_indexed.join(CHECK_REFERENCE_BAM.out.regions),
+        ch_alignments.join(CHECK_REFERENCE_BAM.out.regions),
         ch_reference.map { meta, fasta, _fai, _gzi -> [meta, fasta] },
         ['LOW_COVERAGE', 'CALLABLE']
     )
+
+    // 3. callable intervals per alignment (quantized bins: base mode; regions: region mode)
+    MOSDEPTH_CALLABLE(
+        MOSDEPTH.out.quantized_bed
+            .join(MOSDEPTH.out.regions_bed)
+            .join(CHECK_REFERENCE_BAM.out.rename),
+        ch_fai
+    )
+    BEDTOOLS_SORT_CALLABLE(MOSDEPTH_CALLABLE.out.bed, ch_fai.map { _meta, fai -> fai })
 
     // samples with a tumor alignment for every technology
     def ch_eligibility = ch_samplesheet
@@ -51,20 +75,27 @@ workflow COVERAGE {
         .groupTuple()
         .map { sample, flags -> [sample, flags.every { flag -> flag }] }
 
-    def ch_coverage = callable_mode == 'region' ? MOSDEPTH.out.regions_bed : MOSDEPTH.out.quantized_bed
-    def ch_per_sample = ch_coverage
-        .join(CHECK_REFERENCE_BAM.out.rename)
-        .map { meta, coverage, rename -> [meta.sample, coverage, rename] }
+    // 4. per eligible sample: bases callable in all its alignments, inside the common region
+    def ch_per_sample = BEDTOOLS_SORT_CALLABLE.out.sorted
+        .map { meta, bed -> [meta.sample, bed] }
         .groupTuple()
         .join(ch_eligibility.filter { _sample, eligible -> eligible })
-        .map { sample, coverage, renames, _eligible -> [[id: sample, sample: sample], coverage, renames] }
+        .map { sample, beds, _eligible -> [[id: "${sample}.callable_all".toString(), sample: sample, alignments: beds.size()], beds] }
+    BED_INTERSECT_ALL(ch_per_sample)
+    BEDTOOLS_INTERSECT_COMMON(
+        BED_INTERSECT_ALL.out.bed
+            .combine(common_bed)
+            .map { meta, bed, common -> [[id: meta.sample, sample: meta.sample, alignments: meta.alignments], bed, common] },
+        // genome file for -sorted (sorted output in reference order)
+        ch_fai
+    )
+    def ch_callable = BEDTOOLS_INTERSECT_COMMON.out.intersect
 
-    CALLABLE_REGIONS(
-        ch_per_sample,
-        common_bed,
-        ch_reference.map { _meta, _fasta, fai, _gzi -> fai },
-        callable_mode,
-        min_coverage
+    // 5. summary per sample
+    REGION_SUMMARY_CALLABLE(
+        ch_callable.combine(common_bed).map { meta, bed, common -> [meta, common, [bed], []] },
+        'callable',
+        []
     )
 
     // comparison region per samplesheet entry: callable region of its sample, else the common region
@@ -74,7 +105,7 @@ workflow COVERAGE {
     def ch_regions = ch_entries
         .filter { _sample, _meta, eligible -> eligible }
         .map { sample, meta, _eligible -> [sample, meta] }
-        .combine(CALLABLE_REGIONS.out.bed.map { meta, bed -> [meta.sample, bed] }, by: 0)
+        .combine(ch_callable.map { meta, bed -> [meta.sample, bed] }, by: 0)
         .map { _sample, meta, bed -> [meta, bed] }
         .mix(
             ch_entries
@@ -84,10 +115,10 @@ workflow COVERAGE {
         )
 
     emit:
-    regions          = ch_regions                                                             // channel: [ meta, bed ] per samplesheet entry
-    callable         = CALLABLE_REGIONS.out.bed                                               // channel: [ meta(sample), bed ]
-    callable_summary = CALLABLE_REGIONS.out.summary                                           // channel: [ meta(sample), tsv ]
-    reports          = CHECK_REFERENCE_BAM.out.report                                         // channel: [ meta, tsv ]
+    regions          = ch_regions                             // channel: [ meta, bed ] per samplesheet entry
+    callable         = ch_callable                            // channel: [ meta(sample), bed ]
+    callable_summary = REGION_SUMMARY_CALLABLE.out.summary    // channel: [ meta(sample), tsv ]
+    reports          = CHECK_REFERENCE_BAM.out.report         // channel: [ meta, tsv ]
     multiqc_files    = MOSDEPTH.out.global_txt.mix(MOSDEPTH.out.summary_txt, MOSDEPTH.out.regions_txt)
-                           .map { _meta, file -> file }                                       // channel: path
+                           .map { _meta, file -> file }       // channel: path
 }

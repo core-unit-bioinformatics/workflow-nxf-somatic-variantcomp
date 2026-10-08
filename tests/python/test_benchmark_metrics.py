@@ -42,13 +42,26 @@ def read_tsv(path):
 def metrics(tmp_path):
     truth = [(100, "A", "C", 0.3), (200, "A", "G", 0.04), (300, "AT", "A", 0.3)]
     query = [(100, "A", "C", 0.28), (200, "A", "T", 0.05), (400, "G", "T", 0.6)]
+    # bcftools isec sites.txt: CHROM POS REF ALT flags (truth, query)
+    exact = tmp_path / "isec_exact"
+    exact.mkdir()
+    (exact / "sites.txt").write_text(
+        "chr1\t100\tA\tC\t11\nchr1\t200\tA\tG\t10\nchr1\t200\tA\tT\t01\n"
+        "chr1\t300\tAT\tA\t10\nchr1\t400\tG\tT\t01\n"
+    )
+    position = tmp_path / "isec_position"
+    position.mkdir()
+    (position / "sites.txt").write_text(
+        "chr1\t100\tA\tC\t11\nchr1\t100\tA\tT\t01\nchr1\t200\tA\tG\t11\nchr1\t300\tAT\tA\t10\n"
+        "chr1\t400\tG\tT\t01\n"
+    )  # chr1:100 A>T: extra query allele at a shared position, isec -c all lists it as 01
     files = {
         "tp-baseline": vcf(tmp_path / "tpb.vcf", [truth[0]]),
         "fn": vcf(tmp_path / "fn.vcf", truth[1:]),
         "tp": vcf(tmp_path / "tp.vcf", [query[0]]),
         "fp": vcf(tmp_path / "fp.vcf", query[1:]),
-        "truth-vcf": vcf(tmp_path / "truth.vcf", truth),
-        "query-vcf": vcf(tmp_path / "query.vcf", query),
+        "isec-exact": exact,
+        "isec-position": position,
     }
     cmd = [sys.executable, str(BIN / "benchmark_metrics.py"), "--sample", "S1", "--truth", "wgs",
            "--query", "wes", "--prefix", str(tmp_path / "S1_wes")]  # fmt: skip
@@ -92,7 +105,8 @@ def test_match_strata(metrics):
     exact = row(rows, "match", "exact")
     position = row(rows, "match", "position")
     assert (exact["tp_baseline"], exact["fn"], exact["fp"]) == ("1", "2", "2")
-    # chr1:200 has different alleles: matched by position only
+    # chr1:200 has different alleles: matched by position only;
+    # the extra allele at chr1:100 does not count as FP (counted per position)
     assert (position["tp_baseline"], position["fn"], position["fp"]) == ("2", "1", "1")
 
 
@@ -129,9 +143,48 @@ def test_match_strata_restricted_to_regions(tmp_path, metrics):
     cmd = [sys.executable, str(BIN / "benchmark_metrics.py"), "--sample", "S1", "--truth", "wgs",
            "--query", "wes", "--prefix", str(tmp_path / "restricted"),
            "--regions", str(bed)]  # fmt: skip
-    for key, name in (("tp-baseline", "tpb"), ("fn", "fn"), ("tp", "tp"), ("fp", "fp"),
-                      ("truth-vcf", "truth"), ("query-vcf", "query")):  # fmt: skip
-        cmd += [f"--{key}", str(tmp_path / f"{name}.vcf")]
+    for key, name in (("tp-baseline", "tpb.vcf"), ("fn", "fn.vcf"), ("tp", "tp.vcf"), ("fp", "fp.vcf"),
+                      ("isec-exact", "isec_exact"), ("isec-position", "isec_position")):  # fmt: skip
+        cmd += [f"--{key}", str(tmp_path / name)]
     subprocess.run(cmd, check=True)
     exact = row(read_tsv(tmp_path / "restricted.metrics.tsv"), "match", "exact")
     assert (exact["tp_baseline"], exact["fn"], exact["fp"]) == ("1", "1", "1")
+
+
+def test_missing_isec_sites_fails(tmp_path, metrics):
+    cmd = [sys.executable, str(BIN / "benchmark_metrics.py"), "--sample", "S1", "--truth", "wgs",
+           "--query", "wes", "--prefix", str(tmp_path / "x"), "--tp-baseline", str(tmp_path / "tpb.vcf"),
+           "--fn", str(tmp_path / "fn.vcf"), "--tp", str(tmp_path / "tp.vcf"), "--fp", str(tmp_path / "fp.vcf"),
+           "--isec-exact", str(tmp_path), "--isec-position", str(tmp_path / "isec_position")]  # fmt: skip
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    assert result.returncode == 1
+    assert "sites.txt does not exist" in result.stderr
+
+
+def run_aggregate(tmp_path, *texts):
+    """Run aggregate_metrics.py on metrics tables given as text."""
+    paths = []
+    for i, text in enumerate(texts):
+        paths.append(tmp_path / f"m{i}.tsv")
+        paths[-1].write_text(text)
+    return subprocess.run([sys.executable, str(BIN / "aggregate_metrics.py"), *map(str, paths),
+                           "--prefix", str(tmp_path / "agg")], capture_output=True, text=True)  # fmt: skip
+
+
+METRICS_HEADER = "sample\ttruth\tquery\tstratum_type\tstratum\ttp_baseline\tfn\ttp_call\tfp\trecall\tprecision\tf1\n"
+
+
+def test_aggregate_duplicate_rows_fail(tmp_path):
+    row = "S1\twgs\twes\toverall\tall\t9\t1\t9\t1\t0.9\t0.9\t0.9\n"
+    result = run_aggregate(tmp_path, METRICS_HEADER + row, METRICS_HEADER + row)
+    assert result.returncode == 1
+    assert "rows for the same sample and stratum" in result.stderr
+
+
+def test_aggregate_invalid_values_fail(tmp_path):
+    result = run_aggregate(tmp_path, METRICS_HEADER + "S1\twgs\twes\toverall\tall\t-1\t1\t9\t1\t0.9\t0.9\t0.9\n")
+    assert result.returncode == 1
+    assert "tp_baseline '-1' is not a non-negative integer" in result.stderr
+    result = run_aggregate(tmp_path, METRICS_HEADER + "S1\twgs\twes\toverall\tall\t9\t1\t9\t1\t1.9\t0.9\t0.9\n")
+    assert result.returncode == 1
+    assert "recall '1.9' is not a number within [0, 1]" in result.stderr

@@ -30,6 +30,8 @@ process KNOWN_CHECK {
         match ? "${tech}=${match}" : null
     }.findAll { arg -> arg }
     """
+    # PASS/FAIL of every required known variant in every technology of the sample
+    # (compared calls, filtered calls, comparison region, tumor read evidence)
     known_variants.py check \\
         --known ${known} \\
         --sample ${meta.sample} \\

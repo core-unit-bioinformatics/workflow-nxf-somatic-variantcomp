@@ -73,10 +73,76 @@ def test_tags_gt_and_symbolic(tmp_path):
     assert list(second.filter.keys()) == ["weak_evidence"]
     assert third.info["VC_T_VAF"] == pytest.approx(0.25)
     assert third.info["VC_T_ALT"] == 10
-    assert "dropped 1 records with a symbolic ALT" in result.stderr
+    assert "3 written, 1 dropped (symbolic ALT)" in result.stderr
+    # per-record source of the tumor values
+    assert [r.info.get("VC_T_SRC") for r in recs] == ["AD", "AD", "AF_DP"]
+    assert "1 records without FORMAT/AD" in result.stderr
+
+
+def test_summary_counts_sources(tmp_path):
+    body = (
+        "chr1\t10\t.\tA\tC\t.\tPASS\t.\tGT:AD:DP\t0/1:70,30:110\t0/0:50,1:51\n"
+        "chr1\t20\t.\tA\tAT\t.\tPASS\t.\tGT:AD\t0/1:9,1\t0/0:.,.\n"
+    )
+    summary = tmp_path / "summary.tsv"
+    result, _ = run(tmp_path, body, "--tumor", "T", "--normal", "N", "--summary", str(summary))
+    assert result.returncode == 0, result.stderr
+    values = dict(line.split("\t") for line in summary.read_text().splitlines()[1:])
+    assert values["records_written"] == "2"
+    assert values["T_source_AD"] == "2" and values["T_depth_DP"] == "1" and values["T_depth_AD_sum"] == "1"
+    # a normal without reads is only counted
+    assert values["N_source_none"] == "1"
+
+
+@pytest.mark.parametrize(
+    ("record", "message"),
+    [
+        ("chr1\t10\t.\tA\tC,G\t.\tPASS\t.\tGT:AD\t0/1:5,3,2\t0/0:9,0,0\n", "2 ALT alleles; split"),
+        ("chr1\t10\t.\tA\tC\t.\tPASS\t.\tGT:AD\t0/1:5,-3\t0/0:9,0\n", "negative value"),
+        ("chr1\t10\t.\tA\tC\t.\tPASS\t.\tGT:AF:DP\t0/1:1.5:20\t0/0:0:20\n", "outside [0, 1]"),
+        ("chr1\t10\t.\tA\tC\t.\tPASS\t.\tGT\t0/1\t0/0\n", "1 of 1 tumor records have no VAF"),
+    ],
+)
+def test_invalid_input_fails_with_message(tmp_path, record, message):
+    result, _ = run(tmp_path, record, "--tumor", "T", "--normal", "N")
+    assert result.returncode == 1
+    assert message in result.stderr
+
+
+def test_missing_vaf_allowed_up_to_threshold(tmp_path):
+    body = (
+        "chr1\t10\t.\tA\tC\t.\tPASS\t.\tGT:AD\t0/1:5,5\t0/0:9,0\n"
+        "chr1\t20\t.\tA\tC\t.\tPASS\t.\tGT\t0/1\t0/0\n"
+    )
+    result, _ = run(tmp_path, body, "--tumor", "T", "--normal", "N", "--max-missing-vaf", "0.5")
+    assert result.returncode == 0, result.stderr
 
 
 def test_wrong_sample_order_fails(tmp_path):
     result, _ = run(tmp_path, "", "--tumor", "N", "--normal", "T")
     assert result.returncode != 0
-    assert "expected samples ['N', 'T']" in result.stderr
+    assert "expected the samples ['N', 'T'] in this order" in result.stderr
+
+
+def test_nan_af_is_missing_not_an_error(tmp_path):
+    # GATK MuTect2 3.8 writes AF=nan for a normal without alt reads; AD is used
+    body = "chr1\t10\t.\tA\tC\t.\tPASS\t.\tGT:AD:AF\t0/1:3,5:1\t0/0:2,0:nan\n"
+    summary = tmp_path / "summary.tsv"
+    result, out = run(tmp_path, body, "--tumor", "T", "--normal", "N", "--summary", str(summary))
+    assert result.returncode == 0, result.stderr
+    rec = next(iter(pysam.VariantFile(str(out))))
+    assert rec.info["VC_N_VAF"] == pytest.approx(0.0)
+    assert "N_af_nan\t1" in summary.read_text()
+
+
+def test_zero_depth_tumor_is_undefined_not_missing(tmp_path):
+    # filtered MuTect2 3.8 call without tumor reads: AD 0,0, AF 1, no DP
+    body = "chr1\t10\t.\tC\tCA\t.\tweak_evidence\t.\tGT:AD:AF\t0/1:0,0:1\t0/0:5,0:0\n"
+    summary = tmp_path / "summary.tsv"
+    result, out = run(tmp_path, body, "--tumor", "T", "--normal", "N", "--summary", str(summary))
+    assert result.returncode == 0, result.stderr
+    rec = next(iter(pysam.VariantFile(str(out))))
+    # AF=1 is not used as VAF
+    assert "VC_T_VAF" not in rec.info and rec.info["VC_T_ALT"] == 0 and rec.info["VC_T_DP"] == 0
+    assert "T_source_zero_depth\t1" in summary.read_text()
+    assert "1 records with no tumor reads" in result.stderr

@@ -2,8 +2,9 @@
 // Prepare the reference: uncompressed FASTA with .fai, and a BED of all contigs
 //
 
-include { GUNZIP         } from '../../../modules/nf-core/gunzip/main'
-include { SAMTOOLS_FAIDX } from '../../../modules/nf-core/samtools/faidx/main'
+include { GUNZIP                  } from '../../../modules/nf-core/gunzip/main'
+include { SAMTOOLS_FAIDX          } from '../../../modules/nf-core/samtools/faidx/main'
+include { GAWK as GAWK_GENOME_BED } from '../../../modules/nf-core/gawk/main'
 
 workflow PREPARE_REFERENCE {
 
@@ -20,6 +21,7 @@ workflow PREPARE_REFERENCE {
         ch_fasta = GUNZIP.out.gunzip
     }
 
+    // .fai: given (plain FASTA only) or created with samtools faidx
     def ch_reference
     if (fasta_fai && !fasta.name.endsWith('.gz')) {
         ch_reference = ch_fasta.map { meta, fa -> [meta, fa, fasta_fai, []] }
@@ -31,17 +33,10 @@ workflow PREPARE_REFERENCE {
             .map { meta, fa, fai -> [meta, fa, fai, []] }
     }
 
-    // BED with the full length of every reference contig
-    def ch_genome_bed = ch_reference
-        .map { _meta, _fa, fai, _gzi ->
-            fai.readLines().collect { line ->
-                def fields = line.tokenize('\t')
-                "${fields[0]}\t0\t${fields[1]}"
-            }.join('\n') + '\n'
-        }
-        .collectFile(name: 'genome.bed')
+    // BED with the full length of every reference contig (gawk program in conf/modules.config)
+    GAWK_GENOME_BED(ch_reference.map { meta, _fa, fai, _gzi -> [meta, fai, 'bed'] }, [], false)
 
     emit:
-    reference  = ch_reference.first()  // value channel: [ meta, fasta, fai, gzi ]
-    genome_bed = ch_genome_bed.first() // value channel: path
+    reference  = ch_reference.first()                                         // value channel: [ meta, fasta, fai, gzi ]
+    genome_bed = GAWK_GENOME_BED.out.output.map { _meta, bed -> bed }.first() // value channel: path
 }

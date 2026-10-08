@@ -10,13 +10,31 @@
                     "pandas": "2.2.1",
                     "python": "3.12.15"
                 },
-                "ANNOTATE_VARIANTS": {
-                    "bedtools": "2.31.1"
+                "ANNOTATION_MERGE": {
+                    "python": "3.12.15"
                 },
                 "BCFTOOLS_ANNOTATE": {
                     "bcftools": "1.23.1"
                 },
+                "BCFTOOLS_ISEC_EXACT": {
+                    "bcftools": "1.23.1"
+                },
+                "BCFTOOLS_ISEC_POSITION": {
+                    "bcftools": "1.23.1"
+                },
+                "BCFTOOLS_MPILEUP": {
+                    "bcftools": "1.23.1"
+                },
                 "BCFTOOLS_NORM": {
+                    "bcftools": "1.23.1"
+                },
+                "BCFTOOLS_NORM_EVIDENCE": {
+                    "bcftools": "1.23.1"
+                },
+                "BCFTOOLS_QUERY_CONTIGS": {
+                    "bcftools": "1.23.1"
+                },
+                "BCFTOOLS_QUERY_SITES": {
                     "bcftools": "1.23.1"
                 },
                 "BCFTOOLS_REHEADER": {
@@ -28,40 +46,65 @@
                 "BCFTOOLS_VIEW_COMPARE": {
                     "bcftools": "1.23.1"
                 },
+                "BCFTOOLS_VIEW_HEADER": {
+                    "bcftools": "1.23.1"
+                },
                 "BCFTOOLS_VIEW_SELECT": {
                     "bcftools": "1.23.1"
                 },
+                "BEDTOOLS_INTERSECT_COMMON": {
+                    "bedtools": "2.31.1"
+                },
+                "BEDTOOLS_INTERSECT_STRATA": {
+                    "bedtools": "2.31.1"
+                },
+                "BEDTOOLS_MAP_GENES": {
+                    "bedtools": "2.31.1"
+                },
+                "BEDTOOLS_MERGE": {
+                    "bedtools": "2.31.1"
+                },
+                "BEDTOOLS_MERGE_COMMON": {
+                    "bedtools": "2.31.1"
+                },
+                "BEDTOOLS_MULTIINTER": {
+                    "bedtools": "2.31.1"
+                },
                 "BEDTOOLS_SORT": {
+                    "bedtools": "2.31.1"
+                },
+                "BEDTOOLS_SORT_ANNOTATION": {
+                    "bedtools": "2.31.1"
+                },
+                "BEDTOOLS_SORT_CALLABLE": {
                     "bedtools": "2.31.1"
                 },
                 "BENCHMARK_METRICS": {
                     "pysam": "0.24.1",
                     "python": "3.12.15"
                 },
-                "CALLABLE_REGIONS": {
-                    "bedtools": "2.31.1"
-                },
                 "CHECK_KNOWN": {
                     "python": "3.12.15"
                 },
                 "CHECK_REFERENCE_ANNOTATION": {
-                    "pysam": "0.24.1",
                     "python": "3.12.15"
                 },
                 "CHECK_REFERENCE_BAM": {
-                    "pysam": "0.24.1",
                     "python": "3.12.15"
                 },
                 "CHECK_REFERENCE_BED": {
-                    "pysam": "0.24.1",
                     "python": "3.12.15"
                 },
                 "CHECK_REFERENCE_KNOWN": {
-                    "pysam": "0.24.1",
                     "python": "3.12.15"
                 },
                 "CHECK_REFERENCE_VCF": {
-                    "pysam": "0.24.1",
+                    "python": "3.12.15"
+                },
+                "CHECK_REF_ALLELES": {
+                    "python": "3.12.15"
+                },
+                "CHECK_REF_ALLELES_KNOWN": {
                     "python": "3.12.15"
                 },
                 "CHECK_SAMPLESHEET": {
@@ -74,8 +117,11 @@
                     "pysam": "0.24.1",
                     "python": "3.12.15"
                 },
-                "COMMON_REGIONS": {
-                    "bedtools": "2.31.1"
+                "GAWK_ALL": {
+                    "gawk": "5.3.1"
+                },
+                "GAWK_GENOME_BED": {
+                    "gawk": "5.3.1"
                 },
                 "GUNZIP": {
                     "gunzip": 1.13
@@ -91,6 +137,12 @@
                 "KNOWN_CHECK": {
                     "python": "3.12.15"
                 },
+                "KNOWN_ISEC_EXACT": {
+                    "bcftools": "1.23.1"
+                },
+                "KNOWN_ISEC_POSITION": {
+                    "bcftools": "1.23.1"
+                },
                 "KNOWN_METRICS": {
                     "pysam": "0.24.1",
                     "python": "3.12.15"
@@ -102,6 +154,9 @@
                     "pysam": "0.24.1",
                     "python": "3.12.15"
                 },
+                "KNOWN_SUMMARY": {
+                    "python": "3.12.15"
+                },
                 "KNOWN_VCFEVAL": {
                     "rtgtools": 3.13
                 },
@@ -109,8 +164,14 @@
                     "gzip": 1.14,
                     "mosdepth": "0.3.14"
                 },
-                "READ_EVIDENCE": {
-                    "bcftools": "1.23.1"
+                "MOSDEPTH_CALLABLE": {
+                    "python": "3.12.15"
+                },
+                "REGION_SUMMARY": {
+                    "python": "3.12.15"
+                },
+                "REGION_SUMMARY_CALLABLE": {
+                    "python": "3.12.15"
                 },
                 "RTGTOOLS_FORMAT": {
                     "rtgtools": 3.13
@@ -121,14 +182,20 @@
                 "SAMTOOLS_FAIDX": {
                     "samtools": 1.24
                 },
+                "SAMTOOLS_IDXSTATS": {
+                    "samtools": 1.24
+                },
                 "VARIANTCOMP_REPORT": {
                     "matplotlib": "3.9.2",
                     "pandas": "2.2.3",
                     "python": "3.12.15",
                     "scipy": "1.14.1"
                 },
+                "VARIANTS_TO_BED": {
+                    "python": "3.12.15"
+                },
                 "Workflow": {
-                    "core-unit-bioinformatics/workflow-nxf-somatic-variantcomp": "v0.11.0-dev"
+                    "core-unit-bioinformatics/workflow-nxf-somatic-variantcomp": "v0.12.0-dev"
                 }
             },
             [
@@ -346,6 +413,8 @@
                 "known_variants/lists/seqc2_truth.known.normalized.vcf.gz",
                 "known_variants/lists/seqc2_truth.known.normalized.vcf.gz.tbi",
                 "known_variants/reference_check",
+                "known_variants/reference_check/required_demo.ref_alleles.tsv",
+                "known_variants/reference_check/seqc2_truth.ref_alleles.tsv",
                 "known_variants/reference_check/seqc2_truth.regions.reference_check.tsv",
                 "known_variants/required",
                 "known_variants/required/required_demo",
@@ -430,36 +499,54 @@
                 "vcf_preprocessed/SEQC2_FD_1",
                 "vcf_preprocessed/SEQC2_FD_1/SEQC2_FD_1_wes.compare.vcf.gz",
                 "vcf_preprocessed/SEQC2_FD_1/SEQC2_FD_1_wes.compare.vcf.gz.tbi",
+                "vcf_preprocessed/SEQC2_FD_1/SEQC2_FD_1_wes.normalized.harmonize_summary.tsv",
                 "vcf_preprocessed/SEQC2_FD_1/SEQC2_FD_1_wes.normalized.vcf.gz",
                 "vcf_preprocessed/SEQC2_FD_1/SEQC2_FD_1_wes.normalized.vcf.gz.tbi",
                 "vcf_preprocessed/SEQC2_FD_1/SEQC2_FD_1_wgs.compare.vcf.gz",
                 "vcf_preprocessed/SEQC2_FD_1/SEQC2_FD_1_wgs.compare.vcf.gz.tbi",
+                "vcf_preprocessed/SEQC2_FD_1/SEQC2_FD_1_wgs.normalized.harmonize_summary.tsv",
                 "vcf_preprocessed/SEQC2_FD_1/SEQC2_FD_1_wgs.normalized.vcf.gz",
                 "vcf_preprocessed/SEQC2_FD_1/SEQC2_FD_1_wgs.normalized.vcf.gz.tbi",
                 "vcf_preprocessed/SEQC2_IL_1",
                 "vcf_preprocessed/SEQC2_IL_1/SEQC2_IL_1_wes.compare.vcf.gz",
                 "vcf_preprocessed/SEQC2_IL_1/SEQC2_IL_1_wes.compare.vcf.gz.tbi",
+                "vcf_preprocessed/SEQC2_IL_1/SEQC2_IL_1_wes.normalized.harmonize_summary.tsv",
                 "vcf_preprocessed/SEQC2_IL_1/SEQC2_IL_1_wes.normalized.vcf.gz",
                 "vcf_preprocessed/SEQC2_IL_1/SEQC2_IL_1_wes.normalized.vcf.gz.tbi",
                 "vcf_preprocessed/SEQC2_IL_1/SEQC2_IL_1_wgs.compare.vcf.gz",
                 "vcf_preprocessed/SEQC2_IL_1/SEQC2_IL_1_wgs.compare.vcf.gz.tbi",
+                "vcf_preprocessed/SEQC2_IL_1/SEQC2_IL_1_wgs.normalized.harmonize_summary.tsv",
                 "vcf_preprocessed/SEQC2_IL_1/SEQC2_IL_1_wgs.normalized.vcf.gz",
                 "vcf_preprocessed/SEQC2_IL_1/SEQC2_IL_1_wgs.normalized.vcf.gz.tbi",
                 "vcf_preprocessed/SEQC2_NV_1",
                 "vcf_preprocessed/SEQC2_NV_1/SEQC2_NV_1_wes.compare.vcf.gz",
                 "vcf_preprocessed/SEQC2_NV_1/SEQC2_NV_1_wes.compare.vcf.gz.tbi",
+                "vcf_preprocessed/SEQC2_NV_1/SEQC2_NV_1_wes.normalized.harmonize_summary.tsv",
                 "vcf_preprocessed/SEQC2_NV_1/SEQC2_NV_1_wes.normalized.vcf.gz",
                 "vcf_preprocessed/SEQC2_NV_1/SEQC2_NV_1_wes.normalized.vcf.gz.tbi",
                 "vcf_preprocessed/SEQC2_NV_1/SEQC2_NV_1_wgs.compare.vcf.gz",
                 "vcf_preprocessed/SEQC2_NV_1/SEQC2_NV_1_wgs.compare.vcf.gz.tbi",
+                "vcf_preprocessed/SEQC2_NV_1/SEQC2_NV_1_wgs.normalized.harmonize_summary.tsv",
                 "vcf_preprocessed/SEQC2_NV_1/SEQC2_NV_1_wgs.normalized.vcf.gz",
                 "vcf_preprocessed/SEQC2_NV_1/SEQC2_NV_1_wgs.normalized.vcf.gz.tbi",
                 "vcf_preprocessed/reference_check",
+                "vcf_preprocessed/reference_check/SEQC2_FD_1_wes.norm.norm.log",
+                "vcf_preprocessed/reference_check/SEQC2_FD_1_wes.ref_alleles.tsv",
                 "vcf_preprocessed/reference_check/SEQC2_FD_1_wes.vcf.reference_check.tsv",
+                "vcf_preprocessed/reference_check/SEQC2_FD_1_wgs.norm.norm.log",
+                "vcf_preprocessed/reference_check/SEQC2_FD_1_wgs.ref_alleles.tsv",
                 "vcf_preprocessed/reference_check/SEQC2_FD_1_wgs.vcf.reference_check.tsv",
+                "vcf_preprocessed/reference_check/SEQC2_IL_1_wes.norm.norm.log",
+                "vcf_preprocessed/reference_check/SEQC2_IL_1_wes.ref_alleles.tsv",
                 "vcf_preprocessed/reference_check/SEQC2_IL_1_wes.vcf.reference_check.tsv",
+                "vcf_preprocessed/reference_check/SEQC2_IL_1_wgs.norm.norm.log",
+                "vcf_preprocessed/reference_check/SEQC2_IL_1_wgs.ref_alleles.tsv",
                 "vcf_preprocessed/reference_check/SEQC2_IL_1_wgs.vcf.reference_check.tsv",
+                "vcf_preprocessed/reference_check/SEQC2_NV_1_wes.norm.norm.log",
+                "vcf_preprocessed/reference_check/SEQC2_NV_1_wes.ref_alleles.tsv",
                 "vcf_preprocessed/reference_check/SEQC2_NV_1_wes.vcf.reference_check.tsv",
+                "vcf_preprocessed/reference_check/SEQC2_NV_1_wgs.norm.norm.log",
+                "vcf_preprocessed/reference_check/SEQC2_NV_1_wgs.ref_alleles.tsv",
                 "vcf_preprocessed/reference_check/SEQC2_NV_1_wgs.vcf.reference_check.tsv"
             ],
             [
@@ -503,22 +590,22 @@
                 "SEQC2_IL_1_wgs_tumor.regions.bed.gz:md5,074fc6d4e951b5361321b5357ca7e173",
                 "SEQC2_IL_1_wgs_tumor.regions.bed.gz.csi:md5,02883d38e18cf147b6593b267e142c24",
                 "callable_summary.tsv:md5,db59a3854557bd2175d30d4304e740c3",
-                "SEQC2_IL_1_wes_normal.bam.reference_check.tsv:md5,81856510b40c4638b92b8ea9069a0277",
-                "SEQC2_IL_1_wes_tumor.bam.reference_check.tsv:md5,430f0502fa443ad797d6d52d9a03102f",
-                "SEQC2_IL_1_wgs_normal.bam.reference_check.tsv:md5,23923c5db948d16cdd02d04a2fd6a8a9",
-                "SEQC2_IL_1_wgs_tumor.bam.reference_check.tsv:md5,ebb4fb2adf8fcadbf55e992295c2a216",
+                "SEQC2_IL_1_wes_normal.bam.reference_check.tsv:md5,b4931cd99366855781f204f43b2d73aa",
+                "SEQC2_IL_1_wes_tumor.bam.reference_check.tsv:md5,2ee463aba4c661eabe3e1d300ceadb83",
+                "SEQC2_IL_1_wgs_normal.bam.reference_check.tsv:md5,8095a2ee9706a7c17571b1e8d38dc0a7",
+                "SEQC2_IL_1_wgs_tumor.bam.reference_check.tsv:md5,fde1a12161ba6954b4743fa3cbef6b51",
                 "SEQC2_FD_1_wgs_vs_wes.discordance.tsv:md5,3708b46e10618b3d222417cee5af46d4",
                 "SEQC2_FD_1_wgs_vs_wes.power.tsv:md5,85b65314b330b9a8aa5dd53cc07cc966",
                 "SEQC2_IL_1_wgs_vs_wes.discordance.tsv:md5,e7c69f90dfc010b2c3e3c4ca0f1061c4",
                 "SEQC2_IL_1_wgs_vs_wes.power.tsv:md5,c2018ab7720f864ff7c7912b54e678c8",
                 "SEQC2_NV_1_wgs_vs_wes.discordance.tsv:md5,947c941cfe75e09eabb3348e56d98b54",
                 "SEQC2_NV_1_wgs_vs_wes.power.tsv:md5,9a191d8b177198ca56e8069e87ba4ec6",
-                "all_difficult.reference_check.tsv:md5,df552af62de31759aa577d79223c90ef",
-                "genes.reference_check.tsv:md5,7393486dc79ae18c29b82b6cc52a1579",
-                "homopolymer.reference_check.tsv:md5,795033fe5b221ea1fee14fad1bf732cf",
-                "low_mappability.reference_check.tsv:md5,2c8474cb81e6ea08e82d5d2252552776",
-                "segmental_duplication.reference_check.tsv:md5,83c513c72452651e215fb478037f373c",
-                "tandem_repeat.reference_check.tsv:md5,ca2f173c04faa42c20e52164cdb61ca0",
+                "all_difficult.reference_check.tsv:md5,e2db742f22b94e653e68336c8ecac073",
+                "genes.reference_check.tsv:md5,8ae3c8c0195a6ad157b649e61b00af51",
+                "homopolymer.reference_check.tsv:md5,e54946bf10c786d4e17bd87c9c1cf62c",
+                "low_mappability.reference_check.tsv:md5,87c2a488151053502ae929d19ff426d1",
+                "segmental_duplication.reference_check.tsv:md5,21c093b587f645359742c3ccf3f656df",
+                "tandem_repeat.reference_check.tsv:md5,d909749145a96c03d88e7d44926d5694",
                 "variants.annotated.tsv:md5,c1729600e589a9da822895207e02279d",
                 "SEQC2_FD_1_seqc2_truth_vs_wes.metrics.tsv:md5,782b9b5112cecdfb67d250ca2268f112",
                 "SEQC2_FD_1_seqc2_truth_vs_wes.variants.tsv:md5,56297bc87099e992fe56ac80cb2c9a3f",
@@ -534,11 +621,13 @@
                 "SEQC2_NV_1_seqc2_truth_vs_wgs.variants.tsv:md5,49147a4ea99397c8aca6791b9ef8a58e",
                 "known_benchmark.aggregated.tsv:md5,1cebd9346575b2b03972073097fb85a9",
                 "known_benchmark.per_pair.tsv:md5,eee6ad4a84f9b3e3db6b7b928df922c0",
-                "seqc2_truth.regions.reference_check.tsv:md5,e0176269733cbfd828a50991ebf847c0",
-                "required_demo_SEQC2_IL_1.known_summary.tsv:md5,f95a99af55f20597195f5e9a2d488df1",
-                "required_demo_SEQC2_IL_1.known_variants.tsv:md5,57a6273145e7fcd24cec2f443d867cdd",
-                "required_summary.tsv:md5,4102bc577a9c680efaf6bc97094d7946",
-                "required_variants.tsv:md5,57a6273145e7fcd24cec2f443d867cdd",
+                "required_demo.ref_alleles.tsv:md5,43d8e8a70670ce6872cc15c94fce79ed",
+                "seqc2_truth.ref_alleles.tsv:md5,211a96bc7ab6d86a9837846f529deb89",
+                "seqc2_truth.regions.reference_check.tsv:md5,bdc29a9b027ae7bcf3042edfdc614194",
+                "required_demo_SEQC2_IL_1.known_summary.tsv:md5,2cf612193a0ce89241ce41b42da98097",
+                "required_demo_SEQC2_IL_1.known_variants.tsv:md5,31c8cbc66f1e2df8cfba57d63416e8e8",
+                "required_summary.tsv:md5,91e8b46e128554f540781f5de6164b0c",
+                "required_variants.tsv:md5,0e12c138d586a381bb360fc7ac9a06a3",
                 "mosdepth-coverage-per-contig-single.txt:md5,b3af770133bfb0d4fc1aae5009a9f3fd",
                 "mosdepth-cumcoverage-dist-id.txt:md5,f3b01f3c4b0d97be5876b785a419fe9f",
                 "mosdepth_cov_dist.txt:md5,1038978f90a283cf745ffadf81a21699",
@@ -553,20 +642,38 @@
                 "multiqc_variantcomp_required.txt:md5,57b85b882c26bab79d533043ed2852a9",
                 "common_targets.bed:md5,41eeb51455f418377a735ecde07a9cd3",
                 "common_targets.summary.tsv:md5,b7c3aea36ddd9c70a0c05915281ef339",
-                "wes.bed.reference_check.tsv:md5,67d73e2ec6a9fda144788bd5acfe90af",
+                "wes.bed.reference_check.tsv:md5,c836e1f05549886241a7aad44c833e42",
                 "wes.bed:md5,41eeb51455f418377a735ecde07a9cd3",
                 "variantcomp.classes.tsv:md5,edcb28e160f6bde3e6c6a75125395c8c",
                 "variantcomp.enrichment.tsv:md5,9d6806016cc86de7d5df681d33e35157",
                 "variantcomp.genes.tsv:md5,acc77558eb2e8f66810e4e3de3c4a2e9",
-                "SEQC2_FD_1_wes.vcf.reference_check.tsv:md5,2ff92b30e53453d0b02feed3ee9a2a29",
-                "SEQC2_FD_1_wgs.vcf.reference_check.tsv:md5,5b41e540053ff3d76b2e78abb198952c",
-                "SEQC2_IL_1_wes.vcf.reference_check.tsv:md5,c7b71363c2f6a4d525042e59b71496df",
-                "SEQC2_IL_1_wgs.vcf.reference_check.tsv:md5,dd5af204df215bf20a1e5c8d85973b06",
-                "SEQC2_NV_1_wes.vcf.reference_check.tsv:md5,c9e8f198e1261e948ada31d5d4309e0d",
-                "SEQC2_NV_1_wgs.vcf.reference_check.tsv:md5,5a7b19686ea76fc90f31b6c10130a984"
+                "SEQC2_FD_1_wes.normalized.harmonize_summary.tsv:md5,b04998400e57115ea3f68752c083492c",
+                "SEQC2_FD_1_wgs.normalized.harmonize_summary.tsv:md5,fd73a1741bf8adfe096f4b55779587c0",
+                "SEQC2_IL_1_wes.normalized.harmonize_summary.tsv:md5,6b248b848270349db660031620d82831",
+                "SEQC2_IL_1_wgs.normalized.harmonize_summary.tsv:md5,a9e49346274a68a2b51070dd3ea3cf52",
+                "SEQC2_NV_1_wes.normalized.harmonize_summary.tsv:md5,9ca2bffb3e4d27d93fc0b7c1c572c249",
+                "SEQC2_NV_1_wgs.normalized.harmonize_summary.tsv:md5,a07206007eb3a970d038e01325be8b52",
+                "SEQC2_FD_1_wes.norm.norm.log:md5,9863dd230ac693a7753a5ee14197bc97",
+                "SEQC2_FD_1_wes.ref_alleles.tsv:md5,b79b022b7a1acb3406e94de5a9d71013",
+                "SEQC2_FD_1_wes.vcf.reference_check.tsv:md5,47fce70a951cdcaca4605a966ee69d10",
+                "SEQC2_FD_1_wgs.norm.norm.log:md5,547020ca0382aa990763f0373b53d694",
+                "SEQC2_FD_1_wgs.ref_alleles.tsv:md5,62371af6a23f9b3cd03bf6cb58d30978",
+                "SEQC2_FD_1_wgs.vcf.reference_check.tsv:md5,d7541caca92077045644df0cd1aac4fe",
+                "SEQC2_IL_1_wes.norm.norm.log:md5,a7f32cd62654d061c260b74f0e4519a3",
+                "SEQC2_IL_1_wes.ref_alleles.tsv:md5,e4acfd4c2d8430c18d5bdf0952c7fbfd",
+                "SEQC2_IL_1_wes.vcf.reference_check.tsv:md5,c5a6152138abaf9e7bf0b02f99543eee",
+                "SEQC2_IL_1_wgs.norm.norm.log:md5,5529ca0e91c413b6ad4263cee5c91b6e",
+                "SEQC2_IL_1_wgs.ref_alleles.tsv:md5,1ac2dfb282bae05cba6590f3f8246a0d",
+                "SEQC2_IL_1_wgs.vcf.reference_check.tsv:md5,53a9f576c0826eecbc6d4c0e748b84df",
+                "SEQC2_NV_1_wes.norm.norm.log:md5,b047616cf7221a8ecb9b1cabb4efbfdc",
+                "SEQC2_NV_1_wes.ref_alleles.tsv:md5,01c908990a731ff923cad3b494b8c6bb",
+                "SEQC2_NV_1_wes.vcf.reference_check.tsv:md5,c3e7907ef00551c99f76bbfed3e6bc7f",
+                "SEQC2_NV_1_wgs.norm.norm.log:md5,022498af9c9ae45703b4041e46c46a7f",
+                "SEQC2_NV_1_wgs.ref_alleles.tsv:md5,c326449bdd8c48c9ac7a9e15b034f031",
+                "SEQC2_NV_1_wgs.vcf.reference_check.tsv:md5,f5b086885ea90f1764957a1958eaf6ad"
             ]
         ],
-        "timestamp": "2026-10-08T10:12:24.812429109",
+        "timestamp": "2026-10-08T16:25:39.00017302",
         "meta": {
             "nf-test": "0.9.5",
             "nextflow": "26.04.4"

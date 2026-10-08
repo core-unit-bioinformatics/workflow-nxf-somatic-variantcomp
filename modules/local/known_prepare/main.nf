@@ -9,7 +9,7 @@ process KNOWN_PREPARE {
 
     input:
     tuple val(meta), path(variants, stageAs: 'input?/*')
-    tuple val(meta2), path(fasta), path(fai), path(gzi)
+    tuple val(meta2), path(fai)
 
     output:
     tuple val(meta), path("${prefix}.vcf.gz"), path("${prefix}.vcf.gz.tbi"), emit: vcf
@@ -23,9 +23,9 @@ process KNOWN_PREPARE {
     def args = task.ext.args ?: ''
     prefix = task.ext.prefix ?: "${meta.id}.known"
     """
+    # list(s) -> sorted sites-only VCF on the reference contig names (REF check: bcftools norm)
     known_variants.py prepare \\
         --input ${[variants].flatten().join(' ')} \\
-        --fasta ${fasta} \\
         --fai ${fai} \\
         --output ${prefix}.vcf.gz \\
         ${args}

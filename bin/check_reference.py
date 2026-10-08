@@ -1,72 +1,70 @@
 #!/usr/bin/env python3
-"""Check that a VCF, BED or BAM/CRAM file is on the configured reference genome.
+"""Decide whether an input is on the configured reference genome.
 
-Checks:
-  - contig names: exact match, or a safe rename (chr1 <-> 1, chrM <-> MT/M)
-  - contig lengths in the VCF header against the reference .fai
-    * nuclear contig with a different length -> different genome build (error)
-    * mitochondrial contig with a different length -> header-only issue, fixed
-      by re-writing the header from the .fai (REF check still applies)
-  - REF alleles of all records (VCF) against the FASTA; mismatch rate above
-    --max-ref-mismatch -> error (wrong build or wrong reference)
-  - records/intervals on contigs absent from the reference (dropped, reported)
-  - records/intervals beyond the end of a contig (error)
-  - (VCF, --samples) the expected sample columns exist (error otherwise)
-  - (BAM/CRAM) @SQ names and lengths: nuclear length mismatch -> error; the
-    rename map translates the alignment's contig names to the reference
+The facts are extracted by tools in the modules before this script runs:
 
-Outputs (prefix given by --prefix):
-  <prefix>.rename_chrs.tsv      old<TAB>new contig names (for bcftools annotate
-                                --rename-chrs); empty if nothing to rename
-  <prefix>.keep_contigs.txt     reference contig names present in the input
-                                (after renaming), one per line
-  <prefix>.reference_check.tsv  key<TAB>value report
-  <prefix>.regions.bed          (--type bam with --regions) the regions BED
-                                (reference names) translated to the
-                                alignment's contig names, e.g. for mosdepth --by
-  <prefix>.harmonized.bed       (--type bed only) all columns with
-                                renamed contigs, intervals on unknown contigs
-                                dropped; input order kept (sort afterwards)
+  VCF  header         `bcftools view -h`            -> contig lines and sample names
+       record contigs `bcftools query -f '%CHROM\\n'` -> contig of every record
+  BAM  contigs        `samtools idxstats`           -> contig names and lengths
+  BED  the BED itself (plain text; only the contig names and interval ends are used)
+  VCF  REF alleles    log of `bcftools norm --check-ref x` (total and removed
+                      REF-mismatch records)
 
-Exit code 0 if the input is usable (possibly after the fixes above), 1 otherwise.
+This script makes the decisions (it reads no FASTA and no binary file):
+
+subcommand `contigs` (--type vcf, bed or bam)
+  - contig names: exact match with the reference .fai, or a safe rename
+    (chr1 <-> 1, chrM <-> MT/M/chrMT)
+  - contig lengths (VCF header, BAM): a nuclear contig with another length means
+    another genome build -> error; a mitochondrial contig with another length is a
+    known header-only problem (e.g. chrM 16570 vs 16571) -> fixed by rewriting the
+    VCF header from the .fai (the REF check still applies to its records)
+  - records/intervals on contigs absent from the reference -> dropped and reported
+  - BED intervals that end beyond their contig -> error (another genome build)
+  - VCF: the sample columns given with --samples must exist -> error otherwise
+  Outputs (--prefix):
+    <prefix>.rename_chrs.tsv      old<TAB>new names for `bcftools annotate --rename-chrs`
+    <prefix>.keep_contigs.txt     reference contigs present in the input
+    <prefix>.reference_check.tsv  key<TAB>value report (status ok / fixed / error)
+    <prefix>.harmonized.bed       (bed) all columns, renamed, unknown contigs dropped
+    <prefix>.regions.bed          (bam, with --regions) a reference-named BED translated
+                                  to the alignment's contig names (for mosdepth --by)
+
+subcommand `ref-alleles`
+  - reads the summary line of `bcftools norm --check-ref x`
+    ("Lines total/split/joined/realigned/mismatch_removed/dup_removed/skipped: ...")
+  - mismatch rate = mismatch_removed / total; above --max-ref-mismatch -> error
+    (the input was called on another reference or build)
+
+Exit status 1 on any error; messages are prefixed ERROR/WARNING/INFO on stderr.
+
+Tools considered: `bcftools norm --check-ref` and `bcftools +fixref` check REF
+alleles (the first is used); `bcftools reheader --fai` and `bcftools annotate
+--rename-chrs` apply the fixes. No tool decides which contig names correspond and
+whether a length difference is a build mismatch, so this logic is in this script.
 """
 
 import argparse
 import gzip
+import re
 import sys
 from pathlib import Path
 
+# names of the mitochondrial contig in common references
 MITO = {"chrM", "MT", "M", "chrMT"}
-
-
-def read_fai(path):
-    lengths = {}
-    with open(path) as fh:
-        for line in fh:
-            name, length = line.split("\t")[:2]
-            lengths[name] = int(length)
-    return lengths
-
-
-def map_contig(name, reference):
-    """Return the reference contig name for `name`, or None."""
-    if name in reference:
-        return name
-    candidates = []
-    if name in MITO:
-        candidates += ["chrM", "MT", "M", "chrMT"]
-    if name.startswith("chr"):
-        candidates.append(name[3:])
-    else:
-        candidates.append("chr" + name)
-    for candidate in candidates:
-        if candidate in reference:
-            return candidate
-    return None
+# ##contig=<ID=chr1,length=248956422,...>
+CONTIG_LINE = re.compile(r"^##contig=<(.*)>$")
+# summary line of bcftools norm
+NORM_LINE = re.compile(
+    r"total/split/joined/realigned/mismatch_removed/dup_removed/skipped:\s*([\d/]+)"
+)
 
 
 class Report:
-    def __init__(self):
+    """Collects key/value results, warnings and errors of one check."""
+
+    def __init__(self, name):
+        self.name = name
         self.values = {}
         self.errors = []
         self.warnings = []
@@ -74,7 +72,14 @@ class Report:
     def set(self, key, value):
         self.values[key] = value
 
-    def write(self, path, status):
+    def write(self, path):
+        # status: error > fixed (anything was renamed/rewritten/dropped) > ok
+        if self.errors:
+            status = "error"
+        elif self.warnings or self.values.get("renamed_contigs", "none") != "none":
+            status = "fixed"
+        else:
+            status = "ok"
         with open(path, "w") as fh:
             fh.write("key\tvalue\n")
             fh.write(f"status\t{status}\n")
@@ -84,216 +89,342 @@ class Report:
                 fh.write(f"warning\t{msg}\n")
             for msg in self.errors:
                 fh.write(f"error\t{msg}\n")
+        return status
+
+    def print_and_exit(self):
+        # print all messages; exit 1 if there was an error
+        for msg in self.warnings:
+            print(f"WARNING: {self.name}: {msg}", file=sys.stderr)
+        for msg in self.errors:
+            print(f"ERROR: {self.name}: {msg}", file=sys.stderr)
+        if self.errors:
+            sys.exit(1)
 
 
-def check_header_lengths(header_lengths, mapping, reference, report):
-    fixed = []
-    for name, length in header_lengths.items():
-        ref_name = mapping.get(name)
-        if ref_name is None or length is None or length == reference[ref_name]:
-            continue
-        if ref_name in MITO:
-            fixed.append(f"{name}:{length}->{reference[ref_name]}")
-            report.warnings.append(
-                f"contig {name} length {length} differs from reference {ref_name} "
-                f"({reference[ref_name]}); header will be rewritten from the reference"
-            )
-        else:
-            report.errors.append(
-                f"contig {name} has length {length} but reference {ref_name} has "
-                f"{reference[ref_name]}: the input is on a different genome build"
-            )
-    report.set("header_length_fixes", ",".join(fixed) or "none")
+def read_fai(path):
+    """{contig: length} of the reference, in reference order."""
+    lengths = {}
+    with open(path) as fh:
+        for line_no, line in enumerate(fh, start=1):
+            fields = line.rstrip("\n").split("\t")
+            if len(fields) < 2 or not fields[1].isdigit():
+                sys.exit(f"ERROR: {path}: line {line_no}: not a FASTA index (.fai) line")
+            lengths[fields[0]] = int(fields[1])
+    if not lengths:
+        sys.exit(f"ERROR: {path}: the reference index is empty")
+    return lengths
 
 
-def finish_mapping(names, reference, report, prefix):
-    mapping = {name: map_contig(name, reference) for name in names}
-    renames = {old: new for old, new in mapping.items() if new is not None and old != new}
-    unknown = sorted(name for name, new in mapping.items() if new is None)
-    with open(f"{prefix}.rename_chrs.tsv", "w") as fh:
-        fh.writelines(f"{old}\t{new}\n" for old, new in sorted(renames.items()))
-    renamed = ",".join(f"{o}->{n}" for o, n in sorted(renames.items()))
-    report.set("renamed_contigs", renamed or "none")
-    return mapping, unknown
-
-
-def check_vcf(args, reference, report):
-    import pysam
-
-    vcf = pysam.VariantFile(args.input)
-    fasta = pysam.FastaFile(args.fasta)
-    header_lengths = {name: rec.length for name, rec in vcf.header.contigs.items()}
-    report.set("header_contigs", len(header_lengths))
-    if args.samples:
-        available = list(vcf.header.samples)
-        missing = [s for s in args.samples.split(",") if s not in available]
-        report.set("samples", ",".join(available))
-        if missing:
-            report.errors.append(
-                f"sample(s) {','.join(missing)} not in the VCF (available: {','.join(available)})"
-            )
-
-    mapping = {}
-    record_contigs = {}
-    n_records = checked = mismatches = beyond_end = 0
-    mito_checked = mito_mismatches = 0
-    for rec in vcf:
-        n_records += 1
-        record_contigs[rec.chrom] = record_contigs.get(rec.chrom, 0) + 1
-        if rec.chrom not in mapping:
-            mapping[rec.chrom] = map_contig(rec.chrom, reference)
-        ref_name = mapping[rec.chrom]
-        if ref_name is None:
-            continue
-        ref = rec.ref
-        if rec.pos - 1 + len(ref) > reference[ref_name]:
-            beyond_end += 1
-            continue
-        observed = fasta.fetch(ref_name, rec.pos - 1, rec.pos - 1 + len(ref)).upper()
-        if "N" in observed:
-            continue
-        checked += 1
-        is_mismatch = observed != ref.upper()
-        mismatches += is_mismatch
-        if ref_name in MITO:
-            mito_checked += 1
-            mito_mismatches += is_mismatch
-    report.set("records", n_records)
-
-    mapping, unknown = finish_mapping(
-        set(header_lengths) | set(record_contigs), reference, report, args.prefix
-    )
-    check_header_lengths(header_lengths, mapping, reference, report)
-
-    unknown_with_records = {c: record_contigs[c] for c in unknown if c in record_contigs}
-    dropped = sum(unknown_with_records.values())
-    report.set("records_on_unknown_contigs", dropped)
-    if dropped:
-        report.warnings.append(
-            f"{dropped} records on contigs absent from the reference will be dropped: "
-            + ",".join(f"{c}({n})" for c, n in sorted(unknown_with_records.items()))
-        )
-    if n_records and dropped == n_records:
-        report.errors.append("no record is on a reference contig: wrong reference or naming")
-
-    rate = mismatches / checked if checked else 0.0
-    report.set("ref_checked", checked)
-    report.set("ref_mismatches", mismatches)
-    report.set("ref_mismatch_rate", f"{rate:.6f}")
-    report.set("records_beyond_contig_end", beyond_end)
-    if beyond_end:
-        report.errors.append(f"{beyond_end} records lie beyond the end of their contig")
-    if rate > args.max_ref_mismatch:
-        report.errors.append(
-            f"{mismatches} of {checked} REF alleles ({rate:.2%}) do not match the reference "
-            f"(threshold {args.max_ref_mismatch:.2%}): wrong genome build or reference"
-        )
-    if mito_checked and mito_mismatches / mito_checked > args.max_ref_mismatch:
-        report.errors.append(
-            f"{mito_mismatches} of {mito_checked} mitochondrial REF alleles do not match "
-            "the reference: different mitochondrial sequence"
-        )
-    return mapping
+def map_contig(name, reference):
+    """Reference contig name for `name` (exact or safe rename), or None."""
+    if name in reference:
+        return name
+    candidates = []
+    # mitochondrial contig: any of the common names
+    if name in MITO:
+        candidates += ["chrM", "MT", "M", "chrMT"]
+    # add or remove the 'chr' prefix
+    candidates.append(name[3:] if name.startswith("chr") else "chr" + name)
+    for candidate in candidates:
+        if candidate in reference:
+            return candidate
+    return None
 
 
 def open_text(path):
     return gzip.open(path, "rt") if str(path).endswith(".gz") else open(path)
 
 
-def check_bed(args, reference, report):
-    intervals = []
-    with open_text(args.input) as fh:
+def check_lengths(lengths, mapping, reference, report):
+    """Compare contig lengths of the input with the reference."""
+    fixes = []
+    for name, length in lengths.items():
+        ref_name = mapping.get(name)
+        # contigs not in the reference, or without length, can't be compared
+        if ref_name is None or length is None or length == reference[ref_name]:
+            continue
+        if ref_name in MITO:
+            # header-only problem: the header is rewritten from the .fai
+            fixes.append(f"{name}:{length}->{reference[ref_name]}")
+            report.warnings.append(
+                f"contig {name} has length {length}, the reference {ref_name} has "
+                f"{reference[ref_name]}; the header is rewritten from the reference"
+            )
+        else:
+            report.errors.append(
+                f"contig {name} has length {length}, but the reference {ref_name} has "
+                f"{reference[ref_name]}: the input is on another genome build than --fasta"
+            )
+    report.set("header_length_fixes", ",".join(fixes) or "none")
+
+
+def write_mapping(names, reference, report, prefix):
+    """Map all input contig names; write the rename map; return (mapping, unknown names)."""
+    mapping = {name: map_contig(name, reference) for name in names}
+    renames = {old: new for old, new in mapping.items() if new is not None and old != new}
+    unknown = sorted(name for name, new in mapping.items() if new is None)
+    # two input names for one reference contig (e.g. '1' and 'chr1') can't both be renamed
+    targets = {}
+    for old, new in mapping.items():
+        if new is not None:
+            targets.setdefault(new, []).append(old)
+    for new, olds in sorted(targets.items()):
+        if len(olds) > 1:
+            report.errors.append(f"contigs {', '.join(sorted(olds))} all correspond to the reference "
+                                 f"contig {new}; the input mixes naming styles")  # fmt: skip
+    # nothing on the reference at all: wrong reference or wrong file
+    if names and len(unknown) == len(mapping):
+        report.errors.append(f"none of the {len(names)} contigs ({', '.join(sorted(names)[:5])}"
+                             f"{', ...' if len(names) > 5 else ''}) is in the reference; is the "
+                             "input on another genome?")  # fmt: skip
+    with open(f"{prefix}.rename_chrs.tsv", "w") as fh:
+        fh.writelines(f"{old}\t{new}\n" for old, new in sorted(renames.items()))
+    report.set(
+        "renamed_contigs", ",".join(f"{o}->{n}" for o, n in sorted(renames.items())) or "none"
+    )
+    # reference contigs present in the input, in reference order
+    keep = [c for c in reference if c in set(mapping.values())]
+    with open(f"{prefix}.keep_contigs.txt", "w") as fh:
+        fh.writelines(f"{c}\n" for c in keep)
+    return mapping, unknown
+
+
+def parse_vcf_header(path):
+    """({contig: length or None}, [samples]) from the output of `bcftools view -h`."""
+    contigs, samples, has_chrom_line = {}, [], False
+    with open_text(path) as fh:
         for line in fh:
+            line = line.rstrip("\n")
+            match = CONTIG_LINE.match(line)
+            if match:
+                # key=value pairs of the contig line (values may contain no commas here)
+                fields = dict(kv.split("=", 1) for kv in match.group(1).split(",") if "=" in kv)
+                if "ID" not in fields:
+                    sys.exit(f"ERROR: {path}: contig line without ID: {line}")
+                length = fields.get("length")
+                contigs[fields["ID"]] = int(length) if length and length.isdigit() else None
+            elif line.startswith("#CHROM"):
+                has_chrom_line = True
+                # sample names follow the 9 fixed columns
+                samples = line.split("\t")[9:]
+    if not has_chrom_line:
+        sys.exit(f"ERROR: {path}: no #CHROM line; is this the output of `bcftools view -h`?")
+    return contigs, samples
+
+
+def count_record_contigs(path):
+    """{contig: number of records} from the output of `bcftools query -f '%CHROM\\n'`."""
+    counts = {}
+    with open_text(path) as fh:
+        for line in fh:
+            chrom = line.strip()
+            if chrom:
+                counts[chrom] = counts.get(chrom, 0) + 1
+    return counts
+
+
+def contigs_vcf(args, reference, report):
+    if not args.vcf_header or not args.record_contigs:
+        sys.exit("ERROR: --type vcf needs --vcf-header and --record-contigs")
+    header_lengths, samples = parse_vcf_header(args.vcf_header)
+    record_contigs = count_record_contigs(args.record_contigs)
+    n_records = sum(record_contigs.values())
+    report.set("header_contigs", len(header_lengths))
+    report.set("records", n_records)
+    report.set("samples", ",".join(samples) or "none")
+    # the samplesheet's tumor/normal sample columns must exist in the VCF
+    if args.samples:
+        missing = [s for s in args.samples.split(",") if s not in samples]
+        if missing:
+            report.errors.append(
+                f"sample(s) {', '.join(missing)} not in the VCF (samples in the VCF: "
+                f"{', '.join(samples) or 'none'}); check tumor_id/normal_id in the samplesheet"
+            )
+    mapping, unknown = write_mapping(
+        set(header_lengths) | set(record_contigs), reference, report, args.prefix
+    )
+    check_lengths(header_lengths, mapping, reference, report)
+    # records on contigs the reference doesn't have (decoys, alt contigs, ...) are dropped later
+    dropped = {c: record_contigs[c] for c in unknown if c in record_contigs}
+    report.set("records_on_unknown_contigs", sum(dropped.values()))
+    if dropped:
+        report.warnings.append(
+            f"{sum(dropped.values())} records on contigs absent from the reference will be "
+            f"dropped: {', '.join(f'{c} ({n})' for c, n in sorted(dropped.items()))}"
+        )
+    if n_records == 0:
+        report.warnings.append("the VCF has no records")
+    elif sum(dropped.values()) == n_records:
+        report.errors.append(
+            "no record is on a contig of the reference: wrong reference or contig naming "
+            f"(record contigs: {', '.join(sorted(record_contigs)[:10])})"
+        )
+
+
+def contigs_bed(args, reference, report):
+    if not args.bed:
+        sys.exit("ERROR: --type bed needs --bed")
+    intervals = []
+    with open_text(args.bed) as fh:
+        for line_no, line in enumerate(fh, start=1):
+            # skip empty, comment and UCSC header lines
             if not line.strip() or line.startswith(("#", "track", "browser")):
                 continue
             fields = line.rstrip("\n").split("\t")
-            intervals.append((fields[0], int(fields[1]), int(fields[2]), fields[3:]))
+            if len(fields) < 3:
+                sys.exit(
+                    f"ERROR: {args.bed}: line {line_no}: expected at least 3 tab-separated columns"
+                )
+            try:
+                start, end = int(fields[1]), int(fields[2])
+            except ValueError:
+                sys.exit(
+                    f"ERROR: {args.bed}: line {line_no}: start/end '{fields[1]}'/'{fields[2]}' are not integers"
+                )
+            if start < 0 or end < start:
+                sys.exit(f"ERROR: {args.bed}: line {line_no}: invalid interval {start}-{end}")
+            intervals.append((fields[0], start, end, fields[3:]))
     report.set("intervals", len(intervals))
-    mapping, unknown = finish_mapping({c for c, *_ in intervals}, reference, report, args.prefix)
+    if not intervals:
+        report.errors.append("the BED has no intervals")
+        return
+    mapping, unknown = write_mapping({c for c, *_ in intervals}, reference, report, args.prefix)
     dropped = sum(1 for c, *_ in intervals if mapping[c] is None)
     report.set("intervals_on_unknown_contigs", dropped)
     if dropped:
         report.warnings.append(
-            f"{dropped} intervals on contigs absent from the reference will be dropped: "
-            + ",".join(unknown)
+            f"{dropped} intervals on contigs absent from the reference are dropped: {', '.join(unknown)}"
         )
-    if intervals and dropped == len(intervals):
-        report.errors.append("no interval is on a reference contig: wrong reference or naming")
-    with open(f"{args.prefix}.harmonized.bed", "w") as fh:
-        fh.writelines(
-            "\t".join([mapping[c], str(s), str(e), *rest]) + "\n"
-            for c, s, e, rest in intervals
-            if mapping[c]
-        )
-    beyond = sum(1 for c, _, e, _ in intervals if mapping[c] and e > reference[mapping[c]])
-    report.set("intervals_beyond_contig_end", beyond)
-    if beyond:
+    if dropped == len(intervals):
         report.errors.append(
-            f"{beyond} intervals end beyond their contig: the BED is on a different genome build"
+            "no interval is on a contig of the reference: wrong reference or contig naming"
         )
-    return mapping
+    # an interval beyond the end of its contig means another genome build
+    beyond = [(c, e) for c, _, e, _ in intervals if mapping[c] and e > reference[mapping[c]]]
+    report.set("intervals_beyond_contig_end", len(beyond))
+    if beyond:
+        c, e = beyond[0]
+        report.errors.append(
+            f"{len(beyond)} intervals end beyond their contig (e.g. {c} at {e}, reference length "
+            f"{reference[mapping[c]]}): the BED is on another genome build than --fasta"
+        )
+    # harmonized BED: all columns, renamed contigs, unknown contigs dropped
+    with open(f"{args.prefix}.harmonized.bed", "w") as fh:
+        for c, s, e, rest in intervals:
+            if mapping[c]:
+                fh.write("\t".join([mapping[c], str(s), str(e), *rest]) + "\n")
 
 
-def check_bam(args, reference, report):
-    import pysam
-
-    with pysam.AlignmentFile(args.input, reference_filename=args.fasta) as bam:
-        header_lengths = dict(zip(bam.references, bam.lengths, strict=True))
-    report.set("header_contigs", len(header_lengths))
-    mapping, _unknown = finish_mapping(set(header_lengths), reference, report, args.prefix)
-    check_header_lengths(header_lengths, mapping, reference, report)
+def contigs_bam(args, reference, report):
+    if not args.idxstats:
+        sys.exit("ERROR: --type bam needs --idxstats")
+    lengths = {}
+    with open(args.idxstats) as fh:
+        for line_no, line in enumerate(fh, start=1):
+            fields = line.rstrip("\n").split("\t")
+            if len(fields) < 4:
+                sys.exit(
+                    f"ERROR: {args.idxstats}: line {line_no}: expected 4 columns of samtools idxstats"
+                )
+            # the last line ('*') counts unplaced reads; it is no contig
+            if fields[0] != "*":
+                lengths[fields[0]] = int(fields[1])
+    report.set("header_contigs", len(lengths))
+    mapping, _unknown = write_mapping(set(lengths), reference, report, args.prefix)
+    check_lengths(lengths, mapping, reference, report)
     if not any(mapping.values()):
-        report.errors.append("no alignment contig is on the reference: wrong reference or naming")
+        report.errors.append(
+            "no contig of the alignment is in the reference: wrong reference or naming"
+        )
+    # translate a reference-named BED to the alignment's names (for mosdepth --by)
     if args.regions:
-        to_bam = {new: old for old, new in mapping.items() if new is not None}
+        to_alignment = {new: old for old, new in mapping.items() if new is not None}
+        n_written = 0
         with open_text(args.regions) as fin, open(f"{args.prefix}.regions.bed", "w") as fout:
             for line in fin:
                 fields = line.rstrip("\n").split("\t")
-                if len(fields) >= 3 and fields[0] in to_bam:
-                    fout.write("\t".join([to_bam[fields[0]], *fields[1:3]]) + "\n")
-    return mapping
+                if len(fields) >= 3 and fields[0] in to_alignment:
+                    fout.write("\t".join([to_alignment[fields[0]], *fields[1:3]]) + "\n")
+                    n_written += 1
+        report.set("regions_translated", n_written)
+        if n_written == 0:
+            report.errors.append(
+                f"none of the regions in {Path(args.regions).name} is on a contig of the alignment"
+            )
+
+
+def contigs(args):
+    reference = read_fai(args.fai)
+    report = Report(args.name)
+    report.set("input", args.name)
+    report.set("reference_contigs", len(reference))
+    {"vcf": contigs_vcf, "bed": contigs_bed, "bam": contigs_bam}[args.type](args, reference, report)
+    status = report.write(f"{args.prefix}.reference_check.tsv")
+    print(f"INFO: {args.name}: reference check {status}", file=sys.stderr)
+    report.print_and_exit()
+
+
+def ref_alleles(args):
+    report = Report(args.name)
+    match = None
+    with open(args.norm_log) as fh:
+        for line in fh:
+            match = NORM_LINE.search(line) or match
+    if match is None:
+        sys.exit(f"ERROR: {args.name}: {args.norm_log}: no summary line of bcftools norm found; "
+                 "the log must contain the stderr of `bcftools norm --check-ref x`")  # fmt: skip
+    counts = [int(x) for x in match.group(1).split("/")]
+    if len(counts) != 7:
+        sys.exit(f"ERROR: {args.name}: unexpected bcftools norm summary '{match.group(1)}'")
+    total, _split, _joined, realigned, mismatch, dups, _skipped = counts
+    rate = mismatch / total if total else 0.0
+    report.set("records", total)
+    report.set("ref_mismatches_removed", mismatch)
+    report.set("ref_mismatch_rate", f"{rate:.6f}")
+    report.set("realigned", realigned)
+    report.set("duplicates_removed", dups)
+    if mismatch:
+        report.warnings.append(
+            f"{mismatch} of {total} records had a REF allele different from the reference and were removed"
+        )
+    if rate > args.max_ref_mismatch:
+        report.errors.append(
+            f"{mismatch} of {total} REF alleles ({rate:.2%}) differ from the reference (threshold "
+            f"--max_ref_mismatch {args.max_ref_mismatch:.2%}): the VCF was called on another "
+            "reference or genome build than --fasta"
+        )
+    status = report.write(f"{args.prefix}.ref_alleles.tsv")
+    print(
+        f"INFO: {args.name}: REF allele check {status} ({mismatch} of {total} mismatching)",
+        file=sys.stderr,
+    )
+    report.print_and_exit()
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--input", required=True, help="VCF/BCF, BED(.gz) or BAM/CRAM file")
-    parser.add_argument("--type", choices=["vcf", "bed", "bam"], required=True)
-    parser.add_argument("--fai", required=True, help="reference .fai")
-    parser.add_argument("--fasta", help="reference FASTA (required for --type vcf)")
-    parser.add_argument("--prefix", required=True, help="output prefix")
-    parser.add_argument("--samples", help="(VCF) comma-separated sample names that must exist")
-    parser.add_argument("--regions", help="(BAM) BED in reference names to translate to BAM names")
-    parser.add_argument(
-        "--max-ref-mismatch",
-        type=float,
-        default=0.01,
-        help="maximum fraction of REF alleles not matching the reference (default: %(default)s)",
+    sub = parser.add_subparsers(dest="command", required=True)
+    c = sub.add_parser("contigs", help="contig names, lengths and sample names")
+    c.add_argument("--type", choices=["vcf", "bed", "bam"], required=True)
+    c.add_argument("--name", required=True, help="name of the input for messages")
+    c.add_argument("--fai", required=True, help="reference .fai")
+    c.add_argument("--prefix", required=True, help="output prefix")
+    c.add_argument("--vcf-header", help="(vcf) output of bcftools view -h")
+    c.add_argument("--record-contigs", help="(vcf) output of bcftools query -f '%%CHROM\\n'")
+    c.add_argument("--samples", help="(vcf) comma-separated sample names that must exist")
+    c.add_argument("--bed", help="(bed) the BED file")
+    c.add_argument("--idxstats", help="(bam) output of samtools idxstats")
+    c.add_argument(
+        "--regions", help="(bam) reference-named BED to translate to the alignment's names"
     )
+    r = sub.add_parser("ref-alleles", help="REF allele mismatch rate from the bcftools norm log")
+    r.add_argument("--name", required=True)
+    r.add_argument("--norm-log", required=True, help="stderr of bcftools norm --check-ref x")
+    r.add_argument("--max-ref-mismatch", type=float, default=0.01)
+    r.add_argument("--prefix", required=True)
     args = parser.parse_args()
-    if args.type == "vcf" and not args.fasta:
-        parser.error("--fasta is required for --type vcf")
-
-    reference = read_fai(args.fai)
-    report = Report()
-    report.set("input", Path(args.input).name)
-    report.set("reference_contigs", len(reference))
-    checks = {"vcf": check_vcf, "bed": check_bed, "bam": check_bam}
-    mapping = checks[args.type](args, reference, report)
-
-    keep = sorted({new for new in mapping.values() if new is not None}, key=list(reference).index)
-    with open(f"{args.prefix}.keep_contigs.txt", "w") as fh:
-        fh.writelines(f"{c}\n" for c in keep)
-
-    status = "error" if report.errors else ("fixed" if report.warnings else "ok")
-    if status == "ok" and report.values.get("renamed_contigs", "none") != "none":
-        status = "fixed"
-    report.write(f"{args.prefix}.reference_check.tsv", status)
-    for msg in report.warnings:
-        print(f"WARNING: {args.input}: {msg}", file=sys.stderr)
-    for msg in report.errors:
-        print(f"ERROR: {args.input}: {msg}", file=sys.stderr)
-    return 1 if report.errors else 0
+    contigs(args) if args.command == "contigs" else ref_alleles(args)
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

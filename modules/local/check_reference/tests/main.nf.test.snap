@@ -1,24 +1,32 @@
 {
-    "vcf - no-chr contig names are renamed": {
+    "bed - no-chr names are renamed, unknown contigs dropped": {
         "content": [
             [
                 [
                     {
-                        "id": "S2_panel"
+                        "id": "no_chr"
                     },
-                    "S2_panel.vcf.rename_chrs.tsv:md5,dcb473847fb66914dcc00f2ce7ab1ec7"
+                    "no_chr.bed.rename_chrs.tsv:md5,14801ac78ee3e79bedc362be118283ad"
                 ]
             ],
             [
                 [
                     {
-                        "id": "S2_panel"
+                        "id": "no_chr"
                     },
-                    "S2_panel.vcf.keep_contigs.txt:md5,7a96c5e0c82090e4793bee9f38715e02"
+                    "no_chr.bed.keep_contigs.txt:md5,268d2dbf8367d27eeb4d2cfefd1e5208"
+                ]
+            ],
+            [
+                [
+                    {
+                        "id": "no_chr"
+                    },
+                    "no_chr.bed.harmonized.bed:md5,5e881d57eb025db163f54c7563f523df"
                 ]
             ]
         ],
-        "timestamp": "2026-10-07T17:26:59.787754335",
+        "timestamp": "2026-10-08T14:02:27.251171589",
         "meta": {
             "nf-test": "0.9.5",
             "nextflow": "26.04.4"
@@ -64,13 +72,6 @@
                         "3.12.15"
                     ]
                 ],
-                "6": [
-                    [
-                        "CHECK_REFERENCE",
-                        "pysam",
-                        "0.24.1"
-                    ]
-                ],
                 "bed": [
                     
                 ],
@@ -101,13 +102,6 @@
                         "S1_wgs.vcf.reference_check.tsv:md5,766653b6adb4a5cbd2bde22112125ba9"
                     ]
                 ],
-                "versions_pysam": [
-                    [
-                        "CHECK_REFERENCE",
-                        "pysam",
-                        "0.24.1"
-                    ]
-                ],
                 "versions_python": [
                     [
                         "CHECK_REFERENCE",
@@ -117,7 +111,7 @@
                 ]
             }
         ],
-        "timestamp": "2026-10-07T19:36:12.518077491",
+        "timestamp": "2026-10-08T14:04:27.580755731",
         "meta": {
             "nf-test": "0.9.5",
             "nextflow": "26.04.4"

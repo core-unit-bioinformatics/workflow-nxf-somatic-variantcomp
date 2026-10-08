@@ -66,6 +66,7 @@ workflow VARIANTCOMP {
     PREPARE_REGIONS(
         ch_samplesheet,
         PREPARE_REFERENCE.out.reference,
+        PREPARE_REFERENCE.out.genome_bed,
         regions_bed ? file(regions_bed, checkIfExists: true) : null,
         exclude_bed ? file(exclude_bed, checkIfExists: true) : null
     )
@@ -77,9 +78,7 @@ workflow VARIANTCOMP {
         ch_samplesheet,
         PREPARE_REFERENCE.out.reference,
         PREPARE_REGIONS.out.common_bed,
-        params.require_normal_coverage,
-        params.callable_mode,
-        params.min_coverage
+        params.require_normal_coverage
     )
     ch_multiqc_files = ch_multiqc_files.mix(COVERAGE.out.multiqc_files)
     COVERAGE.out.callable_summary
@@ -136,42 +135,7 @@ workflow VARIANTCOMP {
         DISCORDANCE.out.evidence,
         BENCHMARK.out.sdf
     )
-    def ch_required = KNOWN_VARIANTS.out.required_variants
-        .map { _meta, tsv -> tsv }
-        .collectFile(name: 'required_variants.tsv', keepHeader: true, skip: 1, sort: true, storeDir: "${outdir}/known_variants")
-    def ch_required_summary = KNOWN_VARIANTS.out.required_summary
-        .map { meta, tsv -> tsv.readLines().drop(1).collect { line -> "${meta.name}\t${line}" }.join('\n') }
-        .collectFile(
-            name: 'required_summary.tsv', sort: true, newLine: true, storeDir: "${outdir}/known_variants",
-            seed: 'list\tsample\ttechnology\trequired\tpassed\tfailed\tall_passed'
-        )
-    ch_required
-        .map { tsv -> tsv.readLines() }
-        .subscribe { lines ->
-            def header = lines[0].tokenize('\t')
-            def failed = lines.drop(1).collect { line -> [header, line.split('\t', -1).toList()].transpose().collectEntries() }
-                .findAll { row -> row.status != 'PASS' }
-            failed.each { row ->
-                log.warn("Required variant ${row.label} ${row.chrom}:${row.pos} ${row.ref}>${row.alt} (${row.gene}) not found in ${row.sample} ${row.technology}: ${row.status}")
-            }
-            if (failed && params.fail_on_missing_required) {
-                error("${failed.size()} required variant(s) not found, see ${outdir}/known_variants/required_variants.tsv (--fail_on_missing_required)")
-            }
-        }
-    ch_multiqc_files = ch_multiqc_files.mix(
-        ch_required_summary.map { tsv ->
-            def header = "# id: 'variantcomp_required'\n# section_name: 'Required variants'\n" +
-                "# description: 'Known variants that must be found in every technology (--known_variants, mode required).'\n" +
-                "# plot_type: 'table'\n"
-            def lines = tsv.readLines()
-            def table = lines.withIndex().collect { line, i -> i == 0 ? 'id\t' + line : "${line.tokenize('\t')[0..2].join(' ')}\t${line}" }
-            def mqc = file("${workflow.workDir}/tmp/variantcomp_required_mqc.tsv")
-            mqc.parent.mkdirs()
-            mqc.text = header + table.join('\n') + '\n'
-            mqc
-        }
-    )
-
+    ch_multiqc_files = ch_multiqc_files.mix(KNOWN_VARIANTS.out.multiqc)
 
     //
     // MODULE: statistics (enrichment, genes, classes), plots and MultiQC sections

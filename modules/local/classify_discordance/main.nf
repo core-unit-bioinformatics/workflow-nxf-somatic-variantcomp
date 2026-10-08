@@ -28,8 +28,13 @@ process CLASSIFY_DISCORDANCE {
     def query_tumor = query_tumor_evidence ? "--query-tumor-evidence ${query_tumor_evidence}" : ''
     def normals = normal_evidence ? "--normal-evidence ${[normal_evidence].flatten().join(' ')}" : ''
     """
+    # class of every FN/FP (filtered call, read evidence, germline in normal, coverage)
+    # and detection power of the query for every truth variant
     classify_discordance.py \\
         --variants ${variants} \\
+        --sample ${meta.sample} \\
+        --truth ${meta.truth} \\
+        --query ${meta.query} \\
         --truth-normalized ${truth_normalized} \\
         --query-normalized ${query_normalized} \\
         ${truth_tumor} \\

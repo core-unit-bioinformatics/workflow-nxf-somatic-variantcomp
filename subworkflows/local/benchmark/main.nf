@@ -1,13 +1,16 @@
 //
 // Compare the calls of every technology with the truth technology of the same sample
 //
-// Matching: rtg vcfeval (haplotype-aware, --squash-ploidy, all records, decomposed).
+// Matching: rtg vcfeval (haplotype-aware, --squash-ploidy, all records, decomposed);
+// bcftools isec for exact (-c none) and position-only (-c all) record matching.
 // With comparison_mode 'all_pairs', all non-truth technologies are additionally compared
 // pairwise (the alphabetically first technology is the baseline).
 //
 
 include { RTGTOOLS_FORMAT   } from '../../../modules/nf-core/rtgtools/format/main'
 include { RTGTOOLS_VCFEVAL  } from '../../../modules/nf-core/rtgtools/vcfeval/main'
+include { BCFTOOLS_ISEC as BCFTOOLS_ISEC_EXACT    } from '../../../modules/nf-core/bcftools/isec/main'
+include { BCFTOOLS_ISEC as BCFTOOLS_ISEC_POSITION } from '../../../modules/nf-core/bcftools/isec/main'
 include { BENCHMARK_METRICS } from '../../../modules/local/benchmark_metrics/main'
 include { AGGREGATE_METRICS } from '../../../modules/local/aggregate_metrics/main'
 
@@ -48,12 +51,19 @@ workflow BENCHMARK {
         RTGTOOLS_FORMAT.out.sdf
     )
 
+    // record matching: truth first, then query (sites.txt flags: truth, query)
+    def ch_isec_input = ch_pairs.map { meta, call_vcf, call_tbi, base_vcf, base_tbi, _bed -> [meta, [base_vcf, call_vcf], [base_tbi, call_tbi], [], [], []] }
+    BCFTOOLS_ISEC_EXACT(ch_isec_input)
+    BCFTOOLS_ISEC_POSITION(ch_isec_input)
+
     BENCHMARK_METRICS(
         RTGTOOLS_VCFEVAL.out.baseline_vcf
             .join(RTGTOOLS_VCFEVAL.out.fn_vcf)
             .join(RTGTOOLS_VCFEVAL.out.tp_vcf)
             .join(RTGTOOLS_VCFEVAL.out.fp_vcf)
-            .join(ch_pairs.map { meta, call_vcf, _call_tbi, base_vcf, _base_tbi, _bed -> [meta, base_vcf, call_vcf, []] })
+            .join(BCFTOOLS_ISEC_EXACT.out.results)
+            .join(BCFTOOLS_ISEC_POSITION.out.results)
+            .map { meta, tpb, fn, tp, fp, exact, position -> [meta, tpb, fn, tp, fp, exact, position, []] }
     )
 
     AGGREGATE_METRICS(

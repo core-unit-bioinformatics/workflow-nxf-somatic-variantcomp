@@ -29,7 +29,9 @@ process VARIANTCOMP_REPORT {
     prefix = task.ext.prefix ?: "variantcomp"
     def power_arg = power ? "--power ${power}" : ''
     """
+    # matplotlib needs a writable config/cache directory (the home may be read-only on HPC)
     export MPLCONFIGDIR=\$PWD/.matplotlib
+    # enrichment statistics, gene table, discordance classes, plots and MultiQC files
     variantcomp_report.py \\
         --metrics ${metrics} \\
         --per-pair ${per_pair} \\

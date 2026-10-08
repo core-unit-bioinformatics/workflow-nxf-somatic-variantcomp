@@ -23,7 +23,11 @@ process AGGREGATE_METRICS {
     def args = task.ext.args ?: ''
     prefix = task.ext.prefix ?: "${meta.id}"
     """
-    aggregate_metrics.py metrics/* --prefix ${prefix} ${args}
+    # per-pair table of all inputs and micro/macro aggregation over samples
+    aggregate_metrics.py \\
+        metrics/* \\
+        --prefix ${prefix} \\
+        ${args}
     """
 
     stub:

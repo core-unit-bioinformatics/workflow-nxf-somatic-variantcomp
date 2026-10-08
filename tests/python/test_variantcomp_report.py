@@ -57,3 +57,26 @@ def test_gene_summary():
 def test_class_summary():
     classes = report.class_summary(variants())
     assert classes.set_index("status").loc["FP", "absent"] == 8
+
+
+def test_check_variants_accepts_valid_table():
+    report.check_variants(variants(), "variants.tsv")
+
+
+@pytest.mark.parametrize(
+    ("column", "value", "message"),
+    [("class", "outside_callable", "unknown discordance class(es) outside_callable"),
+     ("status", "TN", "unknown status value(s) TN")],
+)  # fmt: skip
+def test_check_variants_rejects_unknown_values(capsys, column, value, message):
+    df = variants()
+    df.loc[0, column] = value
+    with pytest.raises(SystemExit) as err:
+        report.check_variants(df, "variants.tsv")
+    assert message in str(err.value)
+
+
+def test_check_variants_missing_column():
+    with pytest.raises(SystemExit) as err:
+        report.check_variants(variants().drop(columns="class"), "variants.tsv")
+    assert "missing column(s) class" in str(err.value)

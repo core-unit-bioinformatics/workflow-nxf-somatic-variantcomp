@@ -28,8 +28,6 @@ nextflow_workflow {
                                           file(base + 'reference/GRCh38.d1.vd1_chr22.fa.gz.fai'), file(base + 'reference/GRCh38.d1.vd1_chr22.fa.gz.gzi')])
                 input[2] = channel.value(file(base + 'bed/S07604624_Covered_human_all_v6_plus_UTR_hg38.bed'))
                 input[3] = true
-                input[4] = 'base'
-                input[5] = 10
                 """
             }
         }

@@ -20,10 +20,18 @@ Outputs (prefix "variantcomp"):
   <prefix>.classes.tsv       per comparison: counts of discordance classes
   *_mqc.*                    MultiQC custom content (tables, bar and line graphs)
   plots/*.png                recall/precision, recall by VAF, classes, enrichment
+
+Checks: the required columns of every input, status values TP/FN/FP and known
+discordance classes (an unknown class would be missing from the class summary).
+
+Why a script: the statistics (Fisher's exact test, Benjamini-Hochberg), plots and
+MultiQC custom-content files are analysis code; no tool produces them from these
+tables.
 """
 
 import argparse
 import math
+import sys
 from pathlib import Path
 
 import matplotlib
@@ -43,19 +51,48 @@ BASE_COLUMNS = {
 }  # fmt: skip
 CLASS_ORDER = ["present_but_filtered", "germline_in_normal", "low_coverage",
                "subthreshold_evidence", "no_evidence", "absent"]  # fmt: skip
+METRICS_COLUMNS = ["truth", "query", "stratum_type", "stratum", "n_samples", "tp_baseline", "fn",
+                   "tp_call", "fp", "micro_recall", "micro_precision", "micro_f1",
+                   "macro_recall_mean", "macro_precision_mean"]  # fmt: skip
+PER_PAIR_COLUMNS = ["sample", "truth", "query", "stratum_type", "stratum", "tp_baseline", "fn",
+                    "tp_call", "fp", "recall", "precision", "f1"]  # fmt: skip
+VARIANT_COLUMNS = ["sample", "truth", "query", "status", "pos", "type", "truth_vaf", "query_vaf",
+                   "class"]  # fmt: skip
 COLORS = {"recall": "#2a6f97", "precision": "#c8553d", "f1": "#6a994e"}
 
 
+def require_columns(df, path, columns):
+    """Stop if a table misses one of the columns."""
+    missing = [c for c in columns if c not in df.columns]
+    if missing:
+        sys.exit(f"ERROR: {path}: missing column(s) {', '.join(missing)}")
+
+
+def check_variants(variants, path):
+    """Required columns and known status/class values of the variant table."""
+    require_columns(variants, path, VARIANT_COLUMNS)
+    # status and class values must be known, otherwise counts would be lost silently
+    bad_status = sorted(set(variants["status"]) - {"TP", "FN", "FP"})
+    if bad_status:
+        sys.exit(f"ERROR: {path}: unknown status value(s) {', '.join(bad_status)}")
+    bad_class = sorted(set(variants["class"]) - set(CLASS_ORDER) - {"concordant"})
+    if bad_class:
+        sys.exit(f"ERROR: {path}: unknown discordance class(es) {', '.join(bad_class)} "
+                 f"(known: concordant, {', '.join(CLASS_ORDER)})")  # fmt: skip
+
+
 def bh(pvalues):
-    """Benjamini-Hochberg adjusted p-values (NaN kept)."""
+    """Benjamini-Hochberg adjusted p-values (NaN kept, not counted as tests)."""
     p = np.asarray(pvalues, dtype=float)
     q = np.full_like(p, np.nan)
     ok = ~np.isnan(p)
     if not ok.any():
         return q
     ps = p[ok]
+    # p-values in ascending order, scaled by n / rank
     order = np.argsort(ps)
     ranked = ps[order] * len(ps) / (np.arange(len(ps)) + 1)
+    # enforce monotonicity from the largest p-value downwards
     ranked = np.minimum.accumulate(ranked[::-1])[::-1]
     out = np.empty_like(ps)
     out[order] = np.minimum(ranked, 1.0)
@@ -64,7 +101,10 @@ def bh(pvalues):
 
 
 def fisher(a, b, c, d):
-    """Fisher's exact test of [[a, b], [c, d]]; (odds ratio, p)."""
+    """Fisher's exact test of [[a, b], [c, d]]; (odds ratio, p).
+
+    NaN if a row or column of the table is empty (the test is not defined).
+    """
     if min(a + b, c + d, a + c, b + d) == 0:
         return math.nan, math.nan
     odds, p = fisher_exact([[a, b], [c, d]])
@@ -79,6 +119,7 @@ def feature_flags(df, low_vaf):
         "indel": df["type"].isin(["INS", "DEL", "COMPLEX"]),
         f"vaf_lt_{low_vaf:g}": vaf < low_vaf,
     }
+    # every other yes/no column is a stratification (from annotate_variants.py)
     for col in df.columns:
         if col not in BASE_COLUMNS and set(df[col].dropna().unique()) <= {"yes", "no"}:
             features[col] = df[col] == "yes"
@@ -86,6 +127,7 @@ def feature_flags(df, low_vaf):
 
 
 def enrichment(df, low_vaf):
+    """Fisher's exact test per comparison, discordance status and feature (BH over all tests)."""
     rows = []
     for (truth, query), group in df.groupby(["truth", "query"], sort=True):
         features = feature_flags(group, low_vaf)
@@ -96,6 +138,7 @@ def enrichment(df, low_vaf):
             ("FN+FP", group["status"] != "TP"),
         ):
             for name, flag in features.items():
+                # 2x2 table: discordant / concordant x with / without the feature
                 a = int((discordant & flag).sum())
                 b = int((discordant & ~flag).sum())
                 c = int((concordant & flag).sum())
@@ -116,8 +159,10 @@ def enrichment(df, low_vaf):
 
 
 def gene_summary(df):
+    """Per comparison and gene: counts and Fisher's test of the gene vs. all other genes."""
     if "gene" not in df.columns:
         return pd.DataFrame()
+    # a variant overlapping several genes counts for each; '.' = no gene
     exploded = df.assign(gene=df["gene"].fillna(".").str.split(",")).explode("gene")
     exploded = exploded[exploded["gene"] != "."]
     rows = []
@@ -142,6 +187,7 @@ def gene_summary(df):
 
 
 def class_summary(df):
+    """Counts of the discordance classes per comparison and status (FN, FP)."""
     disc = df[df["status"] != "TP"]
     if disc.empty:
         return pd.DataFrame(columns=["truth", "query", "status", *CLASS_ORDER])
@@ -164,6 +210,8 @@ def mqc_header(section_id, name, description, plot_type, extra=""):
 
 
 def write_mqc(prefix, metrics, per_pair, power, classes):
+    """MultiQC custom-content files: metrics tables, class bar graph, recall-by-VAF line graph."""
+    # overall metrics per comparison, with the power-adjusted recall if available
     overall = metrics[(metrics["stratum_type"] == "overall")].copy()
     if power is not None and not power.empty:
         overall = overall.merge(
@@ -312,12 +360,21 @@ def main():
     def read(path):
         return pd.read_csv(path, sep="\t", na_values=["NA"], keep_default_na=False)
 
+    # inputs with their required columns
     metrics = read(args.metrics)
+    require_columns(metrics, args.metrics, METRICS_COLUMNS)
     per_pair = read(args.per_pair)
+    require_columns(per_pair, args.per_pair, PER_PAIR_COLUMNS)
     power = read(args.power) if args.power else None
+    if power is not None:
+        require_columns(power, args.power, ["truth", "query", "micro_recall"])
     variants = read(args.variants)
+    check_variants(variants, args.variants)
+    # VAFs as numbers (NA -> NaN)
     for col in ("truth_vaf", "query_vaf"):
         variants[col] = pd.to_numeric(variants[col], errors="coerce")
+    print(f"INFO: {len(variants)} variants, {variants.groupby(['truth', 'query']).ngroups} "
+          "comparisons", file=sys.stderr)  # fmt: skip
 
     enrich = enrichment(variants, args.low_vaf)
     genes = gene_summary(variants)
@@ -336,6 +393,9 @@ def main():
     plot_classes(classes, plots)
     if not enrich.empty:
         plot_enrichment(enrich, plots)
+    n_sig = int((enrich["q_value"] < 0.05).sum()) if not enrich.empty else 0
+    print(f"INFO: {len(enrich)} enrichment tests ({n_sig} with q < 0.05), {len(genes)} gene rows; "
+          f"plots in {plots}/", file=sys.stderr)  # fmt: skip
 
 
 if __name__ == "__main__":

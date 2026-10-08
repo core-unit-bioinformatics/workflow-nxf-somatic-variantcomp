@@ -7,16 +7,21 @@ nextflow_process {
     tag "modules_local"
     tag "check_reference"
 
-    test("vcf - no-chr contig names are renamed") {
+    // VCF cases (renaming, header length fixes) are tested with the extracted facts in
+    // subworkflows/local/preprocess_vcf/tests
+
+    test("bed - no-chr names are renamed, unknown contigs dropped") {
 
         when {
             process {
                 """
                 def base = params.pipelines_testdata_base_path + 'synthetic/'
-                input[0] = [[id: 'S2_panel'], file(base + 'vcf/S2_panel.vcf.gz', checkIfExists: true)]
-                input[1] = 'vcf'
-                input[2] = [[id: 'synthetic'], file(base + 'reference/synthetic.fa', checkIfExists: true),
-                            file(base + 'reference/synthetic.fa.fai', checkIfExists: true), []]
+                def bed = file("${outputDir}/no_chr.bed")
+                bed.parent.mkdirs()
+                bed.text = '1\\t100\\t200\\tA\\nchrUn_x\\t1\\t5\\tB\\nMT\\t10\\t20\\tC\\n'
+                input[0] = [[id: 'no_chr'], bed]
+                input[1] = 'bed'
+                input[2] = [[id: 'synthetic'], file(base + 'reference/synthetic.fa.fai', checkIfExists: true)]
                 input[3] = []
                 """
             }
@@ -27,34 +32,8 @@ nextflow_process {
             assertAll(
                 { assert process.success },
                 { assert report.contains('status\tfixed') },
-                { assert report.contains('renamed_contigs\t1->chr1,2->chr2,MT->chrM') },
-                { assert report.contains('ref_mismatches\t0') },
-                { assert snapshot(process.out.rename, process.out.keep).match() }
-            )
-        }
-    }
-
-    test("vcf - wrong chrM length in header is fixed") {
-
-        when {
-            process {
-                """
-                def base = params.pipelines_testdata_base_path + 'synthetic/'
-                input[0] = [[id: 'S2_wes'], file(base + 'vcf/S2_wes.vcf.gz', checkIfExists: true)]
-                input[1] = 'vcf'
-                input[2] = [[id: 'synthetic'], file(base + 'reference/synthetic.fa', checkIfExists: true),
-                            file(base + 'reference/synthetic.fa.fai', checkIfExists: true), []]
-                input[3] = []
-                """
-            }
-        }
-
-        then {
-            def report = path(process.out.report[0][1]).readLines()
-            assertAll(
-                { assert process.success },
-                { assert report.contains('status\tfixed') },
-                { assert report.contains('header_length_fixes\tchrM:16570->16569') }
+                { assert path(process.out.bed[0][1]).text == 'chr1\t100\t200\tA\nchrM\t10\t20\tC\n' },
+                { assert snapshot(process.out.rename, process.out.keep, process.out.bed).match() }
             )
         }
     }
@@ -70,8 +49,7 @@ nextflow_process {
                 bed.text = 'chr1\\t100\\t200\\nchr1\\t29000\\t31000\\n'
                 input[0] = [[id: 'wrong_build'], bed]
                 input[1] = 'bed'
-                input[2] = [[id: 'synthetic'], file(base + 'reference/synthetic.fa', checkIfExists: true),
-                            file(base + 'reference/synthetic.fa.fai', checkIfExists: true), []]
+                input[2] = [[id: 'synthetic'], file(base + 'reference/synthetic.fa.fai', checkIfExists: true)]
                 input[3] = []
                 """
             }
@@ -80,7 +58,7 @@ nextflow_process {
         then {
             assertAll(
                 { assert process.failed },
-                { assert (process.stdout + process.stderr).any { line -> line.contains('different genome build') } }
+                { assert (process.stdout + process.stderr).any { line -> line.contains('on another genome build') } }
             )
         }
     }
@@ -93,10 +71,14 @@ nextflow_process {
             process {
                 """
                 def base = params.pipelines_testdata_base_path + 'synthetic/'
-                input[0] = [[id: 'S1_wgs'], file(base + 'vcf/S1_wgs.vcf.gz', checkIfExists: true)]
+                def header = file("${outputDir}/header.vcf")
+                header.parent.mkdirs()
+                header.text = '##fileformat=VCFv4.2\\n'
+                def contigs = file("${outputDir}/contigs.txt")
+                contigs.text = 'chr1\\n'
+                input[0] = [[id: 'S1_wgs'], [header, contigs]]
                 input[1] = 'vcf'
-                input[2] = [[id: 'synthetic'], file(base + 'reference/synthetic.fa', checkIfExists: true),
-                            file(base + 'reference/synthetic.fa.fai', checkIfExists: true), []]
+                input[2] = [[id: 'synthetic'], file(base + 'reference/synthetic.fa.fai', checkIfExists: true)]
                 input[3] = []
                 """
             }

@@ -8,7 +8,9 @@ process BENCHMARK_METRICS {
         : 'quay.io/biocontainers/pysam:0.24.1--py312hf5ad864_0'}"
 
     input:
-    tuple val(meta), path(tp_baseline), path(fn), path(tp), path(fp), path(truth_vcf, stageAs: 'truth/*'), path(query_vcf, stageAs: 'query/*'), path(regions, stageAs: 'regions/*')
+    // vcfeval outputs, bcftools isec output folders (exact, position-only) and optional BEDs
+    // that restrict the isec counts
+    tuple val(meta), path(tp_baseline), path(fn), path(tp), path(fp), path(isec_exact, stageAs: 'isec_exact/*'), path(isec_position, stageAs: 'isec_position/*'), path(regions, stageAs: 'regions/*')
 
     output:
     tuple val(meta), path("${prefix}.metrics.tsv"), emit: metrics
@@ -23,14 +25,16 @@ process BENCHMARK_METRICS {
     def args = task.ext.args ?: ''
     prefix = task.ext.prefix ?: "${meta.id}"
     def regions_arg = regions ? "--regions ${[regions].flatten().join(' ')}" : ''
+    // ext.args: '--vaf-bins ...' (conf/modules.config)
     """
+    # recall, precision and F1 per stratum and the per-variant table
     benchmark_metrics.py \\
         --tp-baseline ${tp_baseline} \\
         --fn ${fn} \\
         --tp ${tp} \\
         --fp ${fp} \\
-        --truth-vcf ${truth_vcf} \\
-        --query-vcf ${query_vcf} \\
+        --isec-exact ${isec_exact} \\
+        --isec-position ${isec_position} \\
         --sample ${meta.sample} \\
         --truth ${meta.truth} \\
         --query ${meta.query} \\

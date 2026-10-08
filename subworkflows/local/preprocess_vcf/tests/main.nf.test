@@ -24,7 +24,7 @@ nextflow_workflow {
                 def genome = file("${outputDir}/genome.bed")
                 genome.parent.mkdirs()
                 genome.text = 'chr1\\t0\\t30000\\nchr2\\t0\\t20000\\nchrM\\t0\\t16569\\n'
-                def entries = channel.of(entry.call('S1', 'wgs'), entry.call('S1', 'wes'), entry.call('S1', 'panel'), entry.call('S2', 'panel'), entry.call('S2', 'wgs'))
+                def entries = channel.of(entry.call('S1', 'wgs'), entry.call('S1', 'wes'), entry.call('S1', 'panel'), entry.call('S2', 'panel'), entry.call('S2', 'wgs'), entry.call('S2', 'wes'))
                 input[0] = entries
                 input[1] = channel.value([[id: 'synthetic'], file(base + 'reference/synthetic.fa'), file(base + 'reference/synthetic.fa.fai'), []])
                 input[2] = channel.value(genome)
@@ -41,6 +41,10 @@ nextflow_workflow {
             def header = { channel_out, id ->
                 def vcf = channel_out.find { item -> item[0].id == id }[1]
                 path(vcf).linesGzip.findAll { line -> line.startsWith('##contig') || line.startsWith('#CHROM') }
+            }
+            def report = { channel_out, id, type ->
+                def tsv = channel_out.find { item -> item[0].id == id && file(item[1]).name.endsWith(".${type}.reference_check.tsv") }[1]
+                path(tsv).readLines()
             }
             assertAll(
                 { assert workflow.success },
@@ -62,7 +66,11 @@ nextflow_workflow {
                     '##contig=<ID=chr1,length=30000>', '##contig=<ID=chr2,length=20000>', '##contig=<ID=chrM,length=16569>'] },
                 // S2 wgs: normal column came first in the input; tumor is first now
                 { assert header(workflow.out.normalized, 'S2_wgs').last().endsWith('FORMAT\tS2_wgs_T\tS2_wgs_N') },
-                { assert workflow.out.reports.size() == 5 }
+                // contig reports (6) and REF-allele reports (6)
+                { assert workflow.out.reports.size() == 12 },
+                { assert report(workflow.out.reports, 'S2_panel', 'vcf').contains('status\tfixed') },
+                { assert report(workflow.out.reports, 'S2_panel', 'vcf').contains('renamed_contigs\t1->chr1,2->chr2,MT->chrM') },
+                { assert report(workflow.out.reports, 'S2_wes', 'vcf').contains('header_length_fixes\tchrM:16570->16569') }
             )
         }
     }
