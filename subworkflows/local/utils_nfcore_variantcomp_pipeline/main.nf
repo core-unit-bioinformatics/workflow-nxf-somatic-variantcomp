@@ -10,11 +10,13 @@
 
 include { UTILS_NFSCHEMA_PLUGIN     } from '../../nf-core/utils_nfschema_plugin'
 include { paramsSummaryMap          } from 'plugin/nf-schema'
-include { samplesheetToList         } from 'plugin/nf-schema'
 include { paramsHelp                } from 'plugin/nf-schema'
 include { completionSummary         } from '../../nf-core/utils_nfcore_pipeline'
 include { UTILS_NFCORE_PIPELINE     } from '../../nf-core/utils_nfcore_pipeline'
 include { UTILS_NEXTFLOW_PIPELINE   } from '../../nf-core/utils_nextflow_pipeline'
+include { CHECK_SHEETS as CHECK_SAMPLESHEET    } from '../../../modules/local/check_sheets/main'
+include { CHECK_SHEETS as CHECK_STRATIFICATION } from '../../../modules/local/check_sheets/main'
+include { CHECK_SHEETS as CHECK_KNOWN          } from '../../../modules/local/check_sheets/main'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -62,7 +64,7 @@ workflow PIPELINE_INITIALISATION {
         before_text = before_text.replaceAll(/\033\[[0-9;]*m/, '')
     }
 
-    command = "nextflow run ${workflow.manifest.name} -profile <docker/singularity/.../institute> --input samplesheet.tsv --truth_technology <technology> --outdir <OUTDIR>"
+    command = "nextflow run ${workflow.manifest.name} -profile <docker/singularity/.../institute> --input samplesheet.csv --fasta genome.fa --truth_technology <technology> --outdir <OUTDIR>"
 
     UTILS_NFSCHEMA_PLUGIN (
         workflow,
@@ -85,72 +87,40 @@ workflow PIPELINE_INITIALISATION {
     )
 
     //
-    // Create channel from input file provided through params.input
+    // Sheets: content checks in bin/check_sheets.py (all problems reported at once);
+    // here only the validated CSVs are read into channels.
     //
+    def input_file = file(input, checkIfExists: true)
+    CHECK_SAMPLESHEET('samplesheet', input_file, input_file.parent.toUriString(), [])
+    // samplesheet entry: [ meta, vcf, vcf_index, tumor_bam, tumor_index, normal_bam, normal_index, target_bed ]
+    ch_samplesheet = CHECK_SAMPLESHEET.out.csv
+        .splitCsv(header: true)
+        .map { row -> samplesheetEntry(row) }
 
-    // Relative paths are resolved against the samplesheet's directory, 'n/a' marks
-    // an empty optional field. Rows are checked across the whole samplesheet.
-    //
-    def entries = buildSamplesheetEntries(
-        samplesheetToList(input, "${projectDir}/assets/schema_input.json"),
-        file(input).parent,
-        truth_technology
-    )
-    def errors = samplesheetErrors(entries, truth_technology) + missingSamplesheetFiles(entries)
-    if (errors) {
-        error("Invalid samplesheet '${input}':\n  - " + errors.join("\n  - "))
-    }
-    samplesheetWarnings(entries).each { msg -> log.warn(msg) }
-
-    ch_samplesheet = channel.fromList(entries)
-
-    //
-    // Optional stratification sheet: [ meta(id: name), bed ], paths relative to the sheet
-    //
     def ch_strata = channel.empty()
     if (stratification) {
-        def strata = samplesheetToList(stratification, "${projectDir}/assets/schema_stratification.json")
-            .collect { row -> [row[0], resolveSamplesheetPath(row[1], file(stratification).parent)] }
-        def missing = strata.findAll { stratum -> !stratum[1].exists() }
-            .collect { stratum -> "${stratum[0].id}: ${stratum[1].toUriString()}" }
-        if (missing) {
-            error("Stratification BED(s) not found:\n  - " + missing.join("\n  - "))
-        }
-        ch_strata = channel.fromList(strata)
+        def strat_file = file(stratification, checkIfExists: true)
+        CHECK_STRATIFICATION('stratification', strat_file, strat_file.parent.toUriString(), [])
+        // stratum: [ meta(id: name), bed ]
+        ch_strata = CHECK_STRATIFICATION.out.csv
+            .splitCsv(header: true)
+            .map { row -> [[id: row.name], file(row.bed, checkIfExists: true)] }
     }
 
-    //
-    // Optional known-variant sheet: [ meta(id: name, sample, mode), [ variant files ], regions or [] ]
-    //
     def ch_known = channel.empty()
     if (known_variants) {
-        def base_dir = file(known_variants).parent
-        def samples = entries.collect { entry -> entry[0].sample }.unique()
-        def known = samplesheetToList(known_variants, "${projectDir}/assets/schema_known_variants.json")
-            .collect { row ->
-                def files = row[1].tokenize(',').collect { path -> resolveSamplesheetPath(path, base_dir) }
-                [row[0], files, resolveSamplesheetPath(row[2], base_dir)]
+        def known_file = file(known_variants, checkIfExists: true)
+        CHECK_KNOWN('known', known_file, known_file.parent.toUriString(), CHECK_SAMPLESHEET.out.csv)
+        // known-variant list: [ meta(id: name, sample, mode), [ variant files ], regions or [] ]
+        ch_known = CHECK_KNOWN.out.csv
+            .splitCsv(header: true)
+            .map { row ->
+                [
+                    [id: row.name, sample: row.sample, mode: row.mode],
+                    row.variants.tokenize(';').collect { path -> file(path, checkIfExists: true) },
+                    row.regions ? file(row.regions, checkIfExists: true) : [],
+                ]
             }
-        def known_errors = []
-        known.each { item ->
-            if (item[0].sample != 'all' && !(item[0].sample in samples)) {
-                known_errors << "List '${item[0].id}': sample '${item[0].sample}' is not in the samplesheet"
-            }
-            (item[1] + (item[2] ? [item[2]] : [])).each { path ->
-                if (!path.exists()) {
-                    known_errors << "List '${item[0].id}': file not found: ${path.toUriString()}"
-                }
-            }
-        }
-        known.groupBy { item -> item[0].id }.each { name, items ->
-            if (items.size() > 1) {
-                known_errors << "List name '${name}' is used more than once"
-            }
-        }
-        if (known_errors) {
-            error("Invalid known-variant sheet '${known_variants}':\n  - " + known_errors.join("\n  - "))
-        }
-        ch_known = channel.fromList(known)
     }
 
     emit:
@@ -194,147 +164,48 @@ workflow PIPELINE_COMPLETION {
 */
 
 //
-// Samplesheet handling
+// Samplesheet entry from a row of the validated samplesheet (bin/check_sheets.py)
 //
-// A samplesheet entry is a list:
-//   [ meta, vcf, vcf_index, tumor_bam, tumor_bai, normal_bam, normal_bai, target_bed ]
-// with meta = [ id, sample, technology, library_type, tumor_id, normal_id, caller, is_truth ].
-// Empty optional fields are represented by [].
+// Content was checked by the script; here the files are only staged (checkIfExists
+// fails with the missing path) and index files next to them are looked up.
 //
-
-//
-// Resolve a samplesheet path: 'n/a'/empty -> [], URLs and absolute paths as given,
-// relative paths against the samplesheet's directory
-//
-def resolveSamplesheetPath(value, base_dir) {
-    def str = value instanceof List ? '' : (value == null ? '' : value.toString().trim())
-    if (str == '' || str == 'n/a') {
-        return []
-    }
-    if (str ==~ /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\/.*/ || str.startsWith('/')) {
-        return file(str)
-    }
-    return file("${base_dir}/${str}")
+def samplesheetEntry(row) {
+    def meta = [
+        id          : "${row.sample}_${row.technology}".toString(),
+        sample      : row.sample,
+        technology  : row.technology,
+        library_type: row.library_type,
+        tumor_id    : row.tumor_id,
+        normal_id   : row.normal_id ?: null,
+        caller      : row.caller,
+        is_truth    : row.is_truth == 'true',
+    ]
+    def vcf = file(row.vcf, checkIfExists: true)
+    def tumor_bam = row.tumor_bam ? file(row.tumor_bam, checkIfExists: true) : []
+    def normal_bam = row.normal_bam ? file(row.normal_bam, checkIfExists: true) : []
+    return [
+        meta,
+        vcf,
+        findIndex(vcf, ['.tbi', '.csi'], []),
+        tumor_bam,
+        tumor_bam ? findIndex(tumor_bam, ['.bai', '.csi', '.crai'], [/\.bam$/: '.bai', /\.cram$/: '.crai']) : [],
+        normal_bam,
+        normal_bam ? findIndex(normal_bam, ['.bai', '.csi', '.crai'], [/\.bam$/: '.bai', /\.cram$/: '.crai']) : [],
+        row.target_bed ? file(row.target_bed, checkIfExists: true) : [],
+    ]
 }
 
 //
-// Convert the rows returned by samplesheetToList into samplesheet entries
+// Index file next to a data file: <file><suffix> (e.g. x.bam.bai) or, with a
+// replacement, <file without extension><new extension> (e.g. x.bai); [] if none exists
+// (the pipeline creates missing indices where they are needed)
 //
-def buildSamplesheetEntries(rows, base_dir, truth_technology) {
-    return rows.collect { row ->
-        def meta = row[0]
-        def paths = row[1..-1].collect { value -> resolveSamplesheetPath(value, base_dir) }
-        def normal_id = meta.normal_id in [null, '', 'n/a'] ? null : meta.normal_id
-        def new_meta = meta + [
-            id       : "${meta.sample}_${meta.technology}".toString(),
-            normal_id: normal_id,
-            caller   : meta.caller ?: 'unknown',
-            is_truth : meta.technology == truth_technology,
-        ]
-        [new_meta] + paths
-    }
-}
-
-//
-// Cross-row checks; returns a list of error messages (empty if valid)
-//
-def samplesheetErrors(entries, truth_technology) {
-    def errors = []
-    def metas = entries.collect { entry -> entry[0] }
-
-    metas.groupBy { meta -> meta.id }.each { _id, group ->
-        if (group.size() > 1) {
-            errors << "Duplicate rows for sample '${group[0].sample}' and technology '${group[0].technology}'"
-        }
-    }
-
-    def technologies = metas.collect { meta -> meta.technology }.unique()
-    if (technologies.size() < 2) {
-        errors << "At least two technologies are required, found: ${technologies.join(', ')}"
-    }
-    if (!truth_technology) {
-        errors << "No truth technology given (--truth_technology)"
-    }
-    else if (!(truth_technology in technologies)) {
-        errors << "Truth technology '${truth_technology}' is not in the samplesheet (technologies: ${technologies.join(', ')})"
-    }
-    else {
-        metas.groupBy { meta -> meta.sample }.each { sample, group ->
-            def sample_techs = group.collect { meta -> meta.technology }
-            if (!(truth_technology in sample_techs)) {
-                errors << "Sample '${sample}' has no row for the truth technology '${truth_technology}'"
-            }
-            else if (sample_techs.unique().size() < 2) {
-                errors << "Sample '${sample}' has no technology to compare with the truth technology '${truth_technology}'"
-            }
-        }
-    }
-
-    entries.groupBy { entry -> entry[0].technology }.each { technology, group ->
-        def beds = group.collect { entry -> entry[7] ? entry[7].toUriString() : 'n/a' }.unique()
-        if (beds.size() > 1) {
-            errors << "Technology '${technology}' must use one target BED for all samples, found: ${beds.join(', ')}"
-        }
-        def library_types = group.collect { entry -> entry[0].library_type }.unique()
-        if (library_types.size() > 1) {
-            errors << "Technology '${technology}' must have one library_type, found: ${library_types.join(', ')}"
-        }
-        if (library_types.any { type -> type != 'wgs' } && group.any { entry -> !entry[7] }) {
-            errors << "Technology '${technology}' (library_type ${library_types.join('/')}) requires a target_bed"
-        }
-    }
-
-    entries.each { entry ->
-        def meta = entry[0]
-        if (meta.normal_id && meta.tumor_id == meta.normal_id) {
-            errors << "Row '${meta.id}': tumor_id and normal_id are identical ('${meta.tumor_id}')"
-        }
-        if (entry[4] && !entry[3]) {
-            errors << "Row '${meta.id}': tumor_bai given without tumor_bam"
-        }
-        if (entry[6] && !entry[5]) {
-            errors << "Row '${meta.id}': normal_bai given without normal_bam"
-        }
-        if (entry[5] && !entry[3]) {
-            errors << "Row '${meta.id}': normal_bam given without tumor_bam"
-        }
-        if (entry[5] && !meta.normal_id) {
-            errors << "Row '${meta.id}': normal_bam given but normal_id is 'n/a'"
-        }
-    }
-    return errors.collect { msg -> msg.toString() }
-}
-
-//
-// Check that all files referenced in the samplesheet exist
-//
-def missingSamplesheetFiles(entries) {
-    def columns = ['vcf', 'vcf_index', 'tumor_bam', 'tumor_bai', 'normal_bam', 'normal_bai', 'target_bed']
-    def errors = []
-    entries.each { entry ->
-        columns.eachWithIndex { column, idx ->
-            def path = entry[idx + 1]
-            if (path && !path.exists()) {
-                errors << "Row '${entry[0].id}': ${column} not found: ${path.toUriString()}"
-            }
-        }
-    }
-    return errors.collect { msg -> msg.toString() }
-}
-
-//
-// Non-fatal samplesheet issues
-//
-def samplesheetWarnings(entries) {
-    def warnings = []
-    def with_bam = entries.findAll { entry -> entry[3] }
-    if (with_bam && with_bam.size() < entries.size()) {
-        warnings << "Alignments are given for only ${with_bam.size()} of ${entries.size()} rows. Coverage-based callable regions and read-evidence checks need alignments for all technologies of a sample."
-    }
-    entries.findAll { entry -> !entry[0].normal_id }.each { entry ->
-        warnings << "Row '${entry[0].id}': no normal sample (tumor-only). Germline variants may appear as false positives."
-    }
-    return warnings.collect { msg -> msg.toString() }
+def findIndex(data_file, suffixes, replacements) {
+    def name = data_file.toUriString()
+    def candidates = suffixes.collect { suffix -> name + suffix }
+    replacements.each { pattern, extension -> candidates << name.replaceAll(pattern, extension) }
+    def found = candidates.findAll { candidate -> candidate != name }.collect { candidate -> file(candidate) }.find { candidate -> candidate.exists() }
+    return found ?: []
 }
 
 //

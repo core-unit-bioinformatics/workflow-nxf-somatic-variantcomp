@@ -2,7 +2,7 @@
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "https://raw.githubusercontent.com/core-unit-bioinformatics/workflow-nxf-somatic-variantcomp/main/assets/schema_stratification.json",
     "title": "core-unit-bioinformatics/workflow-nxf-somatic-variantcomp pipeline - params.stratification schema",
-    "description": "Tab-separated sheet of stratification BEDs (e.g. GIAB genome stratifications). Relative paths are resolved against the sheet's directory.",
+    "description": "Comma-separated sheet of stratification BEDs (e.g. GIAB genome stratifications). Relative paths are resolved against the sheet's directory.",
     "type": "array",
     "items": {
         "type": "object",
@@ -11,7 +11,9 @@
                 "type": "string",
                 "pattern": "^[A-Za-z0-9_]+$",
                 "errorMessage": "Stratification name must be provided and may only contain A-Z, a-z, 0-9 and '_' (it becomes a column name)",
-                "meta": ["id"]
+                "meta": [
+                    "id"
+                ]
             },
             "bed": {
                 "type": "string",
@@ -19,7 +21,12 @@
                 "errorMessage": "Stratification BED must have extension '.bed' or '.bed.gz'"
             }
         },
-        "required": ["name", "bed"],
-        "uniqueEntries": ["name"]
+        "required": [
+            "name",
+            "bed"
+        ],
+        "uniqueEntries": [
+            "name"
+        ]
     }
 }

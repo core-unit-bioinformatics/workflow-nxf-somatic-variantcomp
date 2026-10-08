@@ -20,10 +20,10 @@
                     "format": "file-path",
                     "exists": true,
                     "schema": "assets/schema_input.json",
-                    "mimetype": "text/tab-separated-values",
-                    "pattern": "^\\S+\\.tsv$",
-                    "description": "Path to the tab-separated samplesheet with one row per sample and technology.",
-                    "help_text": "Columns: sample, technology, library_type, tumor_id, normal_id, caller, vcf, vcf_index, tumor_bam, tumor_bai, normal_bam, normal_bai, target_bed. Use 'n/a' for empty optional fields. Relative paths are resolved against the samplesheet's directory. See docs/usage.md.",
+                    "mimetype": "text/csv",
+                    "pattern": "^\\S+\\.csv$",
+                    "description": "Path to the comma-separated samplesheet with one row per sample and technology.",
+                    "help_text": "Columns: sample, technology, library_type, tumor_id, normal_id, caller, vcf, tumor_bam, normal_bam, target_bed. Empty or 'n/a' marks an empty optional field. Relative paths are resolved against the samplesheet's directory. Index files are taken from next to the data files. See docs/usage.md.",
                     "fa_icon": "fas fa-file-csv"
                 },
                 "outdir": {
@@ -219,9 +219,9 @@
                     "format": "file-path",
                     "exists": true,
                     "schema": "assets/schema_stratification.json",
-                    "mimetype": "text/tab-separated-values",
-                    "pattern": "^\\S+\\.tsv$",
-                    "description": "Optional tab-separated sheet (columns name, bed) of stratification BEDs, e.g. GIAB homopolymers, tandem repeats, segmental duplications. Each becomes a yes/no column of the variant table.",
+                    "mimetype": "text/csv",
+                    "pattern": "^\\S+\\.csv$",
+                    "description": "Optional comma-separated sheet (columns name, bed) of stratification BEDs, e.g. GIAB homopolymers, tandem repeats, segmental duplications. Each becomes a yes/no column of the variant table.",
                     "fa_icon": "fas fa-layer-group"
                 },
                 "germline_vaf": {
@@ -275,9 +275,9 @@
                     "format": "file-path",
                     "exists": true,
                     "schema": "assets/schema_known_variants.json",
-                    "mimetype": "text/tab-separated-values",
-                    "pattern": "^\\S+\\.tsv$",
-                    "description": "Tab-separated sheet with columns name, sample (or 'all'), mode ('required' or 'benchmark'), variants (comma-separated VCF/TSV files) and regions (BED or 'n/a').",
+                    "mimetype": "text/csv",
+                    "pattern": "^\\S+\\.csv$",
+                    "description": "Comma-separated sheet with columns name, sample (or 'all'), mode ('required' or 'benchmark'), variants (comma-separated VCF/TSV files) and regions (BED or 'n/a').",
                     "fa_icon": "fas fa-list"
                 },
                 "fail_on_missing_required": {

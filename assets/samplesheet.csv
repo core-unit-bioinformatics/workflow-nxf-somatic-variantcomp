@@ -1,0 +1,7 @@
+sample,technology,library_type,tumor_id,normal_id,caller,vcf,tumor_bam,normal_bam,target_bed
+S1,panel,amplicon,S1_panel_T,S1_panel_N,synthetic-dragen-like,vcf/S1_panel.vcf.gz,n/a,n/a,bed/panel.bed
+S1,wes,capture,S1_wes_T,S1_wes_N,synthetic-dragen-like,vcf/S1_wes.vcf.gz,n/a,n/a,bed/wes.bed
+S1,wgs,wgs,S1_wgs_T,S1_wgs_N,synthetic-dragen-like,vcf/S1_wgs.vcf.gz,n/a,n/a,n/a
+S2,panel,amplicon,S2_panel_T,S2_panel_N,synthetic-dragen-like,vcf/S2_panel.vcf.gz,n/a,n/a,bed/panel.bed
+S2,wes,capture,S2_wes_T,S2_wes_N,synthetic-dragen-like,vcf/S2_wes.vcf.gz,n/a,n/a,bed/wes.bed
+S2,wgs,wgs,S2_wgs_T,S2_wgs_N,synthetic-dragen-like,vcf/S2_wgs.vcf.gz,n/a,n/a,n/a

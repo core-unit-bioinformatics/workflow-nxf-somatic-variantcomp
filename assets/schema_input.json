@@ -2,7 +2,7 @@
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "https://raw.githubusercontent.com/core-unit-bioinformatics/workflow-nxf-somatic-variantcomp/main/assets/schema_input.json",
     "title": "core-unit-bioinformatics/workflow-nxf-somatic-variantcomp pipeline - params.input schema",
-    "description": "Schema for the samplesheet provided with params.input (tab-separated, one row per sample and technology). Relative paths are resolved against the samplesheet's directory; 'n/a' marks an empty optional field.",
+    "description": "Schema for the samplesheet provided with params.input (comma-separated, one row per sample and technology). Relative paths are resolved against the samplesheet's directory; empty or 'n/a' marks an empty optional field. Index files are not listed: they are taken from next to the data files or created. Rules across rows are checked by bin/check_sheets.py.",
     "type": "array",
     "items": {
         "type": "object",
@@ -11,75 +11,82 @@
                 "type": "string",
                 "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
                 "errorMessage": "Sample (patient/case) name must be provided and may only contain A-Z, a-z, 0-9, '_', '.' and '-'",
-                "meta": ["sample"]
+                "meta": [
+                    "sample"
+                ]
             },
             "technology": {
                 "type": "string",
                 "pattern": "^[a-z0-9][a-z0-9-]*$",
                 "errorMessage": "Technology label must be provided and may only contain a-z, 0-9 and '-' (e.g. 'wgs', 'wes', 'panel-oca')",
-                "meta": ["technology"]
+                "meta": [
+                    "technology"
+                ]
             },
             "library_type": {
                 "type": "string",
-                "enum": ["wgs", "capture", "amplicon"],
+                "enum": [
+                    "wgs",
+                    "capture",
+                    "amplicon"
+                ],
                 "errorMessage": "library_type must be one of 'wgs', 'capture' or 'amplicon'",
-                "meta": ["library_type"]
+                "meta": [
+                    "library_type"
+                ]
             },
             "tumor_id": {
                 "type": "string",
                 "pattern": "^\\S+$",
                 "errorMessage": "tumor_id (tumor sample name in the VCF) must be provided and cannot contain spaces",
-                "meta": ["tumor_id"]
+                "meta": [
+                    "tumor_id"
+                ]
             },
             "normal_id": {
                 "type": "string",
-                "pattern": "^\\S+$",
-                "errorMessage": "normal_id (normal sample name in the VCF, 'n/a' for tumor-only) must be provided and cannot contain spaces",
-                "meta": ["normal_id"]
+                "pattern": "^(\\S+)?$",
+                "errorMessage": "normal_id (normal sample name in the VCF; empty or 'n/a' for tumor-only) cannot contain spaces",
+                "meta": [
+                    "normal_id"
+                ]
             },
             "caller": {
                 "type": "string",
                 "pattern": "^\\S+$",
                 "default": "unknown",
                 "errorMessage": "caller cannot contain spaces (e.g. 'dragen-4.4.4')",
-                "meta": ["caller"]
+                "meta": [
+                    "caller"
+                ]
             },
             "vcf": {
                 "type": "string",
                 "pattern": "^\\S+\\.(vcf|vcf\\.gz|bcf)$",
                 "errorMessage": "Somatic VCF must be provided, cannot contain spaces and must have extension '.vcf', '.vcf.gz' or '.bcf'"
             },
-            "vcf_index": {
-                "type": "string",
-                "pattern": "^(n/a|\\S+\\.(tbi|csi))$",
-                "errorMessage": "VCF index must have extension '.tbi' or '.csi' (or 'n/a')"
-            },
             "tumor_bam": {
                 "type": "string",
-                "pattern": "^(n/a|\\S+\\.(bam|cram))$",
+                "pattern": "^(|n/a|\\S+\\.(bam|cram))$",
                 "errorMessage": "Tumor alignment must have extension '.bam' or '.cram' (or 'n/a')"
-            },
-            "tumor_bai": {
-                "type": "string",
-                "pattern": "^(n/a|\\S+\\.(bai|crai|csi))$",
-                "errorMessage": "Tumor alignment index must have extension '.bai', '.crai' or '.csi' (or 'n/a')"
             },
             "normal_bam": {
                 "type": "string",
-                "pattern": "^(n/a|\\S+\\.(bam|cram))$",
+                "pattern": "^(|n/a|\\S+\\.(bam|cram))$",
                 "errorMessage": "Normal alignment must have extension '.bam' or '.cram' (or 'n/a')"
-            },
-            "normal_bai": {
-                "type": "string",
-                "pattern": "^(n/a|\\S+\\.(bai|crai|csi))$",
-                "errorMessage": "Normal alignment index must have extension '.bai', '.crai' or '.csi' (or 'n/a')"
             },
             "target_bed": {
                 "type": "string",
-                "pattern": "^(n/a|\\S+\\.bed(\\.gz)?)$",
+                "pattern": "^(|n/a|\\S+\\.bed(\\.gz)?)$",
                 "errorMessage": "Target BED must have extension '.bed' or '.bed.gz' ('n/a' = genome-wide, e.g. WGS)"
             }
         },
-        "required": ["sample", "technology", "library_type", "tumor_id", "normal_id", "vcf"]
+        "required": [
+            "sample",
+            "technology",
+            "library_type",
+            "tumor_id",
+            "vcf"
+        ]
     }
 }
