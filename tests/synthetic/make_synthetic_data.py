@@ -370,9 +370,11 @@ def write_known_variants(out, d):
     header = "chrom,pos,ref,alt,gene,label,vaf\n"
     # E01 found everywhere, E08 filtered in wes, E07 outside the common region
     (known / "required_S1.csv").write_text(
-        header + line(4100, gene="GENE_A", label="E01") + line(4700, gene="GENE_B", label="E08")
+        header
+        + line(4100, gene="GENE_A", label="E01")
+        + line(4700, gene="GENE_B", label="E08")
         + line(15000, label="E07")
-    )  # fmt: skip
+    )
     # designed true variants of S1 in the common region (as an external truth set)
     truth = [
         r for (c, p), r in sorted(wgs.items()) if (c, p) not in {("chr1", 15000), ("chr1", 7000)}
