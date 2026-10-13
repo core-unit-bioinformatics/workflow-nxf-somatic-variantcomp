@@ -7,7 +7,9 @@ and <x>.known_summary.tsv), each with the list name given as NAME=FILE.
 Outputs (--prefix):
   <prefix>.required_variants.tsv  all variants of all lists, samples and technologies
   <prefix>.required_summary.tsv   per list, sample and technology: required, passed,
-                                  failed, all_passed
+                                  failed, recall (passed / required), all_passed; plus one
+                                  row per list and technology with sample 'all' (counts
+                                  summed over the samples, recall of the sum)
   <prefix>_required_mqc.tsv       the summary as a MultiQC table
 
 Every variant that is not PASS is printed as a WARNING (list, label, position,
@@ -20,7 +22,29 @@ import csv
 import sys
 
 VARIANT_COLUMNS = ["sample", "technology", "label", "gene", "chrom", "pos", "ref", "alt", "status"]
-SUMMARY_COLUMNS = ["sample", "technology", "required", "passed", "failed", "all_passed"]
+SUMMARY_COLUMNS = ["sample", "technology", "required", "passed", "failed", "recall", "all_passed"]
+
+
+def overall_rows(summary):
+    """One row per list and technology over all samples (sample 'all'): summed counts."""
+    totals = {}
+    for row in summary:
+        key = (row["list"], row["technology"])
+        required, passed = totals.get(key, (0, 0))
+        totals[key] = (required + int(row["required"]), passed + int(row["passed"]))
+    return [
+        {
+            "list": name,
+            "sample": "all",
+            "technology": tech,
+            "required": str(required),
+            "passed": str(passed),
+            "failed": str(required - passed),
+            "recall": f"{passed / required:.4f}" if required else "NA",
+            "all_passed": "yes" if passed == required else "no",
+        }
+        for (name, tech), (required, passed) in sorted(totals.items())
+    ]
 
 
 def read_tsv(path, required, what):
@@ -68,6 +92,9 @@ def main():
         key=lambda r: (r["list"], r["sample"], r["technology"], r["chrom"], int(r["pos"]))
     )
     summary.sort(key=lambda r: (r["list"], r["sample"], r["technology"]))
+    # recall over all samples, after the per-sample rows of each list
+    summary += overall_rows(summary)
+    summary.sort(key=lambda r: (r["list"], r["sample"] == "all", r["sample"], r["technology"]))
 
     var_columns = (
         ["list"] + [c for c in variants[0] if c != "list"]

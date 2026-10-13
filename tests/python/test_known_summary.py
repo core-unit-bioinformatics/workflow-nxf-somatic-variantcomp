@@ -11,7 +11,10 @@ VARIANTS = (
     "S1\twes\tV1\tKRAS\tchr1\t100\tA\tC\tPASS\n"
     "S1\twes\tV2\tTP53\tchr1\t50\tG\tT\tabsent\n"
 )
-SUMMARY = "sample\ttechnology\trequired\tpassed\tfailed\tall_passed\nS1\twes\t2\t1\t1\tno\n"
+SUMMARY = (
+    "sample\ttechnology\trequired\tpassed\tfailed\trecall\tall_passed\n"
+    "S1\twes\t2\t1\t1\t0.5000\tno\n"
+)
 
 
 def run(tmp_path, *extra):
@@ -46,7 +49,9 @@ def test_summary_tables_and_warnings(tmp_path):
         in proc.stderr
     )
     mqc = (tmp_path / "known_required_mqc.tsv").read_text().splitlines()
-    assert mqc[-1] == "clinical S1 wes\tclinical\tS1\twes\t2\t1\t1\tno"
+    # per-sample row, then the row over all samples (recall of the summed counts)
+    assert mqc[-2] == "clinical S1 wes\tclinical\tS1\twes\t2\t1\t1\t0.5000\tno"
+    assert mqc[-1] == "clinical all wes\tclinical\tall\twes\t2\t1\t1\t0.5000\tno"
 
 
 def test_fail_on_missing_exits_after_writing_outputs(tmp_path):
