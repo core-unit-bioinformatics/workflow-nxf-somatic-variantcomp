@@ -243,3 +243,24 @@ def test_check_output_order_does_not_depend_on_input_order(tmp_path, ref):
     assert result.returncode == 0, result.stderr
     summary = (tmp_path / "x.known_summary.tsv").read_text().splitlines()
     assert [line.split("\t")[1] for line in summary[1:]] == ["wes", "wgs"]
+
+
+def test_prepare_ref_mismatch_fails_unless_warn_only(tmp_path, ref):
+    fasta, seq = ref
+    wrong = alt_of(seq[99])
+    tsv = tmp_path / "known.tsv"
+    tsv.write_text(
+        "chrom\tpos\tref\talt\tlabel\n"
+        f"chr1\t100\t{wrong}\t{alt_of(wrong)}\tbad\n"
+        f"chr1\t200\t{seq[199]}\t{alt_of(seq[199])}\tgood\n"
+    )
+    args = ["prepare", "--input", str(tsv), "--fai", f"{fasta}.fai", "--fasta", str(fasta)]
+    out = ["--output", str(tmp_path / "k.vcf.gz"), "--report", str(tmp_path / "r.tsv")]
+    result = run(*args, *out)
+    assert result.returncode == 1
+    assert f"REF {wrong} differs from the reference ({seq[99]})" in result.stderr
+    assert "ref_mismatches\t1" in (tmp_path / "r.tsv").read_text()
+    # check switched off: the mismatching variant is dropped, the run goes on
+    result = run(*args, *out, "--warn-only")
+    assert result.returncode == 0, result.stderr
+    assert [r.id for r in pysam.VariantFile(str(tmp_path / "k.vcf.gz"))] == ["good"]

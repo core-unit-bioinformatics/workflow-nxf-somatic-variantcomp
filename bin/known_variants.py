@@ -7,9 +7,11 @@ prepare  Read known variants from one or more VCFs or TSVs (columns chrom, pos,
          and write a sorted, sites-only VCF (INFO/KV_GENE, INFO/KV_LABEL
          and, if a VAF is known, INFO/VC_T_VAF, so recall can be stratified by the
          truth VAF). VCF VAF tags: --vaf-tag, else the first of TVAF, VAF, AF.
-         Normalize the output with bcftools norm afterwards (left-align, split; the
-         REF alleles are checked there against the FASTA: --check-ref x, and the
-         pipeline stops if any REF allele differs, see check_reference.py ref-alleles).
+         With --fasta, every REF allele is compared with the reference: any mismatch
+         stops the run (another build), unless --warn-only (check switched off).
+         Variants on the mitochondrial contig are dropped (unless --keep-mito).
+         --report writes a key<TAB>value check report like check_reference.py.
+         The output is normalized with bcftools norm afterwards (left-align, split).
 
 check    For the 'required' mode: every known variant must be found in every
          technology of a sample. For each technology the variant is looked up in
@@ -40,7 +42,7 @@ from pathlib import Path
 import pysam
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from check_reference import map_contig, read_fai  # noqa: E402
+from check_reference import Report, is_mito, map_contig, read_fai  # noqa: E402
 
 TSV_REQUIRED = ["chrom", "pos", "ref", "alt"]
 
@@ -134,7 +136,12 @@ def prepare(args):
     # reference contigs and their order (for sorting the output)
     reference = read_fai(args.fai)
     order = {c: i for i, c in enumerate(reference)}
+    # FASTA for the REF allele check (pysam), optional
+    fasta = pysam.FastaFile(args.fasta) if args.fasta else None
+    # the check report; --warn-only (check switched off) turns errors into warnings
+    report = Report(args.name or ", ".join(args.input), warn_only=args.warn_only)
     records, errors = [], []
+    n_mito = n_ref_mismatch = 0
     # all variants of all input files of the list
     known = [v for path in args.input for v in read_known(path, args.vaf_tag)]
     if not known:
@@ -147,7 +154,11 @@ def prepare(args):
                 f"{chrom}:{pos} {ref}>{alt} ({label}): contig '{chrom}' is not in the reference"
             )
             continue
-        # position must lie on the contig (the REF alleles are checked by bcftools norm afterwards)
+        # the mitochondrial contig is not compared (unless --keep-mito)
+        if is_mito(ref_chrom) and not args.keep_mito:
+            n_mito += 1
+            continue
+        # position must lie on the contig
         if pos < 1 or pos - 1 + len(ref) > reference[ref_chrom]:
             errors.append(
                 f"{chrom}:{pos} {ref}>{alt} ({label}): position beyond the end of {ref_chrom} "
@@ -160,9 +171,32 @@ def prepare(args):
                 f"{chrom}:{pos} {ref}>{alt} ({label}): REF/ALT must be different A/C/G/T/N alleles"
             )
             continue
+        # the REF allele must match the reference sequence at this position
+        if fasta is not None:
+            expected = fasta.fetch(ref_chrom, pos - 1, pos - 1 + len(ref)).upper()
+            if ref != expected:
+                n_ref_mismatch += 1
+                errors.append(
+                    f"{chrom}:{pos} {ref}>{alt} ({label}): REF {ref} differs from the "
+                    f"reference ({expected}): another genome build?"
+                )
+                continue
         records.append((ref_chrom, pos, ref, alt, gene, label, vaf))
-    if errors:
-        sys.exit("ERROR: known variants not usable:\n  " + "\n  ".join(errors))
+    # report: counts and all problems (errors stop the run unless --warn-only)
+    report.set("input", ", ".join(args.input))
+    report.set("variants_read", len(known))
+    report.set("variants_kept", len(records))
+    report.set("dropped_mito", n_mito)
+    report.set("ref_mismatches", n_ref_mismatch)
+    if n_mito:
+        report.warnings.append(f"{n_mito} variants on the mitochondrial contig are not compared")
+    for message in errors:
+        report.error(message)
+    if args.report:
+        report.write(args.report)
+    report.print_and_exit()
+    if not records:
+        sys.exit(f"ERROR: {', '.join(args.input)}: no usable known variant is left")
     # reference order, then position and alleles (needed for tabix and bcftools)
     records.sort(key=lambda r: (order[r[0]], r[1], r[2], r[3]))
 
@@ -413,6 +447,11 @@ def main():
     )
     p.add_argument("--vaf-tag", help="INFO tag with the VAF in VCF input (default: auto)")
     p.add_argument("--fai", required=True)
+    p.add_argument("--fasta", help="reference FASTA: check the REF alleles")
+    p.add_argument("--name", help="name of the list for messages")
+    p.add_argument("--report", help="write the check report (key<TAB>value) here")
+    p.add_argument("--keep-mito", action="store_true", help="keep mitochondrial variants")
+    p.add_argument("--warn-only", action="store_true", help="report errors as warnings (check off)")
     p.add_argument("--output", required=True, help="output .vcf.gz")
     c = sub.add_parser("check", help="'required' check of one sample")
     c.add_argument("--known", required=True, help="normalized known-variant VCF")
