@@ -1,25 +1,29 @@
 #!/usr/bin/env python3
 """Callable intervals of one alignment from mosdepth output.
 
-Input are the mosdepth outputs of an alignment; --mode selects which one is used:
+INPUT (outputs of mosdepth for one alignment; --mode selects which one is used)
+  --quantized  <prefix>.quantized.bed.gz of `mosdepth --quantize 0:<min>:` with the labels
+               LOW_COVERAGE / CALLABLE (env MOSDEPTH_Q0/MOSDEPTH_Q1): columns contig,
+               start (0-based), end, label. Used with --mode base: every interval labelled
+               --label (default CALLABLE) is callable, i.e. every base in it has a depth
+               >= the threshold given to --quantize.
+  --regions    <prefix>.regions.bed.gz of `mosdepth --by <regions>`: columns contig, start,
+               end, mean depth. Used with --mode region: every region with a mean depth
+               >= --min-coverage is callable (a mean can hide low-coverage parts).
+  --rename     rename map of the alignment's reference check (check_reference.py): two
+               columns, alignment contig name -> reference contig name; may be empty
+  --fai        reference .fai: intervals on other contigs are dropped
 
-  --mode base    --quantized <prefix>.quantized.bed.gz (mosdepth --quantize 0:<min>: with the
-                 labels LOW_COVERAGE / CALLABLE): every interval labelled
-                 --label (default CALLABLE) is callable, i.e. every base in it has
-                 a depth >= the threshold used for --quantize.
-  --mode region  --regions <prefix>.regions.bed.gz (mosdepth --by <regions>): every region
-                 with a mean depth >= --min-coverage is callable. Mean depth can
-                 hide low-coverage parts of a region.
+OUTPUT
+  --output     BED3 (contig in reference names, start, end) of the callable intervals,
+               unsorted (the pipeline sorts and merges it with bedtools)
 
-The contig names of the alignment are translated to the reference names with the
-rename map of check_reference.py (two columns: alignment name, reference name).
-Intervals on contigs that are not in the reference .fai are dropped.
+Checks: base mode accepts only the two expected labels (other labels mean other
+mosdepth settings); region mode needs numeric depths; empty mosdepth output is an error.
 
-Output: BED3 of the callable intervals (unsorted; sort and merge with bedtools).
-
-Why a script: mosdepth writes the depth classes, but selecting a label, applying
-the threshold in region mode and renaming contigs is a few lines of logic that
-would otherwise be an awk program inside a module.
+Why a script: mosdepth writes the depth classes, but selecting a label, applying the
+threshold in region mode and renaming contigs is a few lines of logic that would
+otherwise be an awk program inside a module.
 """
 
 import argparse
@@ -27,9 +31,14 @@ import gzip
 import sys
 
 
-def read_two_columns(path):
-    """Mapping first column -> second column of a tab-separated file (may be empty)."""
-    mapping = {}
+def open_mosdepth_bed(path):
+    """Text handle of a mosdepth BED (bgzipped as written by mosdepth, or plain)."""
+    return gzip.open(path, "rt") if str(path).endswith(".gz") else open(path)
+
+
+def read_rename_map(path):
+    """{alignment contig name: reference contig name}; names that are equal are not listed."""
+    rename_map = {}
     with open(path) as fh:
         for line_no, line in enumerate(fh, start=1):
             if not line.strip():
@@ -37,8 +46,60 @@ def read_two_columns(path):
             fields = line.rstrip("\n").split("\t")
             if len(fields) < 2:
                 sys.exit(f"ERROR: {path}: line {line_no}: expected two tab-separated columns")
-            mapping[fields[0]] = fields[1]
-    return mapping
+            rename_map[fields[0]] = fields[1]
+    return rename_map
+
+
+def read_reference_contigs(fai_path):
+    """Set of the reference contig names (first column of the .fai)."""
+    with open(fai_path) as fh:
+        return {line.split("\t", 1)[0] for line in fh if line.strip()}
+
+
+def is_callable(value, mode, label, min_coverage, where):
+    """Is a mosdepth interval callable? value = label (base mode) or mean depth (region)."""
+    # base mode: the 4th column is the quantize label of the interval
+    if mode == "base":
+        return value == label
+    # region mode: the 4th column is the mean depth of the region
+    try:
+        return float(value) >= min_coverage
+    except ValueError:
+        sys.exit(
+            f"ERROR: {where}: mean depth '{value}' is not a number; is this a mosdepth regions.bed.gz file?"
+        )
+
+
+def write_callable(args, rename_map, reference_contigs):
+    """Write the callable intervals; return counts and the labels seen (base mode)."""
+    counts = {"intervals": 0, "callable": 0, "unknown_contig": 0}
+    labels_seen = set()
+    with open_mosdepth_bed(args.input) as mosdepth_bed, open(args.output, "w") as callable_bed:
+        for line_no, line in enumerate(mosdepth_bed, start=1):
+            if not line.strip() or line.startswith("#"):
+                continue
+            fields = line.rstrip("\n").split("\t")
+            if len(fields) < 4:
+                sys.exit(
+                    f"ERROR: {args.input}: line {line_no}: expected at least 4 columns "
+                    f"(contig, start, end, label/depth), found {len(fields)}"
+                )
+            counts["intervals"] += 1
+            contig, start, end, value = fields[:4]
+            if args.mode == "base":
+                labels_seen.add(value)
+            if not is_callable(
+                value, args.mode, args.label, args.min_coverage, f"{args.input}: line {line_no}"
+            ):
+                continue
+            # contig name of the alignment -> reference name; other contigs are dropped
+            reference_contig = rename_map.get(contig, contig)
+            if reference_contig not in reference_contigs:
+                counts["unknown_contig"] += 1
+                continue
+            callable_bed.write(f"{reference_contig}\t{start}\t{end}\n")
+            counts["callable"] += 1
+    return counts, labels_seen
 
 
 def main():
@@ -63,68 +124,28 @@ def main():
     args.input = args.quantized if args.mode == "base" else args.regions
     print(f"INFO: callable mode '{args.mode}': using {args.input}", file=sys.stderr)
 
-    # alignment contig name -> reference contig name; names already equal are not listed
-    rename = read_two_columns(args.rename)
-    # reference contigs: first column of the .fai
-    with open(args.fai) as fh:
-        reference = {line.split("\t", 1)[0] for line in fh if line.strip()}
+    rename_map = read_rename_map(args.rename)
+    reference_contigs = read_reference_contigs(args.fai)
+    counts, labels_seen = write_callable(args, rename_map, reference_contigs)
 
-    opener = gzip.open if args.input.endswith(".gz") else open
-    n_in = n_callable = n_unknown_contig = 0
-    labels_seen = set()
-    with opener(args.input, "rt") as fin, open(args.output, "w") as fout:
-        for line_no, line in enumerate(fin, start=1):
-            if not line.strip() or line.startswith("#"):
-                continue
-            fields = line.rstrip("\n").split("\t")
-            if len(fields) < 4:
-                sys.exit(
-                    f"ERROR: {args.input}: line {line_no}: expected at least 4 columns "
-                    f"(chrom, start, end, label/depth), found {len(fields)}"
-                )
-            n_in += 1
-            chrom, start, end, value = fields[0], fields[1], fields[2], fields[3]
-            # base mode: the 4th column is the quantize label
-            if args.mode == "base":
-                labels_seen.add(value)
-                callable_ = value == args.label
-            # region mode: the 4th column is the mean depth of the region
-            else:
-                try:
-                    callable_ = float(value) >= args.min_coverage
-                except ValueError:
-                    sys.exit(
-                        f"ERROR: {args.input}: line {line_no}: mean depth '{value}' is not "
-                        "a number; is this a mosdepth regions.bed.gz file?"
-                    )
-            if not callable_:
-                continue
-            # translate the contig name to the reference name
-            ref_chrom = rename.get(chrom, chrom)
-            if ref_chrom not in reference:
-                n_unknown_contig += 1
-                continue
-            fout.write(f"{ref_chrom}\t{start}\t{end}\n")
-            n_callable += 1
-
-    # in base mode, only the two expected labels may occur, otherwise the quantize
-    # settings (bins or MOSDEPTH_Q0/Q1 labels) are not the ones this script expects
+    # base mode: only the two expected labels may occur, otherwise the quantize settings
+    # (bins or MOSDEPTH_Q0/Q1 labels) are not the ones this script expects
     unexpected = labels_seen - {args.label, args.low_label}
     if args.mode == "base" and unexpected:
-        found = ", ".join(sorted(unexpected))
         sys.exit(
-            f"ERROR: {args.input}: unexpected quantize label(s) {found} (expected "
-            f"{args.low_label}/{args.label}); run mosdepth with --quantize 0:<min>: and "
+            f"ERROR: {args.input}: unexpected quantize label(s) {', '.join(sorted(unexpected))} "
+            f"(expected {args.low_label}/{args.label}); run mosdepth with --quantize 0:<min>: and "
             "the labels MOSDEPTH_Q0/MOSDEPTH_Q1"
         )
-    if n_in == 0:
+    if counts["intervals"] == 0:
         sys.exit(f"ERROR: {args.input}: no intervals; mosdepth output is empty")
     print(
-        f"INFO: {args.input}: {n_in} intervals read, {n_callable} callable written, "
-        f"{n_unknown_contig} callable intervals on contigs not in the reference dropped",
+        f"INFO: {args.input}: {counts['intervals']} intervals read, {counts['callable']} callable "
+        f"written, {counts['unknown_contig']} callable intervals on contigs not in the reference "
+        "dropped",
         file=sys.stderr,
     )
-    if n_callable == 0:
+    if counts["callable"] == 0:
         print(
             f"WARNING: {args.input}: no callable interval (all below the threshold)",
             file=sys.stderr,
