@@ -42,10 +42,11 @@ ALL = list(LINES)
 # subworkflow boxes: (subworkflow name(s), purpose, steps)
 # step: (number, what happens, tools, lines that run this step)
 BANDS = [
-    ("PIPELINE_INITIALISATION, PREPARE_ALIGNMENTS", "check the inputs", [
-        ("1.1", "Check the samplesheet, stratification and known-variant sheets",
-         "nf-schema, check_sheets.py", ALL),
-        ("1.2", "Index alignments without an index", "samtools index", ["bam"]),
+    ("PIPELINE_INITIALISATION, CHECK_SAMPLESHEET, PREPARE_ALIGNMENTS", "read and check the samplesheet", [
+        ("1.1", "Read the samplesheet, check every column", "nf-schema", ["regions", "core", "bam"]),
+        ("1.2", "Check rows: truth technology per sample, one BED per technology",
+         "check_sheets.py", ["regions", "core", "bam"]),
+        ("1.3", "Index alignments without an index", "samtools index", ["bam"]),
     ]),
     ("PREPARE_REFERENCE", "index the reference genome", [
         ("2.1", "Unpack and index the reference FASTA", "gunzip, samtools faidx", ["core"]),
@@ -92,13 +93,14 @@ BANDS = [
          "bcftools mpileup + call, bcftools norm", ["bam"]),
         ("7.3", "Reason for every FN/FP; detection power of the query",
          "classify_discordance.py", ["core", "bam"]),
-        ("7.4", "Check and sort gene / stratification BEDs", "check_reference.py, bedtools sort", ["annot"]),
+        ("7.4", "Check the stratification sheet, the gene and stratification BEDs",
+         "check_sheets.py, check_reference.py, bedtools sort", ["annot"]),
         ("7.5", "Add genes and genomic context to every variant",
          "bedtools map, intersect -c, annotate_variants.py", ["annot"]),
     ]),
     ("PREPARE_KNOWN_VARIANTS, KNOWN_VARIANTS", "check known variants", [
-        ("8.1", "Read the lists (CSV/TSV/VCF), check contigs and positions",
-         "known_variants.py prepare", ["required", "truthset"]),
+        ("8.1", "Check the known-variant sheet; read the lists, check positions",
+         "check_sheets.py, known_variants.py prepare", ["required", "truthset"]),
         ("8.2", "Normalize like the calls; stop on any REF mismatch",
          "bcftools norm, check_reference.py", ["required", "truthset"]),
         ("8.3", "PASS/FAIL of each variant per sample and technology",
@@ -115,8 +117,9 @@ BANDS = [
 
 # longer explanation of every step for the README table (the map shows the short text)
 DETAILS = {
-    "1.1": "Checks the per-column formats (nf-schema) and the rows across the sheet: one truth technology per sample, one target BED and library type per technology, existing files. All problems are reported at once with line numbers; VCF and alignment indices are looked up next to the files.",
-    "1.2": "Alignments without a `.bai`/`.csi`/`.crai` next to them are indexed once; they are needed for coverage and read evidence.",
+    "1.1": "The samplesheet is read as in the nf-core template: nf-schema checks every column (names, library types, file extensions). Relative paths are resolved against the samplesheet's directory; VCF and alignment indices are looked up next to the files.",
+    "1.2": "Rules across rows, before anything else runs: every sample has the truth technology and another technology, no duplicate rows, one target BED and library type per technology, existing files. All problems are reported at once with line numbers.",
+    "1.3": "Alignments without a `.bai`/`.csi`/`.crai` next to them are indexed once; they are needed for coverage and read evidence.",
     "2.1": "A gzipped FASTA is unpacked and indexed; the `.fai` (contig names and lengths) is the reference every input is checked against.",
     "2.2": "One interval per contig, used as comparison region when no technology has a target BED (WGS only) and to drop records on other contigs.",
     "3.1": "Contig names that differ only by the `chr` prefix or `MT`/`chrM` are renamed, intervals on unknown contigs are dropped and reported; intervals beyond a contig end stop the run (other genome build).",
@@ -144,9 +147,9 @@ DETAILS = {
     "7.1": "All positions of compared variants of a sample are collected, so every alignment is looked at the same sites.",
     "7.2": "Allele counts of every tumor and normal alignment at these positions (MQ >= 20, BQ >= 13), normalized like the calls.",
     "7.3": "Each FN/FP gets a reason from the other technology's view: called but filtered, germline (alt reads in the normal), low coverage, alt reads below the caller's threshold, no alt reads, or absent (no alignment). For truth variants, the binomial detection power of the query gives the power-adjusted recall.",
-    "7.4": "Gene and stratification BEDs (repeats, homopolymers, ...) are checked against the reference and sorted.",
+    "7.4": "The `--stratification` sheet is checked (columns, unique names, existing BEDs); gene and stratification BEDs (repeats, homopolymers, ...) are checked against the reference and sorted.",
     "7.5": "Every compared variant gets its gene(s) and a yes/no per stratification; result: `discordance/variants.annotated.tsv`.",
-    "8.1": "Known variants from CSV, TSV or VCF lists are mapped to reference contigs, positions and alleles checked, and written as a sorted VCF.",
+    "8.1": "The `--known_variants` sheet is checked (columns, unique names, modes, samples of the samplesheet, existing files). Known variants from CSV, TSV or VCF lists are mapped to reference contigs, positions and alleles checked, and written as a sorted VCF.",
     "8.2": "The list is normalized like the calls (split, left-align, atomize); any REF allele that differs from the FASTA stops the run.",
     "8.3": "Required mode: each listed variant must be found in every technology of the sample: PASS, or FAIL as filtered, outside the comparison region or not called (with read evidence if alignments are given).",
     "8.4": "Required mode: one table over all lists, samples and technologies, a warning per failed variant, and optionally a stop (`--fail_on_missing_required`).",

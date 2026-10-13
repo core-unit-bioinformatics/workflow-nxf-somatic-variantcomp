@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1620" height="2426" viewBox="0 0 1620 2426">
-<rect width="1620" height="2426" fill="#fff"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1620" height="2464" viewBox="0 0 1620 2464">
+<rect width="1620" height="2464" fill="#fff"/>
 <text x="40" y="56" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="30" font-weight="bold">core-unit-bioinformatics/workflow-nxf-somatic-variantcomp</text>
 <text x="40" y="88" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17" fill="#444">Each box is a subworkflow, each row a step every sample goes through (top to bottom). Each line is a use case: it stops at the steps that run in it.</text>
 <line x1="470" y1="136" x2="520" y2="136" stroke="#3d95fd" stroke-width="10" stroke-linecap="round"/>
@@ -14,198 +14,202 @@
 <text x="536" y="262" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17">--known_variants, mode benchmark: external truth set (e.g. SEQC2)</text>
 <line x1="470" y1="286" x2="520" y2="286" stroke="#E879E3" stroke-width="10" stroke-linecap="round"/>
 <text x="536" y="292" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17">With --gene_bed / --stratification: genes and genomic context</text>
-<rect x="30" y="330" width="1560" height="130" rx="12" fill="#f7f7f7" stroke="#9a9a9a" stroke-width="2" stroke-dasharray="7 5"/>
-<text x="470" y="359" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="17" font-weight="bold" fill="#333">PIPELINE_INITIALISATION, PREPARE_ALIGNMENTS</text>
-<text x="1570" y="359" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="16" font-style="italic" fill="#555" text-anchor="end">check the inputs</text>
-<rect x="30" y="474" width="1560" height="130" rx="12" fill="#f7f7f7" stroke="#9a9a9a" stroke-width="2" stroke-dasharray="7 5"/>
-<text x="470" y="503" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="17" font-weight="bold" fill="#333">PREPARE_REFERENCE</text>
-<text x="1570" y="503" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="16" font-style="italic" fill="#555" text-anchor="end">index the reference genome</text>
-<rect x="30" y="618" width="1560" height="244" rx="12" fill="#f7f7f7" stroke="#9a9a9a" stroke-width="2" stroke-dasharray="7 5"/>
-<text x="470" y="647" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="17" font-weight="bold" fill="#333">PREPARE_REGIONS</text>
-<text x="1570" y="647" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="16" font-style="italic" fill="#555" text-anchor="end">build the common comparison region</text>
-<rect x="30" y="876" width="1560" height="206" rx="12" fill="#f7f7f7" stroke="#9a9a9a" stroke-width="2" stroke-dasharray="7 5"/>
-<text x="470" y="905" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="17" font-weight="bold" fill="#333">COVERAGE</text>
-<text x="1570" y="905" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="16" font-style="italic" fill="#555" text-anchor="end">find the bases callable in all technologies of a sample</text>
-<rect x="30" y="1096" width="1560" height="396" rx="12" fill="#f7f7f7" stroke="#9a9a9a" stroke-width="2" stroke-dasharray="7 5"/>
-<text x="470" y="1125" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="17" font-weight="bold" fill="#333">PREPROCESS_VCF</text>
-<text x="1570" y="1125" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="16" font-style="italic" fill="#555" text-anchor="end">normalize every VCF in the same way</text>
-<rect x="30" y="1506" width="1560" height="206" rx="12" fill="#f7f7f7" stroke="#9a9a9a" stroke-width="2" stroke-dasharray="7 5"/>
-<text x="470" y="1535" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="17" font-weight="bold" fill="#333">BENCHMARK</text>
-<text x="1570" y="1535" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="16" font-style="italic" fill="#555" text-anchor="end">compare every technology with the truth technology</text>
-<rect x="30" y="1726" width="1560" height="244" rx="12" fill="#f7f7f7" stroke="#9a9a9a" stroke-width="2" stroke-dasharray="7 5"/>
-<text x="470" y="1755" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="17" font-weight="bold" fill="#333">DISCORDANCE</text>
-<text x="1570" y="1755" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="16" font-style="italic" fill="#555" text-anchor="end">explain why variants differ</text>
-<rect x="30" y="1984" width="1560" height="244" rx="12" fill="#f7f7f7" stroke="#9a9a9a" stroke-width="2" stroke-dasharray="7 5"/>
-<text x="470" y="2013" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="17" font-weight="bold" fill="#333">PREPARE_KNOWN_VARIANTS, KNOWN_VARIANTS</text>
-<text x="1570" y="2013" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="16" font-style="italic" fill="#555" text-anchor="end">check known variants</text>
-<rect x="30" y="2242" width="1560" height="130" rx="12" fill="#f7f7f7" stroke="#9a9a9a" stroke-width="2" stroke-dasharray="7 5"/>
-<text x="470" y="2271" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="17" font-weight="bold" fill="#333">REPORT</text>
-<text x="1570" y="2271" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="16" font-style="italic" fill="#555" text-anchor="end">summarize</text>
-<line x1="90" y1="260" x2="90" y2="833.0" stroke="#3d95fd" stroke-width="10" stroke-linecap="round"/>
+<rect x="30" y="330" width="1560" height="168" rx="12" fill="#f7f7f7" stroke="#9a9a9a" stroke-width="2" stroke-dasharray="7 5"/>
+<text x="470" y="359" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="17" font-weight="bold" fill="#333">PIPELINE_INITIALISATION, CHECK_SAMPLESHEET, PREPARE_ALIGNMENTS</text>
+<text x="1570" y="359" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="16" font-style="italic" fill="#555" text-anchor="end">read and check the samplesheet</text>
+<rect x="30" y="512" width="1560" height="130" rx="12" fill="#f7f7f7" stroke="#9a9a9a" stroke-width="2" stroke-dasharray="7 5"/>
+<text x="470" y="541" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="17" font-weight="bold" fill="#333">PREPARE_REFERENCE</text>
+<text x="1570" y="541" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="16" font-style="italic" fill="#555" text-anchor="end">index the reference genome</text>
+<rect x="30" y="656" width="1560" height="244" rx="12" fill="#f7f7f7" stroke="#9a9a9a" stroke-width="2" stroke-dasharray="7 5"/>
+<text x="470" y="685" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="17" font-weight="bold" fill="#333">PREPARE_REGIONS</text>
+<text x="1570" y="685" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="16" font-style="italic" fill="#555" text-anchor="end">build the common comparison region</text>
+<rect x="30" y="914" width="1560" height="206" rx="12" fill="#f7f7f7" stroke="#9a9a9a" stroke-width="2" stroke-dasharray="7 5"/>
+<text x="470" y="943" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="17" font-weight="bold" fill="#333">COVERAGE</text>
+<text x="1570" y="943" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="16" font-style="italic" fill="#555" text-anchor="end">find the bases callable in all technologies of a sample</text>
+<rect x="30" y="1134" width="1560" height="396" rx="12" fill="#f7f7f7" stroke="#9a9a9a" stroke-width="2" stroke-dasharray="7 5"/>
+<text x="470" y="1163" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="17" font-weight="bold" fill="#333">PREPROCESS_VCF</text>
+<text x="1570" y="1163" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="16" font-style="italic" fill="#555" text-anchor="end">normalize every VCF in the same way</text>
+<rect x="30" y="1544" width="1560" height="206" rx="12" fill="#f7f7f7" stroke="#9a9a9a" stroke-width="2" stroke-dasharray="7 5"/>
+<text x="470" y="1573" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="17" font-weight="bold" fill="#333">BENCHMARK</text>
+<text x="1570" y="1573" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="16" font-style="italic" fill="#555" text-anchor="end">compare every technology with the truth technology</text>
+<rect x="30" y="1764" width="1560" height="244" rx="12" fill="#f7f7f7" stroke="#9a9a9a" stroke-width="2" stroke-dasharray="7 5"/>
+<text x="470" y="1793" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="17" font-weight="bold" fill="#333">DISCORDANCE</text>
+<text x="1570" y="1793" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="16" font-style="italic" fill="#555" text-anchor="end">explain why variants differ</text>
+<rect x="30" y="2022" width="1560" height="244" rx="12" fill="#f7f7f7" stroke="#9a9a9a" stroke-width="2" stroke-dasharray="7 5"/>
+<text x="470" y="2051" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="17" font-weight="bold" fill="#333">PREPARE_KNOWN_VARIANTS, KNOWN_VARIANTS</text>
+<text x="1570" y="2051" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="16" font-style="italic" fill="#555" text-anchor="end">check known variants</text>
+<rect x="30" y="2280" width="1560" height="130" rx="12" fill="#f7f7f7" stroke="#9a9a9a" stroke-width="2" stroke-dasharray="7 5"/>
+<text x="470" y="2309" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="17" font-weight="bold" fill="#333">REPORT</text>
+<text x="1570" y="2309" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="16" font-style="italic" fill="#555" text-anchor="end">summarize</text>
+<line x1="90" y1="260" x2="90" y2="871.0" stroke="#3d95fd" stroke-width="10" stroke-linecap="round"/>
 <g stroke="#000" stroke-width="4" fill="#fff" stroke-linejoin="round"><path d="M 70.0 210 L 98.0 210 L 110.0 222 L 110.0 260 L 70.0 260 Z"/><path d="M 98.0 210 L 98.0 222 L 110.0 222" fill="#000"/></g><rect x="64.0" y="226" width="52" height="22" rx="4" fill="#3d95fd" stroke="#000" stroke-width="2"/><text x="90" y="242" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="15" font-weight="bold" text-anchor="middle" fill="#000">bed</text>
-<line x1="152" y1="260" x2="152" y2="2343.0" stroke="#24B064" stroke-width="10" stroke-linecap="round"/>
+<line x1="152" y1="260" x2="152" y2="2381.0" stroke="#24B064" stroke-width="10" stroke-linecap="round"/>
 <g stroke="#000" stroke-width="4" fill="#fff" stroke-linejoin="round"><path d="M 132.0 210 L 160.0 210 L 172.0 222 L 172.0 260 L 132.0 260 Z"/><path d="M 160.0 210 L 160.0 222 L 172.0 222" fill="#000"/></g><rect x="126.0" y="226" width="52" height="22" rx="4" fill="#24B064" stroke="#000" stroke-width="2"/><text x="152" y="242" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="15" font-weight="bold" text-anchor="middle" fill="#000">vcf</text>
-<line x1="214" y1="260" x2="214" y2="2343.0" stroke="#F18046" stroke-width="10" stroke-linecap="round"/>
+<line x1="214" y1="260" x2="214" y2="2381.0" stroke="#F18046" stroke-width="10" stroke-linecap="round"/>
 <g stroke="#000" stroke-width="4" fill="#fff" stroke-linejoin="round"><path d="M 194.0 210 L 222.0 210 L 234.0 222 L 234.0 260 L 194.0 260 Z"/><path d="M 222.0 210 L 222.0 222 L 234.0 222" fill="#000"/></g><rect x="188.0" y="226" width="52" height="22" rx="4" fill="#F18046" stroke="#000" stroke-width="2"/><text x="214" y="242" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="15" font-weight="bold" text-anchor="middle" fill="#000">bam</text>
-<line x1="276" y1="260" x2="276" y2="2343.0" stroke="#ECDC86" stroke-width="10" stroke-linecap="round"/>
+<line x1="276" y1="260" x2="276" y2="2381.0" stroke="#ECDC86" stroke-width="10" stroke-linecap="round"/>
 <g stroke="#000" stroke-width="4" fill="#fff" stroke-linejoin="round"><path d="M 256.0 210 L 284.0 210 L 296.0 222 L 296.0 260 L 256.0 260 Z"/><path d="M 284.0 210 L 284.0 222 L 296.0 222" fill="#000"/></g><rect x="250.0" y="226" width="52" height="22" rx="4" fill="#ECDC86" stroke="#000" stroke-width="2"/><text x="276" y="242" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="15" font-weight="bold" text-anchor="middle" fill="#000">csv</text>
-<line x1="338" y1="260" x2="338" y2="2343.0" stroke="#FA6863" stroke-width="10" stroke-linecap="round"/>
+<line x1="338" y1="260" x2="338" y2="2381.0" stroke="#FA6863" stroke-width="10" stroke-linecap="round"/>
 <g stroke="#000" stroke-width="4" fill="#fff" stroke-linejoin="round"><path d="M 318.0 210 L 346.0 210 L 358.0 222 L 358.0 260 L 318.0 260 Z"/><path d="M 346.0 210 L 346.0 222 L 358.0 222" fill="#000"/></g><rect x="312.0" y="226" width="52" height="22" rx="4" fill="#FA6863" stroke="#000" stroke-width="2"/><text x="338" y="242" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="15" font-weight="bold" text-anchor="middle" fill="#000">vcf</text>
-<line x1="400" y1="260" x2="400" y2="2343.0" stroke="#E879E3" stroke-width="10" stroke-linecap="round"/>
+<line x1="400" y1="260" x2="400" y2="2381.0" stroke="#E879E3" stroke-width="10" stroke-linecap="round"/>
 <g stroke="#000" stroke-width="4" fill="#fff" stroke-linejoin="round"><path d="M 380.0 210 L 408.0 210 L 420.0 222 L 420.0 260 L 380.0 260 Z"/><path d="M 408.0 210 L 408.0 222 L 420.0 222" fill="#000"/></g><rect x="374.0" y="226" width="52" height="22" rx="4" fill="#E879E3" stroke="#000" stroke-width="2"/><text x="400" y="242" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="15" font-weight="bold" text-anchor="middle" fill="#000">bed</text>
-<rect x="76" y="380.0" width="338" height="26" rx="13" fill="#fff" stroke="#000" stroke-width="5"/>
-<line x1="416" y1="393.0" x2="460" y2="393.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
-<text x="470" y="399.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">1.1</tspan>  Check the samplesheet, stratification and known-variant sheets</text>
-<text x="1110" y="399.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">nf-schema, check_sheets.py</text>
-<circle cx="214" cy="431.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
+<rect x="76" y="380.0" width="152" height="26" rx="13" fill="#fff" stroke="#000" stroke-width="5"/>
+<line x1="230" y1="393.0" x2="460" y2="393.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
+<text x="470" y="399.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">1.1</tspan>  Read the samplesheet, check every column</text>
+<text x="1110" y="399.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">nf-schema</text>
+<rect x="76" y="418.0" width="152" height="26" rx="13" fill="#fff" stroke="#000" stroke-width="5"/>
 <line x1="230" y1="431.0" x2="460" y2="431.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
-<text x="470" y="437.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">1.2</tspan>  Index alignments without an index</text>
-<text x="1110" y="437.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">samtools index</text>
-<circle cx="152" cy="537.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
-<line x1="168" y1="537.0" x2="460" y2="537.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
-<text x="470" y="543.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">2.1</tspan>  Unpack and index the reference FASTA</text>
-<text x="1110" y="543.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">gunzip, samtools faidx</text>
+<text x="470" y="437.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">1.2</tspan>  Check rows: truth technology per sample, one BED per technology</text>
+<text x="1110" y="437.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">check_sheets.py</text>
+<circle cx="214" cy="469.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
+<line x1="230" y1="469.0" x2="460" y2="469.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
+<text x="470" y="475.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">1.3</tspan>  Index alignments without an index</text>
+<text x="1110" y="475.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">samtools index</text>
 <circle cx="152" cy="575.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
 <line x1="168" y1="575.0" x2="460" y2="575.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
-<text x="470" y="581.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">2.2</tspan>  Genome BED: one interval per reference contig</text>
-<text x="1110" y="581.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">gawk</text>
-<circle cx="90" cy="681.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
-<line x1="106" y1="681.0" x2="460" y2="681.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
-<text x="470" y="687.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">3.1</tspan>  Check target BEDs against the reference, rename contigs</text>
-<text x="1110" y="687.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">check_reference.py</text>
+<text x="470" y="581.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">2.1</tspan>  Unpack and index the reference FASTA</text>
+<text x="1110" y="581.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">gunzip, samtools faidx</text>
+<circle cx="152" cy="613.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
+<line x1="168" y1="613.0" x2="460" y2="613.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
+<text x="470" y="619.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">2.2</tspan>  Genome BED: one interval per reference contig</text>
+<text x="1110" y="619.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">gawk</text>
 <circle cx="90" cy="719.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
 <line x1="106" y1="719.0" x2="460" y2="719.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
-<text x="470" y="725.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">3.2</tspan>  Sort the BEDs in reference order</text>
-<text x="1110" y="725.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">bedtools sort</text>
+<text x="470" y="725.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">3.1</tspan>  Check target BEDs against the reference, rename contigs</text>
+<text x="1110" y="725.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">check_reference.py</text>
 <circle cx="90" cy="757.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
 <line x1="106" y1="757.0" x2="460" y2="757.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
-<text x="470" y="763.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">3.3</tspan>  Keep bases targeted by every technology</text>
-<text x="1110" y="763.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">bedtools multiinter, gawk, merge</text>
+<text x="470" y="763.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">3.2</tspan>  Sort the BEDs in reference order</text>
+<text x="1110" y="763.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">bedtools sort</text>
 <circle cx="90" cy="795.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
 <line x1="106" y1="795.0" x2="460" y2="795.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
-<text x="470" y="801.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">3.4</tspan>  Restrict to --regions_bed, remove --exclude_bed (optional)</text>
-<text x="1110" y="801.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">bedtools intersect, subtract</text>
-<rect x="76" y="820.0" width="90" height="26" rx="13" fill="#fff" stroke="#000" stroke-width="5"/>
-<line x1="168" y1="833.0" x2="460" y2="833.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
-<text x="470" y="839.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">3.5</tspan>  Common region (genome if no target BEDs) and its size</text>
-<text x="1110" y="839.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">bedtools merge, region_summary.py</text>
-<circle cx="214" cy="939.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
-<line x1="230" y1="939.0" x2="460" y2="939.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
-<text x="470" y="945.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">4.1</tspan>  Check alignment contigs against the reference</text>
-<text x="1110" y="945.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">samtools idxstats, check_reference.py</text>
+<text x="470" y="801.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">3.3</tspan>  Keep bases targeted by every technology</text>
+<text x="1110" y="801.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">bedtools multiinter, gawk, merge</text>
+<circle cx="90" cy="833.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
+<line x1="106" y1="833.0" x2="460" y2="833.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
+<text x="470" y="839.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">3.4</tspan>  Restrict to --regions_bed, remove --exclude_bed (optional)</text>
+<text x="1110" y="839.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">bedtools intersect, subtract</text>
+<rect x="76" y="858.0" width="90" height="26" rx="13" fill="#fff" stroke="#000" stroke-width="5"/>
+<line x1="168" y1="871.0" x2="460" y2="871.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
+<text x="470" y="877.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">3.5</tspan>  Common region (genome if no target BEDs) and its size</text>
+<text x="1110" y="877.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">bedtools merge, region_summary.py</text>
 <circle cx="214" cy="977.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
 <line x1="230" y1="977.0" x2="460" y2="977.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
-<text x="470" y="983.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">4.2</tspan>  Depth per base and per common-region interval</text>
-<text x="1110" y="983.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">mosdepth</text>
+<text x="470" y="983.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">4.1</tspan>  Check alignment contigs against the reference</text>
+<text x="1110" y="983.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">samtools idxstats, check_reference.py</text>
 <circle cx="214" cy="1015.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
 <line x1="230" y1="1015.0" x2="460" y2="1015.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
-<text x="470" y="1021.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">4.3</tspan>  Callable bases per alignment (depth &gt;= --min_coverage)</text>
-<text x="1110" y="1021.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">mosdepth_callable.py, bedtools sort</text>
+<text x="470" y="1021.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">4.2</tspan>  Depth per base and per common-region interval</text>
+<text x="1110" y="1021.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">mosdepth</text>
 <circle cx="214" cy="1053.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
 <line x1="230" y1="1053.0" x2="460" y2="1053.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
-<text x="470" y="1059.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">4.4</tspan>  Bases callable in all alignments of a sample (in common region)</text>
-<text x="1110" y="1059.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">bedtools multiinter, gawk, intersect</text>
-<circle cx="152" cy="1159.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
-<line x1="168" y1="1159.0" x2="460" y2="1159.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
-<text x="470" y="1165.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">5.1</tspan>  Check VCF contigs, contig lengths and sample names</text>
-<text x="1110" y="1165.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">bcftools view -h, query, check_reference.py</text>
+<text x="470" y="1059.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">4.3</tspan>  Callable bases per alignment (depth &gt;= --min_coverage)</text>
+<text x="1110" y="1059.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">mosdepth_callable.py, bedtools sort</text>
+<circle cx="214" cy="1091.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
+<line x1="230" y1="1091.0" x2="460" y2="1091.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
+<text x="470" y="1097.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">4.4</tspan>  Bases callable in all alignments of a sample (in common region)</text>
+<text x="1110" y="1097.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">bedtools multiinter, gawk, intersect</text>
 <circle cx="152" cy="1197.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
 <line x1="168" y1="1197.0" x2="460" y2="1197.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
-<text x="470" y="1203.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">5.2</tspan>  Keep tumor (+ normal) columns, recompress with BGZF</text>
-<text x="1110" y="1203.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">bcftools view</text>
+<text x="470" y="1203.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">5.1</tspan>  Check VCF contigs, contig lengths and sample names</text>
+<text x="1110" y="1203.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">bcftools view -h, query, check_reference.py</text>
 <circle cx="152" cy="1235.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
 <line x1="168" y1="1235.0" x2="460" y2="1235.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
-<text x="470" y="1241.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">5.3</tspan>  Rename contigs to the reference (chr prefix, MT/chrM)</text>
-<text x="1110" y="1241.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">bcftools annotate</text>
+<text x="470" y="1241.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">5.2</tspan>  Keep tumor (+ normal) columns, recompress with BGZF</text>
+<text x="1110" y="1241.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">bcftools view</text>
 <circle cx="152" cy="1273.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
 <line x1="168" y1="1273.0" x2="460" y2="1273.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
-<text x="470" y="1279.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">5.4</tspan>  Remove records on other contigs and gVCF blocks</text>
-<text x="1110" y="1279.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">bcftools view</text>
+<text x="470" y="1279.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">5.3</tspan>  Rename contigs to the reference (chr prefix, MT/chrM)</text>
+<text x="1110" y="1279.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">bcftools annotate</text>
 <circle cx="152" cy="1311.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
 <line x1="168" y1="1311.0" x2="460" y2="1311.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
-<text x="470" y="1317.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">5.5</tspan>  Rewrite the contig header from the reference</text>
-<text x="1110" y="1317.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">bcftools reheader</text>
+<text x="470" y="1317.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">5.4</tspan>  Remove records on other contigs and gVCF blocks</text>
+<text x="1110" y="1317.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">bcftools view</text>
 <circle cx="152" cy="1349.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
 <line x1="168" y1="1349.0" x2="460" y2="1349.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
-<text x="470" y="1355.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">5.6</tspan>  Split multiallelics, left-align, split MNVs, deduplicate</text>
-<text x="1110" y="1355.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">bcftools norm</text>
+<text x="470" y="1355.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">5.5</tspan>  Rewrite the contig header from the reference</text>
+<text x="1110" y="1355.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">bcftools reheader</text>
 <circle cx="152" cy="1387.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
 <line x1="168" y1="1387.0" x2="460" y2="1387.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
-<text x="470" y="1393.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">5.7</tspan>  Stop if too many REF alleles differ (other genome build)</text>
-<text x="1110" y="1393.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">check_reference.py</text>
+<text x="470" y="1393.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">5.6</tspan>  Split multiallelics, left-align, split MNVs, deduplicate</text>
+<text x="1110" y="1393.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">bcftools norm</text>
 <circle cx="152" cy="1425.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
 <line x1="168" y1="1425.0" x2="460" y2="1425.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
-<text x="470" y="1431.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">5.8</tspan>  Same VAF, depth and alt reads for every caller (from AD)</text>
-<text x="1110" y="1431.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">harmonize_vcf.py</text>
-<rect x="138" y="1450.0" width="90" height="26" rx="13" fill="#fff" stroke="#000" stroke-width="5"/>
-<line x1="230" y1="1463.0" x2="460" y2="1463.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
-<text x="470" y="1469.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">5.9</tspan>  Uniform filters; keep the common (or callable) region</text>
-<text x="1110" y="1469.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">bcftools view</text>
-<circle cx="152" cy="1569.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
-<line x1="168" y1="1569.0" x2="460" y2="1569.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
-<text x="470" y="1575.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">6.1</tspan>  Match calls haplotype-aware: TP, FN, FP</text>
-<text x="1110" y="1575.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">rtg vcfeval</text>
+<text x="470" y="1431.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">5.7</tspan>  Stop if too many REF alleles differ (other genome build)</text>
+<text x="1110" y="1431.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">check_reference.py</text>
+<circle cx="152" cy="1463.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
+<line x1="168" y1="1463.0" x2="460" y2="1463.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
+<text x="470" y="1469.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">5.8</tspan>  Same VAF, depth and alt reads for every caller (from AD)</text>
+<text x="1110" y="1469.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">harmonize_vcf.py</text>
+<rect x="138" y="1488.0" width="90" height="26" rx="13" fill="#fff" stroke="#000" stroke-width="5"/>
+<line x1="230" y1="1501.0" x2="460" y2="1501.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
+<text x="470" y="1507.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">5.9</tspan>  Uniform filters; keep the common (or callable) region</text>
+<text x="1110" y="1507.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">bcftools view</text>
 <circle cx="152" cy="1607.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
 <line x1="168" y1="1607.0" x2="460" y2="1607.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
-<text x="470" y="1613.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">6.2</tspan>  Exact-allele and same-position matches</text>
-<text x="1110" y="1613.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">bcftools isec</text>
+<text x="470" y="1613.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">6.1</tspan>  Match calls haplotype-aware: TP, FN, FP</text>
+<text x="1110" y="1613.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">rtg vcfeval</text>
 <circle cx="152" cy="1645.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
 <line x1="168" y1="1645.0" x2="460" y2="1645.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
-<text x="470" y="1651.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">6.3</tspan>  Recall, precision, F1 per sample (overall, type, VAF)</text>
-<text x="1110" y="1651.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">benchmark_metrics.py</text>
+<text x="470" y="1651.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">6.2</tspan>  Exact-allele and same-position matches</text>
+<text x="1110" y="1651.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">bcftools isec</text>
 <circle cx="152" cy="1683.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
 <line x1="168" y1="1683.0" x2="460" y2="1683.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
-<text x="470" y="1689.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">6.4</tspan>  Combine samples: summed (micro) and mean (macro)</text>
-<text x="1110" y="1689.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">aggregate_metrics.py</text>
-<circle cx="214" cy="1789.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
-<line x1="230" y1="1789.0" x2="460" y2="1789.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
-<text x="470" y="1795.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">7.1</tspan>  Positions of all compared variants of a sample</text>
-<text x="1110" y="1795.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">bcftools query</text>
+<text x="470" y="1689.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">6.3</tspan>  Recall, precision, F1 per sample (overall, type, VAF)</text>
+<text x="1110" y="1689.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">benchmark_metrics.py</text>
+<circle cx="152" cy="1721.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
+<line x1="168" y1="1721.0" x2="460" y2="1721.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
+<text x="470" y="1727.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">6.4</tspan>  Combine samples: summed (micro) and mean (macro)</text>
+<text x="1110" y="1727.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">aggregate_metrics.py</text>
 <circle cx="214" cy="1827.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
 <line x1="230" y1="1827.0" x2="460" y2="1827.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
-<text x="470" y="1833.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">7.2</tspan>  Read counts of every alignment at these positions</text>
-<text x="1110" y="1833.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">bcftools mpileup + call, bcftools norm</text>
-<rect x="138" y="1852.0" width="90" height="26" rx="13" fill="#fff" stroke="#000" stroke-width="5"/>
+<text x="470" y="1833.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">7.1</tspan>  Positions of all compared variants of a sample</text>
+<text x="1110" y="1833.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">bcftools query</text>
+<circle cx="214" cy="1865.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
 <line x1="230" y1="1865.0" x2="460" y2="1865.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
-<text x="470" y="1871.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">7.3</tspan>  Reason for every FN/FP; detection power of the query</text>
-<text x="1110" y="1871.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">classify_discordance.py</text>
-<circle cx="400" cy="1903.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
-<line x1="416" y1="1903.0" x2="460" y2="1903.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
-<text x="470" y="1909.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">7.4</tspan>  Check and sort gene / stratification BEDs</text>
-<text x="1110" y="1909.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">check_reference.py, bedtools sort</text>
+<text x="470" y="1871.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">7.2</tspan>  Read counts of every alignment at these positions</text>
+<text x="1110" y="1871.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">bcftools mpileup + call, bcftools norm</text>
+<rect x="138" y="1890.0" width="90" height="26" rx="13" fill="#fff" stroke="#000" stroke-width="5"/>
+<line x1="230" y1="1903.0" x2="460" y2="1903.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
+<text x="470" y="1909.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">7.3</tspan>  Reason for every FN/FP; detection power of the query</text>
+<text x="1110" y="1909.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">classify_discordance.py</text>
 <circle cx="400" cy="1941.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
 <line x1="416" y1="1941.0" x2="460" y2="1941.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
-<text x="470" y="1947.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">7.5</tspan>  Add genes and genomic context to every variant</text>
-<text x="1110" y="1947.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">bedtools map, intersect -c, annotate_variants.py</text>
-<rect x="262" y="2034.0" width="90" height="26" rx="13" fill="#fff" stroke="#000" stroke-width="5"/>
-<line x1="354" y1="2047.0" x2="460" y2="2047.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
-<text x="470" y="2053.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">8.1</tspan>  Read the lists (CSV/TSV/VCF), check contigs and positions</text>
-<text x="1110" y="2053.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">known_variants.py prepare</text>
+<text x="470" y="1947.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">7.4</tspan>  Check the stratification sheet, the gene and stratification BEDs</text>
+<text x="1110" y="1947.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">check_sheets.py, check_reference.py, bedtools sort</text>
+<circle cx="400" cy="1979.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
+<line x1="416" y1="1979.0" x2="460" y2="1979.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
+<text x="470" y="1985.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">7.5</tspan>  Add genes and genomic context to every variant</text>
+<text x="1110" y="1985.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">bedtools map, intersect -c, annotate_variants.py</text>
 <rect x="262" y="2072.0" width="90" height="26" rx="13" fill="#fff" stroke="#000" stroke-width="5"/>
 <line x1="354" y1="2085.0" x2="460" y2="2085.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
-<text x="470" y="2091.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">8.2</tspan>  Normalize like the calls; stop on any REF mismatch</text>
-<text x="1110" y="2091.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">bcftools norm, check_reference.py</text>
-<rect x="200" y="2110.0" width="90" height="26" rx="13" fill="#fff" stroke="#000" stroke-width="5"/>
-<line x1="292" y1="2123.0" x2="460" y2="2123.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
-<text x="470" y="2129.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">8.3</tspan>  PASS/FAIL of each variant per sample and technology</text>
-<text x="1110" y="2129.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">known_variants.py check</text>
-<circle cx="276" cy="2161.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
+<text x="470" y="2091.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">8.1</tspan>  Check the known-variant sheet; read the lists, check positions</text>
+<text x="1110" y="2091.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">check_sheets.py, known_variants.py prepare</text>
+<rect x="262" y="2110.0" width="90" height="26" rx="13" fill="#fff" stroke="#000" stroke-width="5"/>
+<line x1="354" y1="2123.0" x2="460" y2="2123.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
+<text x="470" y="2129.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">8.2</tspan>  Normalize like the calls; stop on any REF mismatch</text>
+<text x="1110" y="2129.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">bcftools norm, check_reference.py</text>
+<rect x="200" y="2148.0" width="90" height="26" rx="13" fill="#fff" stroke="#000" stroke-width="5"/>
 <line x1="292" y1="2161.0" x2="460" y2="2161.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
-<text x="470" y="2167.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">8.4</tspan>  Checklist summary over all samples</text>
-<text x="1110" y="2167.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">known_summary.py</text>
-<circle cx="338" cy="2199.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
-<line x1="354" y1="2199.0" x2="460" y2="2199.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
-<text x="470" y="2205.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">8.5</tspan>  Recall/precision of every technology vs the truth set</text>
-<text x="1110" y="2205.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">rtg vcfeval, bcftools isec, benchmark_metrics.py</text>
-<line x1="152" y1="2305.0" x2="400" y2="2305.0" stroke="#000" stroke-width="7"/>
-<circle cx="152" cy="2305.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
-<circle cx="400" cy="2305.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
-<line x1="416" y1="2305.0" x2="460" y2="2305.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
-<text x="470" y="2311.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">9.1</tspan>  Enrichment statistics, gene table and plots</text>
-<text x="1110" y="2311.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">variantcomp_report.py</text>
-<rect x="138" y="2330.0" width="276" height="26" rx="13" fill="#fff" stroke="#000" stroke-width="5"/>
+<text x="470" y="2167.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">8.3</tspan>  PASS/FAIL of each variant per sample and technology</text>
+<text x="1110" y="2167.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">known_variants.py check</text>
+<circle cx="276" cy="2199.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
+<line x1="292" y1="2199.0" x2="460" y2="2199.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
+<text x="470" y="2205.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">8.4</tspan>  Checklist summary over all samples</text>
+<text x="1110" y="2205.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">known_summary.py</text>
+<circle cx="338" cy="2237.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
+<line x1="354" y1="2237.0" x2="460" y2="2237.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
+<text x="470" y="2243.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">8.5</tspan>  Recall/precision of every technology vs the truth set</text>
+<text x="1110" y="2243.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">rtg vcfeval, bcftools isec, benchmark_metrics.py</text>
+<line x1="152" y1="2343.0" x2="400" y2="2343.0" stroke="#000" stroke-width="7"/>
+<circle cx="152" cy="2343.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
+<circle cx="400" cy="2343.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
 <line x1="416" y1="2343.0" x2="460" y2="2343.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
-<text x="470" y="2349.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">9.2</tspan>  Interactive report of all results</text>
-<text x="1110" y="2349.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">MultiQC</text>
-<text x="40" y="2410" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="13" fill="#666">Metro-map style: nf-core components (CC0), J. A. Fellows Yates, M. U. Garcia, L. Le Nezet. Step details: README.md</text>
+<text x="470" y="2349.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">9.1</tspan>  Enrichment statistics, gene table and plots</text>
+<text x="1110" y="2349.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">variantcomp_report.py</text>
+<rect x="138" y="2368.0" width="276" height="26" rx="13" fill="#fff" stroke="#000" stroke-width="5"/>
+<line x1="416" y1="2381.0" x2="460" y2="2381.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
+<text x="470" y="2387.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">9.2</tspan>  Interactive report of all results</text>
+<text x="1110" y="2387.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">MultiQC</text>
+<text x="40" y="2448" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="13" fill="#666">Metro-map style: nf-core components (CC0), J. A. Fellows Yates, M. U. Garcia, L. Le Nezet. Step details: README.md</text>
 </svg>

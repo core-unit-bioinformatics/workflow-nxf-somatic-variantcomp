@@ -45,7 +45,10 @@ P01,panel,amplicon,P01_T,P01_N,dragen-4.4.4,vcf/P01_panel.hard-filtered.vcf.gz,n
 | BAM | `<bam>.bai`, `<bam>.csi`, `<name>.bai` (`x.bam` → `x.bai`) | created with `samtools index` |
 | CRAM | `<cram>.crai`, `<name>.crai` | created with `samtools index` |
 
-Rules (checked by `bin/check_sheets.py`; all problems are reported at once):
+The samplesheet is read as in the nf-core template: nf-schema checks every column
+(`assets/schema_input.json`) when the pipeline starts. The rules across rows are then
+checked by `bin/check_sheets.py` (module `CHECK_SAMPLESHEET`, first step of the workflow;
+all problems are reported at once, nothing else starts before it passed):
 
 - Empty optional fields are left empty or written as `n/a`.
 - Relative paths are resolved against the directory of the samplesheet, so a project
@@ -232,6 +235,12 @@ seqc2_truth,all,benchmark,truth/sSNV.vcf.gz;truth/sINDEL.vcf.gz,truth/High-Confi
 | `mode` | `required` or `benchmark` (see below). |
 | `variants` | One or more VCF, CSV or TSV files separated by `;`. CSV/TSV columns: `chrom`, `pos` (1-based), `ref`, `alt`, optional `gene`, `label`, `vaf`. |
 | `regions` | Optional BED (`n/a` if none), e.g. the confident regions of a truth set. |
+
+`--stratification` and `--known_variants` are plain file parameters. Each sheet is checked
+by `bin/check_sheets.py` in the subworkflow that uses it (`DISCORDANCE`,
+`PREPARE_KNOWN_VARIANTS`): required columns, unique names, allowed modes, samples that
+exist in the samplesheet, existing files with the right extensions. All problems are
+reported at once; the checked sheets are written to `pipeline_info/*.validated.csv`.
 
 Every list is checked against the reference (contig names are renamed if needed; a REF
 mismatch is an error) and normalized like the VCFs.
