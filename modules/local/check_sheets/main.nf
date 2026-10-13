@@ -38,6 +38,7 @@ process CHECK_SHEETS {
     stub:
     prefix = task.ext.prefix ?: "${command}"
     """
-    touch ${prefix}.validated.csv
+    # header row only: the stub run reads it with splitCsv (no rows -> empty channels)
+    head -n 1 ${sheet} > ${prefix}.validated.csv
     """
 }

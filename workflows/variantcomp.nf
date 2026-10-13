@@ -6,6 +6,7 @@
 include { MULTIQC                } from '../modules/nf-core/multiqc/main'
 include { CHECK_SHEETS as CHECK_SAMPLESHEET } from '../modules/local/check_sheets/main'
 include { PREPARE_REFERENCE      } from '../subworkflows/local/prepare_reference'
+include { CHECK_INPUTS           } from '../subworkflows/local/check_inputs'
 include { PREPARE_REGIONS        } from '../subworkflows/local/prepare_regions'
 include { PREPARE_ALIGNMENTS     } from '../subworkflows/local/prepare_alignments'
 include { PREPROCESS_VCF         } from '../subworkflows/local/preprocess_vcf'
@@ -58,22 +59,39 @@ workflow VARIANTCOMP {
     def ch_samplesheet_validated = CHECK_SAMPLESHEET.out.csv.first()
 
     //
-    // SUBWORKFLOW: alignment indices (created where missing); starts after the checks passed
-    //
-    PREPARE_ALIGNMENTS(
-        ch_samplesheet_input
-            .combine(ch_samplesheet_validated)
-            .map { entry -> entry[0..-2] }
-    )
-    def ch_samplesheet = PREPARE_ALIGNMENTS.out.samplesheet
-
-    //
-    // SUBWORKFLOW: reference index
+    // SUBWORKFLOW: reference index and genome BED
     //
     PREPARE_REFERENCE(
         file(fasta, checkIfExists: true),
         fasta_fai ? file(fasta_fai, checkIfExists: true) : null
     )
+
+    //
+    // SUBWORKFLOW: all other input checks (sheets, VCFs, alignments, BEDs, known lists)
+    // against the reference, before any long-running step
+    //
+    CHECK_INPUTS(
+        ch_samplesheet_input,
+        ch_samplesheet_validated,
+        PREPARE_REFERENCE.out.reference,
+        regions_bed ? file(regions_bed, checkIfExists: true) : null,
+        exclude_bed ? file(exclude_bed, checkIfExists: true) : null,
+        gene_bed ? file(gene_bed, checkIfExists: true) : null,
+        stratification,
+        known_variants
+    )
+
+    //
+    // SUBWORKFLOW: alignment indices (created where missing); this and every following
+    // step starts only after all checks passed
+    //
+    PREPARE_ALIGNMENTS(
+        ch_samplesheet_input
+            .combine(ch_samplesheet_validated)
+            .combine(CHECK_INPUTS.out.done)
+            .map { entry -> entry[0..-3] }
+    )
+    def ch_samplesheet = PREPARE_ALIGNMENTS.out.samplesheet
 
     //
     // SUBWORKFLOW: harmonize target BEDs and build the common comparison region
@@ -82,8 +100,9 @@ workflow VARIANTCOMP {
         ch_samplesheet,
         PREPARE_REFERENCE.out.reference,
         PREPARE_REFERENCE.out.genome_bed,
-        regions_bed ? file(regions_bed, checkIfExists: true) : null,
-        exclude_bed ? file(exclude_bed, checkIfExists: true) : null
+        CHECK_INPUTS.out.beds,
+        regions_bed as boolean,
+        exclude_bed as boolean
     )
 
     //
@@ -91,6 +110,7 @@ workflow VARIANTCOMP {
     //
     COVERAGE(
         ch_samplesheet,
+        CHECK_INPUTS.out.bam_rename,
         PREPARE_REFERENCE.out.reference,
         PREPARE_REGIONS.out.common_bed,
         params.require_normal_coverage
@@ -101,10 +121,11 @@ workflow VARIANTCOMP {
         .collectFile(name: 'callable_summary.tsv', keepHeader: true, skip: 1, sort: { tsv -> tsv.name }, storeDir: "${outdir}/coverage")
 
     //
-    // SUBWORKFLOW: reference check, normalization, harmonization and uniform filtering
+    // SUBWORKFLOW: normalization, harmonization and uniform filtering
     //
     PREPROCESS_VCF(
         ch_samplesheet,
+        CHECK_INPUTS.out.vcf_rename,
         PREPARE_REFERENCE.out.reference,
         PREPARE_REFERENCE.out.genome_bed,
         COVERAGE.out.regions
@@ -123,7 +144,11 @@ workflow VARIANTCOMP {
     //
     // SUBWORKFLOW: known variant lists on the reference, per sample
     //
-    PREPARE_KNOWN_VARIANTS(known_variants, ch_samplesheet_validated, ch_samplesheet, PREPARE_REFERENCE.out.reference)
+    PREPARE_KNOWN_VARIANTS(
+        CHECK_INPUTS.out.known_lists.combine(CHECK_INPUTS.out.done).map { entry -> entry[0..-2] },
+        ch_samplesheet,
+        PREPARE_REFERENCE.out.reference
+    )
 
     //
     // SUBWORKFLOW: read evidence, classification and annotation of discordant variants
@@ -134,8 +159,7 @@ workflow VARIANTCOMP {
         PREPROCESS_VCF.out.compare,
         BENCHMARK.out.variants,
         PREPARE_REFERENCE.out.reference,
-        gene_bed ? file(gene_bed, checkIfExists: true) : null,
-        stratification,
+        CHECK_INPUTS.out.beds.filter { meta, _bed -> meta.role in ['genes', 'stratum'] },
         PREPARE_KNOWN_VARIANTS.out.sites
     )
 

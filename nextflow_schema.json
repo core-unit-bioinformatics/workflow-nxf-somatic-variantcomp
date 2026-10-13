@@ -72,6 +72,42 @@
                     "maximum": 1,
                     "description": "Maximum fraction of VCF REF alleles that may differ from the reference before the input is rejected as being on a different build.",
                     "fa_icon": "fas fa-exclamation-triangle"
+                },
+                "check_vcf_contigs": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Check contig names and lengths and the sample columns of every VCF at the start. If false, problems are only reported as warnings (at your own risk); contig renaming still happens.",
+                    "fa_icon": "fas fa-check"
+                },
+                "check_ref_alleles": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Compare the REF allele of every VCF record with the reference FASTA at the start (rejects VCFs above --max_ref_mismatch). If false, this check is skipped; mismatching records are still removed by bcftools norm.",
+                    "fa_icon": "fas fa-check"
+                },
+                "check_bam_contigs": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Check contig names and lengths of every alignment header at the start. If false, problems are only reported as warnings.",
+                    "fa_icon": "fas fa-check"
+                },
+                "check_bed_contigs": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Check format, contig names and interval ends of every BED (targets, regions, exclude, genes, stratifications, known-list regions) at the start. If false, problems are only reported as warnings.",
+                    "fa_icon": "fas fa-check"
+                },
+                "check_known_variants": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Check contigs, positions and REF alleles of the known-variant lists at the start. If false, problems are only reported as warnings and the affected variants are dropped.",
+                    "fa_icon": "fas fa-check"
+                },
+                "keep_mito": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Compare variants on the mitochondrial contig (chrM/MT). By default it is dropped from every input and reported, and its length is not checked.",
+                    "fa_icon": "fas fa-dna"
                 }
             }
         },
@@ -96,6 +132,13 @@
                     "pattern": "^\\S+\\.bed(\\.gz)?$",
                     "description": "Optional BED: remove these regions from the comparison (e.g. a blacklist).",
                     "fa_icon": "fas fa-ban"
+                },
+                "min_region_bp": {
+                    "type": "integer",
+                    "default": 10000,
+                    "minimum": 0,
+                    "description": "Minimum size (bp) of the comparison region: the common region of all target BEDs, and with alignments the callable region of every sample. A smaller region stops the run (too small for a valid benchmark).",
+                    "fa_icon": "fas fa-ruler-horizontal"
                 }
             }
         },

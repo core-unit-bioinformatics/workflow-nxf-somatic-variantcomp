@@ -1,9 +1,9 @@
 //
 // Coverage of all alignments in the common region and per-sample callable regions
 //
-//  1. reference check of every alignment (contigs and lengths from samtools idxstats,
-//     decision in check_reference.py); the common region is translated to the
-//     alignment's contig names for mosdepth --by
+//  1. the common region is translated to the alignment's contig names for mosdepth --by
+//     (rename map of the alignment's reference check in CHECK_INPUTS; check_reference.py
+//     rename-bed)
 //  2. mosdepth per alignment (--quantize: LOW_COVERAGE / CALLABLE bins; --by: mean depth
 //     per common-region interval)
 //  3. callable intervals per alignment (mosdepth_callable.py: label or mean-depth
@@ -16,8 +16,7 @@
 // alignment; other samples keep the common region.
 //
 
-include { SAMTOOLS_IDXSTATS                         } from '../../../modules/nf-core/samtools/idxstats/main'
-include { CHECK_REFERENCE as CHECK_REFERENCE_BAM    } from '../../../modules/local/check_reference/main'
+include { RENAME_BED                                } from '../../../modules/local/rename_bed/main'
 include { MOSDEPTH                                  } from '../../../modules/nf-core/mosdepth/main'
 include { MOSDEPTH_CALLABLE                         } from '../../../modules/local/mosdepth_callable/main'
 include { BEDTOOLS_SORT as BEDTOOLS_SORT_CALLABLE   } from '../../../modules/nf-core/bedtools/sort/main'
@@ -29,6 +28,7 @@ workflow COVERAGE {
 
     take:
     ch_samplesheet // channel: samplesheet entries [ meta, vcf, vcf_index, tumor_bam, tumor_index, normal_bam, normal_index, target_bed ] (alignments indexed)
+    ch_bam_rename  // channel: [ meta(alignment), rename map ] of the reference check (CHECK_INPUTS)
     ch_reference   // value channel: [ meta, fasta, fai, gzi ]
     common_bed     // value channel: common comparison region (reference contig names; sorted, merged)
     include_normal // boolean: normal alignments must be callable, too
@@ -49,13 +49,18 @@ workflow COVERAGE {
         alignments
     }
 
-    // 1. reference check of the alignment's contigs; common region in the alignment's names
-    SAMTOOLS_IDXSTATS(ch_alignments)
-    CHECK_REFERENCE_BAM(SAMTOOLS_IDXSTATS.out.idxstats, 'bam', ch_fai, common_bed)
+    // rename map of each alignment, joined by the alignment id
+    def ch_rename = ch_alignments
+        .map { meta, _bam, _index -> [meta.id, meta] }
+        .join(ch_bam_rename.map { meta, rename -> [meta.id, rename] })
+        .map { _id, meta, rename -> [meta, rename] }
+
+    // 1. common region in the alignment's contig names
+    RENAME_BED(ch_rename.combine(common_bed))
 
     // 2. depth per alignment
     MOSDEPTH(
-        ch_alignments.join(CHECK_REFERENCE_BAM.out.regions),
+        ch_alignments.join(RENAME_BED.out.bed),
         ch_reference.map { meta, fasta, _fai, _gzi -> [meta, fasta] },
         ['LOW_COVERAGE', 'CALLABLE']
     )
@@ -64,7 +69,7 @@ workflow COVERAGE {
     MOSDEPTH_CALLABLE(
         MOSDEPTH.out.quantized_bed
             .join(MOSDEPTH.out.regions_bed)
-            .join(CHECK_REFERENCE_BAM.out.rename),
+            .join(ch_rename),
         ch_fai
     )
     BEDTOOLS_SORT_CALLABLE(MOSDEPTH_CALLABLE.out.bed, ch_fai.map { _meta, fai -> fai })
@@ -118,7 +123,6 @@ workflow COVERAGE {
     regions          = ch_regions                             // channel: [ meta, bed ] per samplesheet entry
     callable         = ch_callable                            // channel: [ meta(sample), bed ]
     callable_summary = REGION_SUMMARY_CALLABLE.out.summary    // channel: [ meta(sample), tsv ]
-    reports          = CHECK_REFERENCE_BAM.out.report         // channel: [ meta, tsv ]
     multiqc_files    = MOSDEPTH.out.global_txt.mix(MOSDEPTH.out.summary_txt, MOSDEPTH.out.regions_txt)
                            .map { _meta, file -> file }       // channel: path
 }

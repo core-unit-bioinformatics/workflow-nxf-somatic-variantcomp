@@ -11,8 +11,6 @@
 //     merged back into the table (annotate_variants.py)
 //
 
-include { CHECK_SHEETS as CHECK_STRATIFICATION          } from '../../../modules/local/check_sheets/main'
-include { CHECK_REFERENCE as CHECK_REFERENCE_ANNOTATION } from '../../../modules/local/check_reference/main'
 include { BCFTOOLS_QUERY as BCFTOOLS_QUERY_SITES        } from '../../../modules/nf-core/bcftools/query/main'
 include { BCFTOOLS_MPILEUP                              } from '../../../modules/nf-core/bcftools/mpileup/main'
 include { BCFTOOLS_NORM as BCFTOOLS_NORM_EVIDENCE       } from '../../../modules/nf-core/bcftools/norm/main'
@@ -32,23 +30,11 @@ workflow DISCORDANCE {
     ch_compare      // channel: [ meta, vcf, tbi ] compared records per entry
     ch_variants     // channel: [ meta(pair), tsv ] per-variant table of each comparison
     ch_reference    // value channel: [ meta, fasta, fai, gzi ]
-    gene_bed        // path: optional gene BED (BED4, name = gene)
-    stratification  // string: optional stratification sheet (name, bed)
+    ch_annotation_beds // channel: [ meta(id, role: genes | stratum), bed ] checked gene and stratification BEDs (CHECK_INPUTS)
     ch_extra_sites  // channel: [ meta(id, sample), vcf ] further positions for the read evidence (known variants)
 
     main:
     def ch_fai = ch_reference.map { meta, _fasta, fai, _gzi -> [meta, fai] }
-
-    // stratification sheet: columns, names and files checked by check_sheets.py; the
-    // checked sheet (absolute paths) gives one item per stratification: [ meta(id: name), bed ]
-    def ch_strata = channel.empty()
-    if (stratification) {
-        def sheet = file(stratification, checkIfExists: true)
-        CHECK_STRATIFICATION('stratification', sheet, sheet.parent.toUriString(), [])
-        ch_strata = CHECK_STRATIFICATION.out.csv
-            .splitCsv(header: true)
-            .map { row -> [[id: row.name], file(row.bed, checkIfExists: true)] }
-    }
 
     //
     // 1. read evidence
@@ -141,17 +127,10 @@ workflow DISCORDANCE {
         .collectFile(name: 'variants.tsv', keepHeader: true, skip: 1, sort: { tsv -> tsv.name })
         .map { tsv -> [[id: 'variants'], tsv] }
 
-    // gene and stratification BEDs: reference check (contig renaming; extra columns kept)
-    def ch_annotation_beds = ch_strata.map { meta, bed -> [meta + [role: 'stratum'], bed] }
-    if (gene_bed) {
-        ch_annotation_beds = ch_annotation_beds.mix(channel.of([[id: 'genes', role: 'genes'], gene_bed]))
-    }
-    CHECK_REFERENCE_ANNOTATION(ch_annotation_beds, 'bed', ch_fai, [])
-
     // variants and annotation BEDs sorted in reference order (bedtools map needs both sorted)
     VARIANTS_TO_BED(ch_all_variants)
     BEDTOOLS_SORT_ANNOTATION(
-        VARIANTS_TO_BED.out.bed.map { meta, bed -> [meta + [role: 'variants'], bed] }.mix(CHECK_REFERENCE_ANNOTATION.out.bed),
+        VARIANTS_TO_BED.out.bed.map { meta, bed -> [meta + [role: 'variants'], bed] }.mix(ch_annotation_beds),
         ch_fai.map { _meta, fai -> fai }
     )
     def ch_sorted = BEDTOOLS_SORT_ANNOTATION.out.sorted.branch { meta, _bed ->
