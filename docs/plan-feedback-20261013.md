@@ -53,14 +53,9 @@ merge into `dev`. Before every commit: `black --check`, `ruff`, `pytest`,
   (input_checks, prepare_reference, prepare_regions, coverage, preprocess_vcf,
   benchmark, discordance, annotation, known_variants, report). `conf/modules.config` keeps
   only the default `publishDir` and the `includeConfig` lines. Pure move.
-- **A4** Add a shared helper `bin/variantcomp_io.py` (shebang, docstring):
-  - `read_fai`;
-  - `read_bed` with all BED format checks: columns, integer start/end, start ≤ end,
-    header/track lines;
-  - `open_vcf` (pysam) and `open_alignment` (pysam), with clear errors.
-
-  Unit tests in `tests/python/test_variantcomp_io.py`. Reuses the existing parts of
-  `check_reference.py`: `read_fai`, `map_contig` and the BED parsing in `contigs_bed`.
+- **A4** ~~Shared helper module~~ dropped (user, 2026-10-13: no io helper script). `read_bed`,
+  `read_fai` and the pysam readers become named functions in `check_reference.py`
+  (B1); `known_variants.py` imports them from there.
 
 ### Phase B — all input checks first (`feat-input-checks`) — highest value
 
@@ -231,7 +226,7 @@ merge into `dev`. Before every commit: `black --check`, `ruff`, `pytest`,
 
 - All input checks run first (CHECK_INPUTS); each can be switched off.
 - No silent fixes of contig lengths; chrM is dropped and reported.
-- Python: pysam for VCF/BAM/FASTA, shared IO helpers, black + ruff, an INPUT/OUTPUT
+- Python: pysam for VCF/BAM/FASTA, readers as named functions (no shared helper module), black + ruff, an INPUT/OUTPUT
   docstring per script and a docstring per function.
 - Every threshold of a script or tool is a documented pipeline param.
 - Every step summary reaches MultiQC.
@@ -246,7 +241,7 @@ merge into `dev`. Before every commit: `black --check`, `ruff`, `pytest`,
 
 - `bin/check_reference.py`, `bin/harmonize_vcf.py`, `bin/known_variants.py`,
   `bin/mosdepth_callable.py`, `bin/variantcomp_report.py`, `bin/annotate_variants.py`,
-  new `bin/variantcomp_io.py`, `bin/mqc_tables.py`
+  new `bin/mqc_tables.py`
 - `subworkflows/local/{check_inputs,annotate_variants}/` (new), `preprocess_vcf`,
   `coverage`, `discordance`, `prepare_regions`, `bed_intersect_all`, `benchmark`,
   `prepare_known_variants`
