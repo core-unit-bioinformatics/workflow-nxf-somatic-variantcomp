@@ -183,6 +183,12 @@
                     "default": true,
                     "description": "With --callable_regions: the normal alignments must be callable, too, so every paired row (normal_id given) needs a normal_bam; the run stops at the start otherwise. If false, only the tumor alignments define the callable region.",
                     "fa_icon": "fas fa-user-check"
+                },
+                "amplicon_keep_duplicates": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "For library_type 'amplicon', keep duplicate-flagged reads for coverage and read evidence (amplicon reads share start positions, so duplicate marking removes real reads).",
+                    "fa_icon": "fas fa-clone"
                 }
             }
         },
@@ -287,6 +293,27 @@
                     "description": "Count the reads of every alignment at the positions of all compared variants (bcftools mpileup) to explain missed and extra calls (germline_in_normal, low_coverage, subthreshold_evidence, no_evidence) and to compute the detection power. Needs a tumor_bam for every samplesheet row. If false, no alignment is read and the evidence columns are left out.",
                     "fa_icon": "fas fa-search"
                 },
+                "evidence_min_mapq": {
+                    "type": "integer",
+                    "default": 20,
+                    "minimum": 0,
+                    "description": "Read evidence: minimum mapping quality of a read (bcftools mpileup --min-MQ).",
+                    "fa_icon": "fas fa-filter"
+                },
+                "evidence_min_baseq": {
+                    "type": "integer",
+                    "default": 13,
+                    "minimum": 0,
+                    "description": "Read evidence: minimum base quality (bcftools mpileup --min-BQ).",
+                    "fa_icon": "fas fa-filter"
+                },
+                "evidence_max_depth": {
+                    "type": "integer",
+                    "default": 100000,
+                    "minimum": 1,
+                    "description": "Read evidence: maximum depth per position (bcftools mpileup --max-depth); high for deep panels.",
+                    "fa_icon": "fas fa-filter"
+                },
                 "gene_bed": {
                     "type": "string",
                     "format": "file-path",
@@ -342,6 +369,14 @@
                     "maximum": 1,
                     "description": "VAF threshold of the 'low VAF' feature in the enrichment tests (truth VAF for FN/TP, query VAF for FP).",
                     "fa_icon": "fas fa-percentage"
+                },
+                "enrichment_fdr": {
+                    "type": "number",
+                    "default": 0.05,
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Benjamini-Hochberg q-value below which an enrichment test of the report is significant (highlighted in plots and logs).",
+                    "fa_icon": "fas fa-chart-bar"
                 }
             }
         },

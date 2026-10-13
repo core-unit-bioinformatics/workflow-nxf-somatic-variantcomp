@@ -472,17 +472,17 @@ def plot_classes(classes, outdir):
     plt.close(fig)
 
 
-def plot_enrichment(enrich, outdir):
+def plot_enrichment(enrich, outdir, fdr=0.05):
     data = enrich[(enrich["discordant"] == "FN+FP") & enrich["odds_ratio"].notna()].copy()
     data = data[np.isfinite(data["odds_ratio"]) & (data["odds_ratio"] > 0)]
     if data.empty:
         return
     data["label"] = data["truth"] + " vs " + data["query"] + ": " + data["feature"]
     fig, ax = plt.subplots(figsize=(6, max(2.5, 0.35 * len(data) + 1)))
-    colors = ["#c8553d" if q < 0.05 else "#7f7f7f" for q in data["q_value"].fillna(1)]
+    colors = ["#c8553d" if q < fdr else "#7f7f7f" for q in data["q_value"].fillna(1)]
     ax.scatter(np.log2(data["odds_ratio"]), data["label"], color=colors)
     ax.axvline(0, color="black", lw=0.8)
-    ax.set_xlabel("log2 odds ratio, discordant vs. concordant (red: q < 0.05)")
+    ax.set_xlabel(f"log2 odds ratio, discordant vs. concordant (red: q < {fdr:g})")
     fig.tight_layout()
     fig.savefig(outdir / "enrichment.png", dpi=150)
     plt.close(fig)
@@ -495,6 +495,9 @@ def main():
     parser.add_argument("--power")
     parser.add_argument("--variants", required=True)
     parser.add_argument("--low-vaf", type=float, default=0.1)
+    parser.add_argument(
+        "--fdr", type=float, default=0.05, help="q-value below which a test is significant"
+    )
     parser.add_argument("--prefix", default="variantcomp")
     args = parser.parse_args()
 
@@ -538,10 +541,10 @@ def main():
     plot_vaf(metrics, plots)
     plot_classes(classes, plots)
     if not enrich.empty:
-        plot_enrichment(enrich, plots)
-    n_sig = int((enrich["q_value"] < 0.05).sum()) if not enrich.empty else 0
+        plot_enrichment(enrich, plots, args.fdr)
+    n_sig = int((enrich["q_value"] < args.fdr).sum()) if not enrich.empty else 0
     print(
-        f"INFO: {len(enrich)} enrichment tests ({n_sig} with q < 0.05), {len(genes)} gene rows; "
+        f"INFO: {len(enrich)} enrichment tests ({n_sig} with q < {args.fdr:g}), {len(genes)} gene rows; "
         f"plots in {plots}/",
         file=sys.stderr,
     )
