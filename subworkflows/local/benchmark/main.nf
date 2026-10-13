@@ -1,10 +1,19 @@
 //
 // Compare the calls of every technology with the truth technology of the same sample
 //
-// Matching: rtg vcfeval (haplotype-aware, --squash-ploidy, all records, decomposed);
-// bcftools isec for exact (-c none) and position-only (-c all) record matching.
-// With comparison_mode 'all_pairs', all non-truth technologies are additionally compared
-// pairwise (the alphabetically first technology is the baseline).
+//  1. reference in the SDF format of rtg-tools (rtg format), once
+//  2. pairs per sample: truth technology (baseline) x every other technology (calls);
+//     with comparison_mode 'all_pairs' also every pair of non-truth technologies
+//     (the alphabetically first one is the baseline)
+//  3. haplotype-aware matching: rtg vcfeval (--squash-ploidy: genotypes ignored, all
+//     records, complex calls decomposed) inside the comparison region of the sample
+//     -> TP (baseline and call representation), FN, FP VCFs
+//  4. record matching for comparison: bcftools isec exact (-c none: same CHROM, POS,
+//     REF, ALT) and position-only (-c all: same CHROM, POS)
+//  5. metrics per pair (benchmark_metrics.py): recall, precision, F1 overall, by
+//     variant type, by truth/query VAF, by match type; one table per variant
+//  6. all pairs together (aggregate_metrics.py): summed counts (micro) and the mean and
+//     sd of the per-sample values (macro)
 //
 
 include { RTGTOOLS_FORMAT   } from '../../../modules/nf-core/rtgtools/format/main'
@@ -23,19 +32,25 @@ workflow BENCHMARK {
     comparison_mode // string: 'truth' or 'all_pairs'
 
     main:
+    // 1. reference as rtg SDF (vcfeval needs it to compare haplotypes)
     RTGTOOLS_FORMAT(ch_reference.map { meta, fasta, _fai, _gzi -> [meta, fasta, [], []] })
 
+    // 2. every entry with its comparison region: [ sample, meta, vcf, tbi, region ]
     def ch_entries = ch_compare
         .map { meta, vcf, tbi -> [meta.id, meta, vcf, tbi] }
         .join(ch_regions.map { meta, bed -> [meta.id, bed] })
         .map { _id, meta, vcf, tbi, bed -> [meta.sample, meta, vcf, tbi, bed] }
+    // baseline (truth technology) and calls (every other technology) of each sample
     def ch_truth = ch_entries.filter { _sample, meta, _vcf, _tbi, _bed -> meta.is_truth }
     def ch_query = ch_entries.filter { _sample, meta, _vcf, _tbi, _bed -> !meta.is_truth }
 
+    // pairs of the same sample: [ meta(pair), call vcf, call tbi, baseline vcf, baseline tbi, region ]
+    // (the region is the baseline's; both entries of a sample share it)
     def ch_pairs = ch_truth.combine(ch_query, by: 0)
         .map { _sample, base, base_vcf, base_tbi, bed, call, call_vcf, call_tbi, _call_bed ->
             [pairMeta(base, call, 'truth'), call_vcf, call_tbi, base_vcf, base_tbi, bed]
         }
+    // optional: every pair of non-truth technologies (the alphabetically first is the baseline)
     if (comparison_mode == 'all_pairs') {
         ch_pairs = ch_pairs.mix(
             ch_query.combine(ch_query, by: 0)
@@ -46,16 +61,18 @@ workflow BENCHMARK {
         )
     }
 
+    // 3. haplotype-aware matching inside the comparison region (options: conf/modules/benchmark.config)
     RTGTOOLS_VCFEVAL(
         ch_pairs.map { meta, call_vcf, call_tbi, base_vcf, base_tbi, bed -> [meta, call_vcf, call_tbi, base_vcf, base_tbi, [], bed] },
         RTGTOOLS_FORMAT.out.sdf
     )
 
-    // record matching: truth first, then query (sites.txt flags: truth, query)
+    // 4. record matching: truth first, then query (sites.txt flags: truth, query)
     def ch_isec_input = ch_pairs.map { meta, call_vcf, call_tbi, base_vcf, base_tbi, _bed -> [meta, [base_vcf, call_vcf], [base_tbi, call_tbi], [], [], []] }
     BCFTOOLS_ISEC_EXACT(ch_isec_input)
     BCFTOOLS_ISEC_POSITION(ch_isec_input)
 
+    // 5. metrics of each pair from the vcfeval VCFs and the isec sites
     BENCHMARK_METRICS(
         RTGTOOLS_VCFEVAL.out.baseline_vcf
             .join(RTGTOOLS_VCFEVAL.out.fn_vcf)
@@ -66,6 +83,7 @@ workflow BENCHMARK {
             .map { meta, tpb, fn, tp, fp, exact, position -> [meta, tpb, fn, tp, fp, exact, position, []] }
     )
 
+    // 6. all pairs: micro and macro aggregation over the samples
     AGGREGATE_METRICS(
         BENCHMARK_METRICS.out.metrics
             .map { _meta, tsv -> tsv }
