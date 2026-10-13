@@ -125,3 +125,47 @@ def test_callable_outside_common_region_is_an_error(tmp_path):
     )
     assert proc.returncode == 1
     assert "extends beyond the common region" in proc.stderr
+
+
+def test_targets_below_min_bp_fails(tmp_path):
+    common = write(tmp_path / "common.bed", "chr1\t100\t200\n")
+    genome = write(tmp_path / "genome.bed", "chr1\t0\t1000\n")
+    proc = run(
+        "targets",
+        "--common",
+        common,
+        "--genome",
+        genome,
+        "--output",
+        str(tmp_path / "t.tsv"),
+        "--min-bp",
+        "500",
+    )
+    assert proc.returncode == 1
+    assert "100 bp, less than --min_region_bp 500" in proc.stderr
+
+
+def test_callable_below_min_bp_fails(tmp_path):
+    common = write(tmp_path / "common.bed", "chr1\t0\t100\n")
+    callable_bed = write(tmp_path / "callable.bed", "chr1\t10\t60\n")
+    proc = run(
+        "callable",
+        "--sample",
+        "S1",
+        "--common",
+        common,
+        "--callable-bed",
+        callable_bed,
+        "--alignments",
+        "4",
+        "--mode",
+        "base",
+        "--min-coverage",
+        "10",
+        "--output",
+        str(tmp_path / "c.tsv"),
+        "--min-bp",
+        "51",
+    )
+    assert proc.returncode == 1
+    assert "S1: only 50 bp of the common region are callable" in proc.stderr

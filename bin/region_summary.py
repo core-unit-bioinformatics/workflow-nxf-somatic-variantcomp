@@ -111,6 +111,13 @@ def targets(args):
             fraction(common_bp, common_bp),
         )
     )
+    # the comparison region must be large enough for a meaningful benchmark
+    if 0 < common_bp < args.min_bp:
+        sys.exit(
+            f"ERROR: the common comparison region has {common_bp} bp, less than --min_region_bp "
+            f"{args.min_bp}: the target BEDs (and --regions_bed/--exclude_bed) overlap too little "
+            "for a valid benchmark. Check the BEDs or lower --min_region_bp."
+        )
     if common_bp == 0:
         sys.exit(
             "ERROR: the common comparison region is empty: the target BEDs (and "
@@ -146,6 +153,14 @@ def callable_(args):
         f"callable in all {args.alignments} alignments",
         file=sys.stderr,
     )
+    # the callable region of the sample must be large enough for a meaningful benchmark
+    if callable_bp < args.min_bp:
+        sys.exit(
+            f"ERROR: {args.sample}: only {callable_bp} bp of the common region are callable in all "
+            f"{args.alignments} alignments, less than --min_region_bp {args.min_bp}. Check the "
+            "coverage (coverage/), --min_coverage_tumor/--min_coverage_normal, or lower "
+            "--min_region_bp."
+        )
     if callable_bp == 0:
         print(
             f"WARNING: {args.sample}: no callable base; no variant of this sample will be "
@@ -165,6 +180,7 @@ def main():
     )
     t.add_argument("--genome-wide", nargs="*", default=[], help="technologies without target BED")
     t.add_argument("--output", required=True)
+    t.add_argument("--min-bp", type=int, default=0, help="minimum size of the common region")
     c = sub.add_parser("callable")
     c.add_argument("--sample", required=True)
     c.add_argument("--common", required=True)
@@ -173,6 +189,7 @@ def main():
     c.add_argument("--mode", required=True)
     c.add_argument("--min-coverage", required=True)
     c.add_argument("--output", required=True)
+    c.add_argument("--min-bp", type=int, default=0, help="minimum size of the callable region")
     args = parser.parse_args()
     targets(args) if args.command == "targets" else callable_(args)
 
