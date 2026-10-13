@@ -44,7 +44,7 @@ workflow COREUNITBIOINFORMATICS_VARIANTCOMP {
         params.fasta_fai,
         params.regions_bed,
         params.exclude_bed,
-        params.gene_bed,
+        params.repeats_bed,
         params.multiqc_config,
         params.multiqc_logo,
         params.multiqc_methods_description,

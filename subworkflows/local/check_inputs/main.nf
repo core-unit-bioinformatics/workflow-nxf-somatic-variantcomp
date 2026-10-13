@@ -10,7 +10,7 @@
 //     (check_reference.py vcf)                                     --check_vcf_contigs, --check_ref_alleles
 //  3. alignments: contig names and lengths of the header (check_reference.py bam)
 //                                                                  --check_bam_contigs
-//  4. BEDs: target BEDs, --regions_bed, --exclude_bed, --gene_bed, stratification BEDs
+//  4. BEDs: target BEDs, --regions_bed, --exclude_bed, --repeats_bed, stratification BEDs
 //     and known-list regions: format, contig names, interval ends (check_reference.py bed)
 //                                                                  --check_bed_contigs
 //  5. known-variant lists: contigs, positions, REF alleles (known_variants.py prepare)
@@ -36,7 +36,7 @@ workflow CHECK_INPUTS {
     ch_reference   // value channel: [ meta, fasta, fai, gzi ]
     regions_bed    // path or null: --regions_bed
     exclude_bed    // path or null: --exclude_bed
-    gene_bed       // path or null: --gene_bed
+    repeats_bed    // path or null: --repeats_bed (precomputed repeat regions)
     stratification // string or null: --stratification sheet (name, bed)
     known_variants // string or null: --known_variants sheet (name, sample, mode, variants, regions)
 
@@ -99,8 +99,8 @@ workflow CHECK_INPUTS {
     if (exclude_bed) {
         ch_beds = ch_beds.mix(channel.of([[id: 'exclude_bed', role: 'exclude'], exclude_bed]))
     }
-    if (gene_bed) {
-        ch_beds = ch_beds.mix(channel.of([[id: 'genes', role: 'genes'], gene_bed]))
+    if (repeats_bed) {
+        ch_beds = ch_beds.mix(channel.of([[id: 'repeats', role: 'repeats'], repeats_bed]))
     }
     def ch_known_regions = ch_known
         .filter { _meta, _variants, regions -> regions }

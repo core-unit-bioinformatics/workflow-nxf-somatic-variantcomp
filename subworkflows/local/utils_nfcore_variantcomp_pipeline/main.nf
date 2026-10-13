@@ -83,6 +83,11 @@ workflow PIPELINE_INITIALISATION {
     )
 
     //
+    // Parameter combinations that nf-schema can't express (as in the nf-core template)
+    //
+    validateInputParameters()
+
+    //
     // Create channel from input file provided through params.input (as in the nf-core
     // template): nf-schema checks every column against assets/schema_input.json. Rules
     // across rows are checked by CHECK_SAMPLESHEET at the start of the workflow.
@@ -183,6 +188,18 @@ def sheetFile(value, base_dir) {
     }
     def absolute = text.startsWith('/') || text ==~ /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\/.*/
     return file(absolute ? text : base_dir.resolve(text).toString(), checkIfExists: true)
+}
+
+//
+// Check parameter combinations: VEP needs exactly one annotation source
+//
+def validateInputParameters() {
+    if (params.vep && !params.vep_cache && !params.vep_gtf) {
+        error("--vep is on, but neither --vep_cache nor --vep_gtf is given: give a VEP cache directory or a bgzipped GTF, or switch the annotation off with --vep false")
+    }
+    if (params.vep && params.vep_cache && params.vep_gtf) {
+        error("--vep_cache and --vep_gtf are both given: VEP uses one annotation source, give only one of them")
+    }
 }
 
 //

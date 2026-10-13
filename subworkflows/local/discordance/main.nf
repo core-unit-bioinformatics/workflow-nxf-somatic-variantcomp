@@ -1,14 +1,13 @@
 //
-// Explain and annotate discordant variants
+// Explain discordant variants
 //
 //  1. read evidence: positions of all compared variants of a sample (bcftools query),
 //     pileup of every alignment of the sample at these positions (bcftools mpileup |
 //     call -m --keep-alts, nf-core module), split and left-aligned like the calls
 //     (bcftools norm)
 //  2. classification of every FN/FP and power-adjusted recall (classify_discordance.py)
-//  3. annotation of all compared variants: variant table -> BED (annotate_variants.py),
-//     sorted (bedtools sort), genes (bedtools map), stratifications (bedtools intersect -c),
-//     merged back into the table (annotate_variants.py)
+//  3. one table with every compared variant of every comparison (annotated next by
+//     the subworkflow ANNOTATE_VARIANTS)
 //
 
 include { BCFTOOLS_QUERY as BCFTOOLS_QUERY_SITES        } from '../../../modules/nf-core/bcftools/query/main'
@@ -16,11 +15,6 @@ include { BCFTOOLS_MPILEUP                              } from '../../../modules
 include { BCFTOOLS_NORM as BCFTOOLS_NORM_EVIDENCE       } from '../../../modules/nf-core/bcftools/norm/main'
 include { CLASSIFY_DISCORDANCE                          } from '../../../modules/local/classify_discordance/main'
 include { AGGREGATE_METRICS as AGGREGATE_POWER          } from '../../../modules/local/aggregate_metrics/main'
-include { VARIANTS_TO_BED                               } from '../../../modules/local/variants_to_bed/main'
-include { BEDTOOLS_SORT as BEDTOOLS_SORT_ANNOTATION     } from '../../../modules/nf-core/bedtools/sort/main'
-include { BEDTOOLS_MAP as BEDTOOLS_MAP_GENES            } from '../../../modules/nf-core/bedtools/map/main'
-include { BEDTOOLS_INTERSECT as BEDTOOLS_INTERSECT_STRATA } from '../../../modules/nf-core/bedtools/intersect/main'
-include { ANNOTATION_MERGE                              } from '../../../modules/local/annotation_merge/main'
 
 workflow DISCORDANCE {
 
@@ -30,12 +24,10 @@ workflow DISCORDANCE {
     ch_compare      // channel: [ meta, vcf, tbi ] compared records per entry
     ch_variants     // channel: [ meta(pair), tsv ] per-variant table of each comparison
     ch_reference    // value channel: [ meta, fasta, fai, gzi ]
-    ch_annotation_beds // channel: [ meta(id, role: genes | stratum), bed ] checked gene and stratification BEDs (CHECK_INPUTS)
     ch_extra_sites  // channel: [ meta(id, sample), vcf ] further positions for the read evidence (known variants)
     read_evidence   // boolean: count the reads of the alignments at the compared positions (--read_evidence)
 
     main:
-    def ch_fai = ch_reference.map { meta, _fasta, fai, _gzi -> [meta, fai] }
 
     //
     // 1. read evidence
@@ -124,7 +116,7 @@ workflow DISCORDANCE {
     )
 
     //
-    // 3. annotation of all compared variants of all comparisons
+    // 3. one table with every compared variant of every comparison
     //
     // one table with every variant of every comparison
     def ch_all_variants = CLASSIFY_DISCORDANCE.out.discordance
@@ -133,43 +125,9 @@ workflow DISCORDANCE {
         .collectFile(name: 'variants.tsv', keepHeader: true, skip: 1, sort: { tsv -> tsv.name })
         .map { tsv -> [[id: 'variants'], tsv] }
 
-    // variants and annotation BEDs sorted in reference order (bedtools map needs both sorted)
-    VARIANTS_TO_BED(ch_all_variants)
-    BEDTOOLS_SORT_ANNOTATION(
-        VARIANTS_TO_BED.out.bed.map { meta, bed -> [meta + [role: 'variants'], bed] }.mix(ch_annotation_beds),
-        ch_fai.map { _meta, fai -> fai }
-    )
-    def ch_sorted = BEDTOOLS_SORT_ANNOTATION.out.sorted.branch { meta, _bed ->
-        variants: meta.role == 'variants'
-        genes: meta.role == 'genes'
-        stratum: meta.role == 'stratum'
-    }
-
-    // genes overlapping each variant (comma-separated, '.' if none)
-    BEDTOOLS_MAP_GENES(
-        ch_sorted.variants.combine(ch_sorted.genes.map { _meta, bed -> bed }).map { meta, variants, genes -> [meta, variants, genes] },
-        ch_fai
-    )
-    // number of stratification intervals overlapping each variant, per stratification
-    BEDTOOLS_INTERSECT_STRATA(
-        ch_sorted.variants
-            .combine(ch_sorted.stratum)
-            .map { _vmeta, variants, smeta, stratum -> [[id: smeta.id], variants, stratum] },
-        [[:], []]
-    )
-
-    // merge the bedtools results into the variant table
-    ANNOTATION_MERGE(
-        ch_all_variants
-            .combine(BEDTOOLS_MAP_GENES.out.mapped.map { _meta, bed -> bed }.ifEmpty([]))
-            // stratification results sorted by name: stable column order in the table
-            .combine(BEDTOOLS_INTERSECT_STRATA.out.intersect.map { _meta, bed -> bed }.toSortedList { a, b -> a.name <=> b.name }.map { beds -> [beds] })
-            .map { meta, table, genes, strata -> [meta, table, genes, strata] }
-    )
-
     emit:
     discordance = CLASSIFY_DISCORDANCE.out.discordance // channel: [ meta(pair), tsv ]
     power       = AGGREGATE_POWER.out.aggregated       // channel: [ meta, tsv ]
-    annotated   = ANNOTATION_MERGE.out.tsv             // channel: [ meta, tsv ] all compared variants
+    variants    = ch_all_variants                      // channel: [ meta(id: 'variants'), tsv ] all compared variants
     evidence    = ch_evidence                          // channel: [ meta(alignment), vcf, tbi ]
 }

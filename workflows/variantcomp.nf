@@ -13,6 +13,7 @@ include { PREPROCESS_VCF         } from '../subworkflows/local/preprocess_vcf'
 include { COVERAGE               } from '../subworkflows/local/coverage'
 include { BENCHMARK              } from '../subworkflows/local/benchmark'
 include { DISCORDANCE            } from '../subworkflows/local/discordance'
+include { ANNOTATE_VARIANTS      } from '../subworkflows/local/annotate_variants'
 include { VARIANTCOMP_REPORT     } from '../modules/local/variantcomp_report/main'
 include { PREPARE_KNOWN_VARIANTS } from '../subworkflows/local/prepare_known_variants'
 include { KNOWN_VARIANTS         } from '../subworkflows/local/known_variants'
@@ -38,7 +39,7 @@ workflow VARIANTCOMP {
     fasta_fai      // string: optional reference .fai
     regions_bed    // string: optional BED restricting the comparison
     exclude_bed    // string: optional BED of regions excluded from the comparison
-    gene_bed       // string: optional gene BED (BED4)
+    repeats_bed    // string: optional precomputed repeat BED (contig, start, end, unit, times)
     multiqc_config
     multiqc_logo
     multiqc_methods_description
@@ -83,7 +84,7 @@ workflow VARIANTCOMP {
         PREPARE_REFERENCE.out.reference,
         regions_bed ? file(regions_bed, checkIfExists: true) : null,
         exclude_bed ? file(exclude_bed, checkIfExists: true) : null,
-        gene_bed ? file(gene_bed, checkIfExists: true) : null,
+        repeats_bed ? file(repeats_bed, checkIfExists: true) : null,
         stratification,
         known_variants
     )
@@ -165,7 +166,7 @@ workflow VARIANTCOMP {
     )
 
     //
-    // SUBWORKFLOW: read evidence, classification and annotation of discordant variants
+    // SUBWORKFLOW: read evidence and classification of discordant variants
     //
     DISCORDANCE(
         ch_samplesheet,
@@ -173,7 +174,6 @@ workflow VARIANTCOMP {
         PREPROCESS_VCF.out.compare,
         BENCHMARK.out.variants,
         PREPARE_REFERENCE.out.reference,
-        CHECK_INPUTS.out.beds.filter { meta, _bed -> meta.role in ['genes', 'stratum'] },
         PREPARE_KNOWN_VARIANTS.out.sites,
         params.read_evidence
     )
@@ -192,13 +192,30 @@ workflow VARIANTCOMP {
     ch_multiqc_files = ch_multiqc_files.mix(KNOWN_VARIANTS.out.multiqc)
 
     //
+    // SUBWORKFLOW: VEP consequences, repeat regions and stratifications of every
+    // compared variant
+    //
+    ANNOTATE_VARIANTS(
+        DISCORDANCE.out.variants,
+        PREPARE_REFERENCE.out.reference,
+        CHECK_INPUTS.out.beds.filter { meta, _bed -> meta.role == 'stratum' },
+        CHECK_INPUTS.out.beds.filter { meta, _bed -> meta.role == 'repeats' },
+        params.vep,
+        params.vep_cache ? file(params.vep_cache, checkIfExists: true) : null,
+        params.vep_gtf ? file(params.vep_gtf, checkIfExists: true) : null,
+        params.annotate_repeats,
+        repeats_bed as boolean
+    )
+    ch_multiqc_files = ch_multiqc_files.mix(ANNOTATE_VARIANTS.out.multiqc)
+
+    //
     // MODULE: statistics (enrichment, genes, classes), plots and MultiQC sections
     //
     VARIANTCOMP_REPORT(
         BENCHMARK.out.aggregated.map { _meta, tsv -> tsv }
             .combine(BENCHMARK.out.per_pair.map { _meta, tsv -> tsv })
             .combine(DISCORDANCE.out.power.map { _meta, tsv -> tsv })
-            .combine(DISCORDANCE.out.annotated.map { _meta, tsv -> tsv })
+            .combine(ANNOTATE_VARIANTS.out.annotated.map { _meta, tsv -> tsv })
             .map { metrics, per_pair, power, variants -> [[id: 'variantcomp'], metrics, per_pair, power, variants] }
     )
     ch_multiqc_files = ch_multiqc_files.mix(VARIANTCOMP_REPORT.out.multiqc.flatten())

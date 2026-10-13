@@ -314,14 +314,6 @@
                     "description": "Read evidence: maximum depth per position (bcftools mpileup --max-depth); high for deep panels.",
                     "fa_icon": "fas fa-filter"
                 },
-                "gene_bed": {
-                    "type": "string",
-                    "format": "file-path",
-                    "exists": true,
-                    "pattern": "^\\S+\\.bed(\\.gz)?$",
-                    "description": "Optional BED4 with gene names in the 4th column (e.g. from GENCODE).",
-                    "fa_icon": "fas fa-dna"
-                },
                 "stratification": {
                     "type": "string",
                     "format": "file-path",
@@ -548,6 +540,79 @@
                     "description": "Display hidden parameters in the help message (only works when --help or --help_full are provided)."
                 }
             }
+        },
+        "annotation_options": {
+            "title": "Annotation options",
+            "type": "object",
+            "fa_icon": "fas fa-tags",
+            "description": "Annotation of every compared variant: consequences with Ensembl VEP (as in cio-abcd/variantinterpretation) and repeat regions with msisensor-pro.",
+            "properties": {
+                "vep": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Annotate the compared variants with Ensembl VEP (consequence, gene, impact, variant class). Needs --vep_cache or --vep_gtf; the run stops at the start otherwise.",
+                    "fa_icon": "fas fa-tags"
+                },
+                "vep_cache": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "exists": true,
+                    "description": "VEP cache directory (offline cache for --vep_species, --vep_genome and --vep_cache_version, downloaded beforehand, e.g. with vep_install).",
+                    "fa_icon": "fas fa-folder-open"
+                },
+                "vep_gtf": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "pattern": "^\\S+\\.gtf\\.gz$",
+                    "description": "Instead of a cache: bgzipped, sorted GTF with tabix index (.tbi next to it), e.g. GENCODE. Offline annotation without existing-variant data (used by the test profiles).",
+                    "fa_icon": "fas fa-file"
+                },
+                "vep_cache_version": {
+                    "type": "integer",
+                    "default": 116,
+                    "description": "Version of the VEP cache (should match the VEP version of the module, 116).",
+                    "fa_icon": "fas fa-code-branch"
+                },
+                "vep_genome": {
+                    "type": "string",
+                    "default": "GRCh38",
+                    "description": "Genome assembly of the VEP cache (--assembly).",
+                    "fa_icon": "fas fa-dna"
+                },
+                "vep_species": {
+                    "type": "string",
+                    "default": "homo_sapiens",
+                    "description": "Species of the VEP cache.",
+                    "fa_icon": "fas fa-dna"
+                },
+                "vep_args": {
+                    "type": "string",
+                    "default": "--flag_pick_allele_gene --terms SO --no_escape --symbol --biotype --variant_class --canonical",
+                    "description": "VEP options for every run (output fields needed by the report: SYMBOL, IMPACT, VARIANT_CLASS, BIOTYPE, Consequence).",
+                    "fa_icon": "fas fa-terminal"
+                },
+                "vep_cache_args": {
+                    "type": "string",
+                    "default": "--check_existing --var_synonyms --clin_sig_allele 1",
+                    "description": "Additional VEP options used only with --vep_cache (they need the cache), e.g. '--everything'.",
+                    "fa_icon": "fas fa-terminal"
+                },
+                "annotate_repeats": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Annotate whether a variant lies in a repeat (microsatellite) region of the reference (msisensor-pro scan), with repeat unit and length.",
+                    "fa_icon": "fas fa-redo"
+                },
+                "repeats_bed": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "pattern": "^\\S+\\.bed(\\.gz)?$",
+                    "description": "Precomputed repeat regions (contig, start, end, repeat unit, repeat times), e.g. from an earlier run (annotation/repeats/): skips the msisensor-pro scan of the reference.",
+                    "fa_icon": "fas fa-file"
+                }
+            }
         }
     },
     "allOf": [
@@ -562,6 +627,9 @@
         },
         {
             "$ref": "#/$defs/discordance_options"
+        },
+        {
+            "$ref": "#/$defs/annotation_options"
         },
         {
             "$ref": "#/$defs/known_variant_options"
