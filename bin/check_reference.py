@@ -14,7 +14,7 @@ Subcommands, inputs and checks
         - mitochondrial contig: dropped from the comparison and reported, its length is
           not checked (--keep-mito keeps it with the normal checks)
         - sample columns given with --samples must exist -> error otherwise
-        - REF alleles (with --fasta): REF of every record on a reference contig is
+        - REF alleles (with --fasta, unless --skip-ref-alleles): REF of every record on a reference contig is
           compared with the FASTA; mismatch rate > --max-ref-mismatch -> error
   bam   --alignment <BAM/CRAM> --fai <.fai> [--fasta <FASTA> for CRAM]
         - contig names and lengths of the alignment header (same rules as VCF)
@@ -406,7 +406,7 @@ def check_vcf(args, reference, report):
             f"naming (record contigs: {', '.join(sorted(record_contigs)[:10])})"
         )
     # REF alleles against the FASTA (second pass over the records)
-    if args.fasta:
+    if args.fasta and not args.skip_ref_alleles:
         vcf.close()
         ref_alleles(open_vcf(args.vcf), mapping, args.fasta, report, args.max_ref_mismatch)
 
@@ -493,6 +493,9 @@ def main():
             p.add_argument("--fasta", help="reference FASTA: check REF alleles")
             p.add_argument("--samples", help="comma-separated sample names that must exist")
             p.add_argument("--max-ref-mismatch", type=float, default=0.01)
+            p.add_argument(
+                "--skip-ref-alleles", action="store_true", help="don't compare REF alleles"
+            )
         elif name == "bam":
             p.add_argument("--alignment", required=True, help="BAM or CRAM")
             p.add_argument("--fasta", help="reference FASTA (needed for CRAM)")
