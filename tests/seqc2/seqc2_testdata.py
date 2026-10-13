@@ -286,24 +286,31 @@ class Dataset:
         return not self.contigs or chrom in self.contigs
 
     def prepare_annotation(self):
-        """Gene BED (GENCODE) and GIAB stratification BEDs, restricted to the contigs."""
+        """Gene annotation for VEP (GENCODE GTF, bgzipped + tabix) and GIAB stratification
+        BEDs, restricted to the contigs."""
         acfg = self.cfg["annotation"]
         ann_dir = self.out / "annotation"
         (ann_dir / "stratification").mkdir(parents=True, exist_ok=True)
 
         url = acfg["genes"]["url"]
         gtf = download(url, self.cache / "annotation" / Path(url).name)
-        self.sources.append(("annotation/genes.bed", url, "n/a (not published)"))
-        genes = ann_dir / "genes.bed"
-        with gzip.open(gtf, "rt") as fin, genes.open("w") as fout:
+        self.sources.append(("annotation/genes.gtf.gz", url, "n/a (not published)"))
+        # GTF records on the kept contigs, sorted by position (tabix needs it)
+        records = []
+        with gzip.open(gtf, "rt") as fin:
             for line in fin:
                 if line.startswith("#"):
                     continue
-                fields = line.rstrip("\n").split("\t")
-                if fields[2] != "gene" or not self.keep_contig(fields[0]):
-                    continue
-                name = fields[8].split('gene_name "', 1)[1].split('"', 1)[0]
-                fout.write(f"{fields[0]}\t{int(fields[3]) - 1}\t{fields[4]}\t{name}\n")
+                fields = line.split("\t", 4)
+                if self.keep_contig(fields[0]):
+                    records.append((fields[0], int(fields[3]), line))
+        records.sort(key=lambda r: (r[0], r[1]))
+        plain = ann_dir / "genes.gtf"
+        plain.write_text("".join(line for _c, _p, line in records))
+        # bgzip + tabix index (VEP --gtf): genes.gtf.gz and genes.gtf.gz.tbi
+        run(["bgzip", "-f", str(plain)])
+        genes = ann_dir / "genes.gtf.gz"
+        run(["tabix", "-f", "-p", "gff", str(genes)])
 
         scfg = acfg["stratifications"]
         base = scfg["base_url"].rstrip("/")
@@ -485,7 +492,7 @@ class Dataset:
             "input": "samplesheet.csv",
             "truth_technology": "wgs",
             "fasta": str(fasta.relative_to(self.out)),
-            "gene_bed": str(genes.relative_to(self.out)),
+            "vep_gtf": str(genes.relative_to(self.out)),
             "stratification": str(strat.relative_to(self.out)),
             "known_variants": str(known.relative_to(self.out)),
         }

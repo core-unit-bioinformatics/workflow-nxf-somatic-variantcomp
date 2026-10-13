@@ -24,8 +24,9 @@ Edge cases (see ``design.tsv`` for the full list):
 - known-variant lists for S1 (``known_variants.csv``): a 'required' list (one
   variant found everywhere, one filtered in wes, one outside the common region)
   and the designed true variants as a 'benchmark' truth set
-- gene BED (``bed/genes.bed``) and stratification BEDs for the homopolymer and the
-  dinucleotide repeat (``stratification.csv``)
+- gene annotation for VEP (``annotation/genes.gtf.gz`` + .tbi: one protein-coding
+  transcript per gene, exon = CDS) and stratification BEDs for the homopolymer and
+  the dinucleotide repeat (``stratification.csv``)
 - sample S2: contigs without ``chr`` prefix and no contig header lines
   (panel), wrong chrM length in the header (wes), normal column before tumor
   column (wgs)
@@ -387,13 +388,37 @@ def write_known_variants(out, d):
     )
 
 
+def write_gtf(path, genes):
+    """Bgzipped, tabix-indexed GTF: one protein-coding transcript per gene (exon = CDS).
+
+    GTF is 1-based and inclusive; the CDS is shortened to a multiple of 3 bases, so that
+    VEP can translate it (synonymous / missense consequences of the designed variants).
+    """
+    lines = []
+    for chrom, start, end, gene in sorted(genes):
+        cds_end = start + (end - start) // 3 * 3
+        attributes = (
+            f'gene_id "{gene}"; transcript_id "{gene}.1"; gene_name "{gene}"; '
+            'gene_type "protein_coding"; gene_biotype "protein_coding"; '
+            'transcript_type "protein_coding"; transcript_biotype "protein_coding";'
+        )
+        for feature, f_end in (("gene", end), ("transcript", end), ("exon", end), ("CDS", cds_end)):
+            frame = "0" if feature == "CDS" else "."
+            lines.append(
+                f"{chrom}\tsynthetic\t{feature}\t{start + 1}\t{f_end}\t.\t+\t{frame}\t{attributes}\n"
+            )
+    path.write_text("".join(lines))
+    # bgzip + tabix (gff preset: columns 1, 4, 5)
+    pysam.tabix_index(str(path), preset="gff", force=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--outdir", required=True, type=Path, help="output directory")
     args = parser.parse_args()
 
     out = args.outdir
-    for sub in ("reference", "vcf", "bed"):
+    for sub in ("reference", "vcf", "bed", "annotation"):
         (out / sub).mkdir(parents=True, exist_ok=True)
 
     ref = make_reference(random.Random(SEED))
@@ -407,8 +432,7 @@ def main():
     for name, intervals in BEDS.items():
         with (out / "bed" / name).open("w") as fh:
             fh.writelines(f"{c}\t{s}\t{e}\n" for c, s, e in intervals)
-    with (out / "bed" / "genes.bed").open("w") as fh:
-        fh.writelines(f"{c}\t{s}\t{e}\t{g}\n" for c, s, e, g in GENES)
+    write_gtf(out / "annotation" / "genes.gtf", GENES)
     # stratifications: the designed repeat contexts (1-based starts -> BED; one base of flank)
     strata = {
         "homopolymer": HOMOPOLYMER,
