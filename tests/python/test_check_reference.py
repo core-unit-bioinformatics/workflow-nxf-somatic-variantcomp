@@ -1,313 +1,266 @@
-"""Unit tests for bin/check_reference.py (decisions on tool outputs)."""
+"""Unit tests for bin/check_reference.py (input checks against the reference)."""
 
+import random
 import subprocess
 import sys
 from pathlib import Path
 
+import pysam
 import pytest
 
 SCRIPT = Path(__file__).resolve().parents[2] / "bin" / "check_reference.py"
-FAI = "chr1\t2000\t6\t60\t61\nchr2\t1000\t2046\t60\t61\nchrM\t500\t3070\t60\t61\n"
+sys.path.insert(0, str(SCRIPT.parent))
+import check_reference  # noqa: E402
+
+LENGTHS = {"chr1": 2000, "chr2": 1000, "chrM": 500}
 
 
 @pytest.fixture()
-def fai(tmp_path):
-    path = tmp_path / "ref.fa.fai"
-    path.write_text(FAI)
-    return path
+def ref(tmp_path):
+    """Reference FASTA with index; returns (fasta, fai, {contig: sequence})."""
+    rng = random.Random(7)
+    seqs = {name: "".join(rng.choice("ACGT") for _ in range(n)) for name, n in LENGTHS.items()}
+    fasta = tmp_path / "ref.fa"
+    fasta.write_text("".join(f">{name}\n{seq}\n" for name, seq in seqs.items()))
+    pysam.faidx(str(fasta))
+    return fasta, Path(f"{fasta}.fai"), seqs
 
 
-def vcf_header(contigs, samples=("TUMOR", "NORMAL")):
+def vcf_text(contigs, records, samples=("TUMOR", "NORMAL")):
+    """VCF with the given contig lines [(name, length or None)] and records [(chrom, pos, ref)]."""
     lines = ["##fileformat=VCFv4.2"]
     lines += [f"##contig=<ID={c},length={n}>" if n else f"##contig=<ID={c}>" for c, n in contigs]
+    lines.append('##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">')
     lines.append(
         "\t".join(
             ["#CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT", *samples]
         )
     )
+    for chrom, pos, ref_allele in records:
+        alt = "A" if ref_allele[0] != "A" else "C"
+        lines.append(
+            "\t".join(
+                [chrom, str(pos), ".", ref_allele, alt, ".", "PASS", ".", "GT"]
+                + ["0/1"] * len(samples)
+            )
+        )
     return "\n".join(lines) + "\n"
 
 
 def run(tmp_path, *args):
-    result = subprocess.run(
-        [sys.executable, str(SCRIPT), *map(str, args)], capture_output=True, text=True
+    """Run the script; return (process, report dict or None)."""
+    prefix = tmp_path / "out"
+    proc = subprocess.run(
+        [sys.executable, str(SCRIPT), *args, "--name", "x", "--prefix", str(prefix)],
+        capture_output=True,
+        text=True,
     )
-    report_file = next(tmp_path.glob("out.*.tsv"), None)
-    report = {}
-    if report_file:
-        for line in report_file.read_text().splitlines()[1:]:
-            key, value = line.split("\t", 1)
+    report_path = Path(f"{prefix}.reference_check.tsv")
+    report = None
+    if report_path.exists():
+        rows = [line.split("\t", 1) for line in report_path.read_text().splitlines()[1:]]
+        report = {}
+        for key, value in rows:
             report.setdefault(key, value)
-    return result, report
+    return proc, report
 
 
-def check_vcf(tmp_path, fai, header, records, *extra):
-    (tmp_path / "header.vcf").write_text(header)
-    (tmp_path / "contigs.txt").write_text("".join(f"{c}\n" for c in records))
-    return run(
+def check_vcf(tmp_path, ref, contigs, records, *extra):
+    fasta, fai, _ = ref
+    vcf = tmp_path / "in.vcf"
+    vcf.write_text(vcf_text(contigs, records))
+    return run(tmp_path, "vcf", "--vcf", str(vcf), "--fai", str(fai), "--fasta", str(fasta), *extra)
+
+
+def real_ref(ref, chrom, pos, n=1):
+    """REF allele of the test reference at a 1-based position."""
+    return ref[2][chrom][pos - 1 : pos - 1 + n]
+
+
+def test_vcf_ok(tmp_path, ref):
+    proc, report = check_vcf(
         tmp_path,
-        "contigs",
-        "--type",
-        "vcf",
-        "--name",
-        "test.vcf",
-        "--fai",
-        fai,
-        "--prefix",
-        tmp_path / "out",
-        "--vcf-header",
-        tmp_path / "header.vcf",
-        "--record-contigs",
-        tmp_path / "contigs.txt",
-        *extra,
-    )
-
-
-def test_vcf_ok(tmp_path, fai):
-    result, report = check_vcf(
-        tmp_path,
-        fai,
-        vcf_header([("chr1", 2000), ("chr2", 1000)]),
-        ["chr1", "chr2"],
+        ref,
+        [("chr1", 2000), ("chr2", 1000)],
+        [("chr1", 10, real_ref(ref, "chr1", 10)), ("chr2", 5, real_ref(ref, "chr2", 5, 2))],
         "--samples",
         "TUMOR,NORMAL",
     )
-    assert result.returncode == 0, result.stderr
+    assert proc.returncode == 0, proc.stderr
     assert report["status"] == "ok"
-    assert (tmp_path / "out.rename_chrs.tsv").read_text() == ""
-    assert (tmp_path / "out.keep_contigs.txt").read_text().split() == ["chr1", "chr2"]
+    assert report["records"] == "2" and report["ref_mismatches"] == "0"
 
 
-def test_vcf_nochr_renamed(tmp_path, fai):
-    result, report = check_vcf(tmp_path, fai, vcf_header([]), ["1", "2", "MT"])
-    assert result.returncode == 0, result.stderr
-    assert report["status"] == "fixed"
-    assert (tmp_path / "out.rename_chrs.tsv").read_text().splitlines() == [
-        "1\tchr1",
-        "2\tchr2",
-        "MT\tchrM",
-    ]
+def test_vcf_nochr_renamed(tmp_path, ref):
+    proc, report = check_vcf(tmp_path, ref, [("1", 2000)], [("1", 10, real_ref(ref, "chr1", 10))])
+    assert proc.returncode == 0, proc.stderr
+    assert report["status"] == "fixed" and report["renamed_contigs"] == "1->chr1"
+    assert (tmp_path / "out.rename_chrs.tsv").read_text() == "1\tchr1\n"
 
 
-def test_vcf_mito_length_fixed(tmp_path, fai):
-    result, report = check_vcf(tmp_path, fai, vcf_header([("chr1", 2000), ("chrM", 501)]), ["chrM"])
-    assert result.returncode == 0, result.stderr
-    assert report["header_length_fixes"] == "chrM:501->500"
-
-
-def test_vcf_nuclear_length_is_build_error(tmp_path, fai):
-    result, _ = check_vcf(tmp_path, fai, vcf_header([("chr1", 2500)]), ["chr1"])
-    assert result.returncode == 1
-    assert "another genome build" in result.stderr
-
-
-def test_vcf_missing_sample(tmp_path, fai):
-    result, _ = check_vcf(
-        tmp_path, fai, vcf_header([("chr1", 2000)]), ["chr1"], "--samples", "T1,NORMAL"
-    )
-    assert result.returncode == 1
-    assert "sample(s) T1 not in the VCF (samples in the VCF: TUMOR, NORMAL)" in result.stderr
-
-
-def test_vcf_unknown_contig_records_dropped(tmp_path, fai):
-    result, report = check_vcf(
-        tmp_path, fai, vcf_header([("chr1", 2000), ("decoy", 10)]), ["chr1", "decoy", "decoy"]
-    )
-    assert result.returncode == 0, result.stderr
-    assert report["records_on_unknown_contigs"] == "2"
-    assert "decoy (2)" in result.stderr
-
-
-def test_vcf_no_record_on_reference(tmp_path, fai):
-    result, _ = check_vcf(tmp_path, fai, vcf_header([]), ["chrUn1", "chrUn2"])
-    assert result.returncode == 1
-    assert "no record is on a contig of the reference" in result.stderr
-
-
-def test_bed(tmp_path, fai):
-    bed = tmp_path / "in.bed"
-    bed.write_text("track name=x\n1\t0\t100\tGENE1\nchr2\t900\t1000\tGENE2\ndecoy\t0\t5\n")
-    result, report = run(
+def test_vcf_mito_dropped_even_with_other_length(tmp_path, ref):
+    # chrM with another length is not checked: the contig is not compared
+    proc, report = check_vcf(
         tmp_path,
-        "contigs",
-        "--type",
-        "bed",
-        "--name",
-        "in.bed",
-        "--fai",
-        fai,
-        "--prefix",
-        tmp_path / "out",
-        "--bed",
-        bed,
+        ref,
+        [("chr1", 2000), ("MT", 16571)],
+        [("chr1", 10, real_ref(ref, "chr1", 10)), ("MT", 5, "A")],
     )
-    assert result.returncode == 0, result.stderr
-    assert (
-        tmp_path / "out.harmonized.bed"
-    ).read_text() == "chr1\t0\t100\tGENE1\nchr2\t900\t1000\tGENE2\n"
-    assert report["intervals_on_unknown_contigs"] == "1"
+    assert proc.returncode == 0, proc.stderr
+    assert report["dropped_mito"] == "MT" and report["records_on_mito"] == "1"
+    assert report["length_mismatches"] == "none"
 
 
-def test_bed_beyond_contig_end(tmp_path, fai):
-    bed = tmp_path / "in.bed"
-    bed.write_text("chr2\t900\t1200\n")
-    result, _ = run(
+def test_vcf_mito_kept_is_length_checked(tmp_path, ref):
+    proc, report = check_vcf(
         tmp_path,
-        "contigs",
-        "--type",
-        "bed",
-        "--name",
-        "in.bed",
-        "--fai",
-        fai,
-        "--prefix",
-        tmp_path / "out",
-        "--bed",
-        bed,
+        ref,
+        [("chr1", 2000), ("chrM", 16571)],
+        [("chr1", 10, real_ref(ref, "chr1", 10))],
+        "--keep-mito",
     )
-    assert result.returncode == 1
-    assert "end beyond their contig (e.g. chr2 at 1200, reference length 1000)" in result.stderr
+    assert proc.returncode == 1
+    assert "another genome build" in proc.stderr and report["status"] == "error"
 
 
-def test_bam_idxstats(tmp_path, fai):
-    idx = tmp_path / "x.idxstats"
-    idx.write_text("1\t2000\t10\t0\n2\t1000\t5\t0\nMT\t500\t1\t0\n*\t0\t0\t3\n")
-    regions = tmp_path / "regions.bed"
-    regions.write_text("chr1\t10\t20\nchrM\t0\t5\n")
-    result, report = run(
+def test_vcf_nuclear_length_is_build_error(tmp_path, ref):
+    proc, _ = check_vcf(tmp_path, ref, [("chr1", 2001)], [("chr1", 10, real_ref(ref, "chr1", 10))])
+    assert proc.returncode == 1
+    assert "chr1:2001 (reference chr1:2000)" in proc.stderr
+
+
+def test_warn_only_turns_errors_into_warnings(tmp_path, ref):
+    proc, report = check_vcf(
+        tmp_path, ref, [("chr1", 2001)], [("chr1", 10, real_ref(ref, "chr1", 10))], "--warn-only"
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert "(check switched off)" in proc.stderr and report["status"] == "fixed"
+
+
+def test_vcf_missing_sample(tmp_path, ref):
+    proc, _ = check_vcf(
         tmp_path,
-        "contigs",
-        "--type",
-        "bam",
-        "--name",
-        "x.bam",
-        "--fai",
-        fai,
-        "--prefix",
-        tmp_path / "out",
-        "--idxstats",
-        idx,
-        "--regions",
-        regions,
+        ref,
+        [("chr1", 2000)],
+        [("chr1", 10, real_ref(ref, "chr1", 10))],
+        "--samples",
+        "TUMOR1",
     )
-    assert result.returncode == 0, result.stderr
-    assert (tmp_path / "out.regions.bed").read_text() == "1\t10\t20\nMT\t0\t5\n"
-    assert report["renamed_contigs"] == "1->chr1,2->chr2,MT->chrM"
+    assert proc.returncode == 1
+    assert "sample(s) TUMOR1 not in the VCF (samples in the VCF: TUMOR, NORMAL)" in proc.stderr
 
 
-def test_bam_other_build(tmp_path, fai):
-    idx = tmp_path / "x.idxstats"
-    idx.write_text("chr1\t2100\t10\t0\n")
-    result, _ = run(
+def test_vcf_unknown_contig_records_dropped(tmp_path, ref):
+    proc, report = check_vcf(
         tmp_path,
-        "contigs",
-        "--type",
-        "bam",
-        "--name",
-        "x.bam",
-        "--fai",
-        fai,
-        "--prefix",
-        tmp_path / "out",
-        "--idxstats",
-        idx,
+        ref,
+        [("chr1", 2000)],
+        [("chr1", 10, real_ref(ref, "chr1", 10)), ("chrUn_x", 3, "A")],
     )
-    assert result.returncode == 1
-    assert "another genome build" in result.stderr
+    assert proc.returncode == 0, proc.stderr
+    assert report["records_on_unknown_contigs"] == "1" and report["unknown_contigs"] == "chrUn_x"
+
+
+def test_vcf_no_record_on_reference(tmp_path, ref):
+    proc, _ = check_vcf(tmp_path, ref, [], [("scaffold9", 3, "A")])
+    assert proc.returncode == 1
+    assert "none of the 1 contigs (scaffold9) is in the reference" in proc.stderr
+
+
+def test_vcf_ref_mismatch_rate(tmp_path, ref):
+    wrong = "A" if real_ref(ref, "chr1", 20) != "A" else "C"
+    records = [("chr1", 10, real_ref(ref, "chr1", 10)), ("chr1", 20, wrong)]
+    # 1 of 2 mismatching: error with the default threshold of 1 %
+    proc, report = check_vcf(tmp_path, ref, [("chr1", 2000)], records)
+    assert proc.returncode == 1
+    assert report["ref_mismatches"] == "1" and "differ from the reference" in proc.stderr
+    # accepted with a threshold of 60 %
+    proc, _ = check_vcf(tmp_path, ref, [("chr1", 2000)], records, "--max-ref-mismatch", "0.6")
+    assert proc.returncode == 0, proc.stderr
+
+
+def test_bed_harmonized(tmp_path, ref):
+    bed = tmp_path / "t.bed"
+    bed.write_text("1\t100\t200\tA\nchrUn_x\t1\t5\tB\nMT\t10\t20\tC\n")
+    proc, report = run(tmp_path, "bed", "--bed", str(bed), "--fai", str(ref[1]))
+    assert proc.returncode == 0, proc.stderr
+    assert (tmp_path / "out.harmonized.bed").read_text() == "chr1\t100\t200\tA\n"
+    assert report["intervals_dropped"] == "2" and report["dropped_mito"] == "MT"
+
+
+def test_bed_beyond_contig_end(tmp_path, ref):
+    bed = tmp_path / "t.bed"
+    bed.write_text("chr1\t100\t200\nchr1\t1900\t2100\n")
+    proc, _ = run(tmp_path, "bed", "--bed", str(bed), "--fai", str(ref[1]))
+    assert proc.returncode == 1
+    assert "line 2: chr1 at 2100" in proc.stderr and "another genome build" in proc.stderr
 
 
 @pytest.mark.parametrize(
-    ("line", "code"),
+    ("line", "message"),
     [
-        (
-            "Lines   total/split/joined/realigned/mismatch_removed/dup_removed/skipped:\t1000/2/0/5/3/1/0",
-            0,
-        ),
-        (
-            "Lines   total/split/joined/realigned/mismatch_removed/dup_removed/skipped:\t100/0/0/0/50/0/0",
-            1,
-        ),
+        ("chr1 0 10", "space-separated? BED needs tabs"),
+        ("chr1\ta\t10", "are not integers"),
+        ("chr1\t20\t10", "invalid interval 20-10"),
     ],
 )
-def test_ref_alleles(tmp_path, line, code):
-    log = tmp_path / "x.norm.log"
-    log.write_text("REF_MISMATCH\tchr1\t10\tA\tC\n" + line + "\n")
-    result, report = run(
-        tmp_path,
-        "ref-alleles",
-        "--name",
-        "x.vcf",
-        "--norm-log",
-        log,
-        "--max-ref-mismatch",
-        "0.01",
-        "--prefix",
-        tmp_path / "out",
-    )
-    assert result.returncode == code, result.stderr
-    if code:
-        assert "50 of 100 REF alleles (50.00%) differ from the reference" in result.stderr
-    else:
-        assert report["ref_mismatches_removed"] == "3"
+def test_read_bed_errors(tmp_path, line, message):
+    bed = tmp_path / "x.bed"
+    bed.write_text(line + "\n")
+    with pytest.raises(SystemExit) as err:
+        check_reference.read_bed(bed)
+    assert "line 1" in str(err.value) and message in str(err.value)
 
 
-def test_ref_alleles_without_summary(tmp_path):
-    log = tmp_path / "x.norm.log"
-    log.write_text("something else\n")
-    result, _ = run(
-        tmp_path, "ref-alleles", "--name", "x.vcf", "--norm-log", log, "--prefix", tmp_path / "out"
-    )
-    assert result.returncode == 1
-    assert "no summary line of bcftools norm" in result.stderr
-
-
-def test_mixed_naming_styles_fail(tmp_path, fai):
+def test_mixed_naming_styles_fail(tmp_path, ref):
     bed = tmp_path / "mixed.bed"
     bed.write_text("1\t10\t20\nchr1\t30\t40\n")
-    result = subprocess.run(
+    proc, _ = run(tmp_path, "bed", "--bed", str(bed), "--fai", str(ref[1]))
+    assert proc.returncode == 1
+    assert "contigs 1, chr1 all correspond to the reference contig chr1" in proc.stderr
+
+
+def make_bam(path, contigs):
+    header = {"HD": {"VN": "1.6"}, "SQ": [{"SN": c, "LN": n} for c, n in contigs]}
+    with pysam.AlignmentFile(str(path), "wb", header=header):
+        pass
+    return path
+
+
+def test_bam_renamed(tmp_path, ref):
+    bam = make_bam(tmp_path / "x.bam", [("1", 2000), ("2", 1000), ("MT", 16569)])
+    proc, report = run(tmp_path, "bam", "--alignment", str(bam), "--fai", str(ref[1]))
+    assert proc.returncode == 0, proc.stderr
+    assert (tmp_path / "out.rename_chrs.tsv").read_text() == "1\tchr1\n2\tchr2\n"
+    assert report["dropped_mito"] == "MT"
+
+
+def test_bam_other_build(tmp_path, ref):
+    bam = make_bam(tmp_path / "x.bam", [("chr1", 2500)])
+    proc, _ = run(tmp_path, "bam", "--alignment", str(bam), "--fai", str(ref[1]))
+    assert proc.returncode == 1 and "another genome build" in proc.stderr
+
+
+def test_rename_bed(tmp_path):
+    rename = tmp_path / "r.tsv"
+    rename.write_text("1\tchr1\n")
+    bed = tmp_path / "common.bed"
+    bed.write_text("chr1\t0\t10\nchr2\t5\t9\n")
+    out = tmp_path / "out.bed"
+    proc = subprocess.run(
         [
             sys.executable,
             str(SCRIPT),
-            "contigs",
-            "--type",
-            "bed",
-            "--name",
-            "mixed",
-            "--fai",
-            str(fai),
-            "--prefix",
-            str(tmp_path / "x"),
+            "rename-bed",
             "--bed",
             str(bed),
+            "--rename",
+            str(rename),
+            "--output",
+            str(out),
         ],
         capture_output=True,
         text=True,
     )
-    assert result.returncode == 1
-    assert "contigs 1, chr1 all correspond to the reference contig chr1" in result.stderr
-
-
-def test_no_contig_on_reference_fails(tmp_path, fai):
-    bed = tmp_path / "other.bed"
-    bed.write_text("scaffold_1\t10\t20\n")
-    result = subprocess.run(
-        [
-            sys.executable,
-            str(SCRIPT),
-            "contigs",
-            "--type",
-            "bed",
-            "--name",
-            "other",
-            "--fai",
-            str(fai),
-            "--prefix",
-            str(tmp_path / "x"),
-            "--bed",
-            str(bed),
-        ],
-        capture_output=True,
-        text=True,
-    )
-    assert result.returncode == 1
-    assert "none of the 1 contigs (scaffold_1) is in the reference" in result.stderr
+    assert proc.returncode == 0, proc.stderr
+    assert out.read_text() == "1\t0\t10\nchr2\t5\t9\n"
