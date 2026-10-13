@@ -21,8 +21,18 @@ def run(tmp_path, text, command="samplesheet", *extra):
     sheet = tmp_path / "sheet.csv"
     sheet.write_text(text)
     out = tmp_path / "out.csv"
-    cmd = [sys.executable, str(SCRIPT), command, "--sheet", str(sheet), "--base-dir",
-           str(tmp_path), "--output", str(out), *extra]  # fmt: skip
+    cmd = [
+        sys.executable,
+        str(SCRIPT),
+        command,
+        "--sheet",
+        str(sheet),
+        "--base-dir",
+        str(tmp_path),
+        "--output",
+        str(out),
+        *extra,
+    ]
     if command == "samplesheet":
         cmd += ["--truth-technology", "wgs"]
     return subprocess.run(cmd, capture_output=True, text=True), out
@@ -43,24 +53,45 @@ def test_valid_samplesheet_resolves_paths(tmp_path):
 @pytest.mark.parametrize(
     ("text", "message"),
     [
-        (HEADER + row("S1", "wgs") + row("S1", "wgs") + row("S1", "wes", "capture", "x.bed"),
-         "occur twice"),
+        (
+            HEADER + row("S1", "wgs") + row("S1", "wgs") + row("S1", "wes", "capture", "x.bed"),
+            "occur twice",
+        ),
         (HEADER + row("S1", "wgs") + row("S2", "wgs"), "at least two technologies"),
-        (HEADER + row("S1", "wgs") + row("S1", "wes", "capture", "x.bed") + row("S2", "wes", "capture", "x.bed"),
-         "sample 'S2' has no row for the truth technology 'wgs'"),
-        (HEADER + row("S1", "wgs") + row("S1", "wes", "capture", "x.bed") + row("S2", "wgs"),
-         "sample 'S2' has no technology to compare"),
-        (HEADER + row("S1", "wgs") + row("S1", "wes", "capture", "a.bed") + row("S2", "wgs")
-         + row("S2", "wes", "capture", "b.bed"), "must use one target_bed"),
+        (
+            HEADER
+            + row("S1", "wgs")
+            + row("S1", "wes", "capture", "x.bed")
+            + row("S2", "wes", "capture", "x.bed"),
+            "sample 'S2' has no row for the truth technology 'wgs'",
+        ),
+        (
+            HEADER + row("S1", "wgs") + row("S1", "wes", "capture", "x.bed") + row("S2", "wgs"),
+            "sample 'S2' has no technology to compare",
+        ),
+        (
+            HEADER
+            + row("S1", "wgs")
+            + row("S1", "wes", "capture", "a.bed")
+            + row("S2", "wgs")
+            + row("S2", "wes", "capture", "b.bed"),
+            "must use one target_bed",
+        ),
         (HEADER + row("S1", "wgs") + row("S1", "panel", "amplicon"), "needs a target_bed"),
-        (HEADER + row("S1", "wgs") + row("S1", "wes", "capture", "x.bed", tumor="T", normal="T"),
-         "tumor_id and normal_id are identical"),
+        (
+            HEADER + row("S1", "wgs") + row("S1", "wes", "capture", "x.bed", tumor="T", normal="T"),
+            "tumor_id and normal_id are identical",
+        ),
         (HEADER + row("S1", "wgs") + row("S1", "wes", "exome", "x.bed"), "library_type 'exome'"),
-        (HEADER.replace("target_bed", "target_bed,vcf_index") + row("S1", "wgs").rstrip() + ",x.tbi\n",
-         "column 'vcf_index' is no longer supported"),
+        (
+            HEADER.replace("target_bed", "target_bed,vcf_index")
+            + row("S1", "wgs").rstrip()
+            + ",x.tbi\n",
+            "column 'vcf_index' is no longer supported",
+        ),
         (VALID.replace(",", "\t"), "tab-separated"),
     ],
-)  # fmt: skip
+)
 def test_invalid_samplesheets(tmp_path, text, message):
     result, _ = run(tmp_path, text)
     assert result.returncode == 1
@@ -81,8 +112,11 @@ def test_all_errors_reported_at_once(tmp_path):
 
 
 def test_stratification(tmp_path):
-    result, out = run(tmp_path, "name,bed\nhomopolymer,giab/hp.bed\ntandem_repeat,/abs/tr.bed.gz\n",
-                      "stratification")  # fmt: skip
+    result, out = run(
+        tmp_path,
+        "name,bed\nhomopolymer,giab/hp.bed\ntandem_repeat,/abs/tr.bed.gz\n",
+        "stratification",
+    )
     assert result.returncode == 0, result.stderr
     rows = list(csv.DictReader(out.open()))
     assert rows[0]["bed"] == str(tmp_path / "giab" / "hp.bed")
@@ -97,14 +131,18 @@ def test_stratification(tmp_path):
 def test_known(tmp_path):
     samplesheet = tmp_path / "validated.csv"
     samplesheet.write_text("sample,technology\nS1,wgs\nS1,wes\n")
-    text = ("name,sample,mode,variants,regions\n"
-            "clinical,S1,required,known/a.csv,n/a\n"
-            "truth,all,benchmark,t/snv.vcf.gz;t/indel.vcf.gz,t/hc.bed\n")  # fmt: skip
+    text = (
+        "name,sample,mode,variants,regions\n"
+        "clinical,S1,required,known/a.csv,n/a\n"
+        "truth,all,benchmark,t/snv.vcf.gz;t/indel.vcf.gz,t/hc.bed\n"
+    )
     result, out = run(tmp_path, text, "known", "--samplesheet", str(samplesheet))
     assert result.returncode == 0, result.stderr
     rows = list(csv.DictReader(out.open()))
-    assert rows[1]["variants"].split(";") == [str(tmp_path / "t" / "snv.vcf.gz"),
-                                              str(tmp_path / "t" / "indel.vcf.gz")]  # fmt: skip
+    assert rows[1]["variants"].split(";") == [
+        str(tmp_path / "t" / "snv.vcf.gz"),
+        str(tmp_path / "t" / "indel.vcf.gz"),
+    ]
     bad = "name,sample,mode,variants,regions\nx,S9,check,a.txt,n/a\n"
     result, _ = run(tmp_path, bad, "known", "--samplesheet", str(samplesheet))
     assert result.returncode == 1

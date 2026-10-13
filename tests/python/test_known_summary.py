@@ -18,10 +18,20 @@ def run(tmp_path, *extra):
     (tmp_path / "v.tsv").write_text(VARIANTS)
     (tmp_path / "s.tsv").write_text(SUMMARY)
     return subprocess.run(
-        [sys.executable, str(SCRIPT), "--variants", f"clinical={tmp_path / 'v.tsv'}",
-         "--summary", f"clinical={tmp_path / 's.tsv'}", "--prefix", str(tmp_path / "known"), *extra],
-        capture_output=True, text=True,
-    )  # fmt: skip
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--variants",
+            f"clinical={tmp_path / 'v.tsv'}",
+            "--summary",
+            f"clinical={tmp_path / 's.tsv'}",
+            "--prefix",
+            str(tmp_path / "known"),
+            *extra,
+        ],
+        capture_output=True,
+        text=True,
+    )
 
 
 def test_summary_tables_and_warnings(tmp_path):
@@ -31,7 +41,10 @@ def test_summary_tables_and_warnings(tmp_path):
         rows = list(csv.DictReader(fh, delimiter="\t"))
     # sorted by position; the list name is the first column
     assert [(r["list"], r["label"]) for r in rows] == [("clinical", "V2"), ("clinical", "V1")]
-    assert "required variant V2 chr1:50 G>T (TP53) of list 'clinical' not found in S1 wes: absent" in proc.stderr
+    assert (
+        "required variant V2 chr1:50 G>T (TP53) of list 'clinical' not found in S1 wes: absent"
+        in proc.stderr
+    )
     mqc = (tmp_path / "known_required_mqc.tsv").read_text().splitlines()
     assert mqc[-1] == "clinical S1 wes\tclinical\tS1\twes\t2\t1\t1\tno"
 
@@ -47,9 +60,18 @@ def test_missing_column_is_an_error(tmp_path):
     (tmp_path / "bad.tsv").write_text("sample\ttechnology\nS1\twes\n")
     (tmp_path / "s.tsv").write_text(SUMMARY)
     proc = subprocess.run(
-        [sys.executable, str(SCRIPT), "--variants", f"x={tmp_path / 'bad.tsv'}",
-         "--summary", f"x={tmp_path / 's.tsv'}", "--prefix", str(tmp_path / "k")],
-        capture_output=True, text=True,
-    )  # fmt: skip
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--variants",
+            f"x={tmp_path / 'bad.tsv'}",
+            "--summary",
+            f"x={tmp_path / 's.tsv'}",
+            "--prefix",
+            str(tmp_path / "k"),
+        ],
+        capture_output=True,
+        text=True,
+    )
     assert proc.returncode == 1
     assert "missing column(s) label" in proc.stderr

@@ -47,8 +47,9 @@ def main():
     parser.add_argument("--regions", required=True, help="mosdepth <prefix>.regions.bed.gz")
     parser.add_argument("--mode", choices=["base", "region"], required=True)
     parser.add_argument("--label", default="CALLABLE", help="quantize label of callable bins")
-    parser.add_argument("--low-label", default="LOW_COVERAGE",
-                        help="quantize label of bins below the threshold")  # fmt: skip
+    parser.add_argument(
+        "--low-label", default="LOW_COVERAGE", help="quantize label of bins below the threshold"
+    )
     parser.add_argument("--min-coverage", type=float, help="minimum mean depth (region mode)")
     parser.add_argument("--rename", required=True, help="contig rename map (may be empty)")
     parser.add_argument("--fai", required=True, help="reference .fai")
@@ -77,8 +78,10 @@ def main():
                 continue
             fields = line.rstrip("\n").split("\t")
             if len(fields) < 4:
-                sys.exit(f"ERROR: {args.input}: line {line_no}: expected at least 4 columns "
-                         f"(chrom, start, end, label/depth), found {len(fields)}")  # fmt: skip
+                sys.exit(
+                    f"ERROR: {args.input}: line {line_no}: expected at least 4 columns "
+                    f"(chrom, start, end, label/depth), found {len(fields)}"
+                )
             n_in += 1
             chrom, start, end, value = fields[0], fields[1], fields[2], fields[3]
             # base mode: the 4th column is the quantize label
@@ -90,8 +93,10 @@ def main():
                 try:
                     callable_ = float(value) >= args.min_coverage
                 except ValueError:
-                    sys.exit(f"ERROR: {args.input}: line {line_no}: mean depth '{value}' is not "
-                             "a number; is this a mosdepth regions.bed.gz file?")  # fmt: skip
+                    sys.exit(
+                        f"ERROR: {args.input}: line {line_no}: mean depth '{value}' is not "
+                        "a number; is this a mosdepth regions.bed.gz file?"
+                    )
             if not callable_:
                 continue
             # translate the contig name to the reference name
@@ -107,17 +112,23 @@ def main():
     unexpected = labels_seen - {args.label, args.low_label}
     if args.mode == "base" and unexpected:
         found = ", ".join(sorted(unexpected))
-        sys.exit(f"ERROR: {args.input}: unexpected quantize label(s) {found} (expected "
-                 f"{args.low_label}/{args.label}); run mosdepth with --quantize 0:<min>: and "
-                 "the labels MOSDEPTH_Q0/MOSDEPTH_Q1")  # fmt: skip
+        sys.exit(
+            f"ERROR: {args.input}: unexpected quantize label(s) {found} (expected "
+            f"{args.low_label}/{args.label}); run mosdepth with --quantize 0:<min>: and "
+            "the labels MOSDEPTH_Q0/MOSDEPTH_Q1"
+        )
     if n_in == 0:
         sys.exit(f"ERROR: {args.input}: no intervals; mosdepth output is empty")
-    print(f"INFO: {args.input}: {n_in} intervals read, {n_callable} callable written, "
-          f"{n_unknown_contig} callable intervals on contigs not in the reference dropped",
-          file=sys.stderr)  # fmt: skip
+    print(
+        f"INFO: {args.input}: {n_in} intervals read, {n_callable} callable written, "
+        f"{n_unknown_contig} callable intervals on contigs not in the reference dropped",
+        file=sys.stderr,
+    )
     if n_callable == 0:
-        print(f"WARNING: {args.input}: no callable interval (all below the threshold)",
-              file=sys.stderr)  # fmt: skip
+        print(
+            f"WARNING: {args.input}: no callable interval (all below the threshold)",
+            file=sys.stderr,
+        )
 
 
 if __name__ == "__main__":

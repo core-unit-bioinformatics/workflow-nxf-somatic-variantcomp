@@ -43,21 +43,85 @@ import pandas as pd  # noqa: E402
 from scipy.stats import fisher_exact  # noqa: E402
 
 BASE_COLUMNS = {
-    "sample", "truth", "query", "status", "chrom", "pos", "ref", "alt", "type", "length",
-    "truth_vaf", "truth_dp", "truth_alt", "query_vaf", "query_dp", "query_alt", "query_filter",
-    "class", "other_in_normalized", "other_filter", "other_vaf_normalized", "other_tumor_dp",
-    "other_tumor_alt", "normal_dp", "normal_alt", "normal_vaf", "query_power", "detectable",
+    "sample",
+    "truth",
+    "query",
+    "status",
+    "chrom",
+    "pos",
+    "ref",
+    "alt",
+    "type",
+    "length",
+    "truth_vaf",
+    "truth_dp",
+    "truth_alt",
+    "query_vaf",
+    "query_dp",
+    "query_alt",
+    "query_filter",
+    "class",
+    "other_in_normalized",
+    "other_filter",
+    "other_vaf_normalized",
+    "other_tumor_dp",
+    "other_tumor_alt",
+    "normal_dp",
+    "normal_alt",
+    "normal_vaf",
+    "query_power",
+    "detectable",
     "gene",
-}  # fmt: skip
-CLASS_ORDER = ["present_but_filtered", "germline_in_normal", "low_coverage",
-               "subthreshold_evidence", "no_evidence", "absent"]  # fmt: skip
-METRICS_COLUMNS = ["truth", "query", "stratum_type", "stratum", "n_samples", "tp_baseline", "fn",
-                   "tp_call", "fp", "micro_recall", "micro_precision", "micro_f1",
-                   "macro_recall_mean", "macro_precision_mean"]  # fmt: skip
-PER_PAIR_COLUMNS = ["sample", "truth", "query", "stratum_type", "stratum", "tp_baseline", "fn",
-                    "tp_call", "fp", "recall", "precision", "f1"]  # fmt: skip
-VARIANT_COLUMNS = ["sample", "truth", "query", "status", "pos", "type", "truth_vaf", "query_vaf",
-                   "class"]  # fmt: skip
+}
+CLASS_ORDER = [
+    "present_but_filtered",
+    "germline_in_normal",
+    "low_coverage",
+    "subthreshold_evidence",
+    "no_evidence",
+    "absent",
+]
+METRICS_COLUMNS = [
+    "truth",
+    "query",
+    "stratum_type",
+    "stratum",
+    "n_samples",
+    "tp_baseline",
+    "fn",
+    "tp_call",
+    "fp",
+    "micro_recall",
+    "micro_precision",
+    "micro_f1",
+    "macro_recall_mean",
+    "macro_precision_mean",
+]
+PER_PAIR_COLUMNS = [
+    "sample",
+    "truth",
+    "query",
+    "stratum_type",
+    "stratum",
+    "tp_baseline",
+    "fn",
+    "tp_call",
+    "fp",
+    "recall",
+    "precision",
+    "f1",
+]
+VARIANT_COLUMNS = [
+    "sample",
+    "truth",
+    "query",
+    "status",
+    "pos",
+    "type",
+    "truth_vaf",
+    "query_vaf",
+    "class",
+]
 COLORS = {"recall": "#2a6f97", "precision": "#c8553d", "f1": "#6a994e"}
 
 
@@ -77,8 +141,10 @@ def check_variants(variants, path):
         sys.exit(f"ERROR: {path}: unknown status value(s) {', '.join(bad_status)}")
     bad_class = sorted(set(variants["class"]) - set(CLASS_ORDER) - {"concordant"})
     if bad_class:
-        sys.exit(f"ERROR: {path}: unknown discordance class(es) {', '.join(bad_class)} "
-                 f"(known: concordant, {', '.join(CLASS_ORDER)})")  # fmt: skip
+        sys.exit(
+            f"ERROR: {path}: unknown discordance class(es) {', '.join(bad_class)} "
+            f"(known: concordant, {', '.join(CLASS_ORDER)})"
+        )
 
 
 def bh(pvalues):
@@ -144,14 +210,22 @@ def enrichment(df, low_vaf):
                 c = int((concordant & flag).sum())
                 d = int((concordant & ~flag).sum())
                 odds, p = fisher(a, b, c, d)
-                rows.append({
-                    "truth": truth, "query": query, "discordant": label, "feature": name,
-                    "discordant_with": a, "discordant_without": b,
-                    "concordant_with": c, "concordant_without": d,
-                    "fraction_discordant": a / (a + b) if a + b else math.nan,
-                    "fraction_concordant": c / (c + d) if c + d else math.nan,
-                    "odds_ratio": odds, "p_value": p,
-                })  # fmt: skip
+                rows.append(
+                    {
+                        "truth": truth,
+                        "query": query,
+                        "discordant": label,
+                        "feature": name,
+                        "discordant_with": a,
+                        "discordant_without": b,
+                        "concordant_with": c,
+                        "concordant_without": d,
+                        "fraction_discordant": a / (a + b) if a + b else math.nan,
+                        "fraction_concordant": c / (c + d) if c + d else math.nan,
+                        "odds_ratio": odds,
+                        "p_value": p,
+                    }
+                )
     out = pd.DataFrame(rows)
     if not out.empty:
         out["q_value"] = bh(out["p_value"])
@@ -174,11 +248,20 @@ def gene_summary(df):
             fn = int((g["status"] == "FN").sum())
             fp = int((g["status"] == "FP").sum())
             odds, p = fisher(fn + fp, disc_total - fn - fp, tp, conc_total - tp)
-            rows.append({
-                "truth": truth, "query": query, "gene": gene, "tp": tp, "fn": fn, "fp": fp,
-                "discordance_rate": (fn + fp) / (tp + fn + fp), "samples": g["sample"].nunique(),
-                "odds_ratio": odds, "p_value": p,
-            })  # fmt: skip
+            rows.append(
+                {
+                    "truth": truth,
+                    "query": query,
+                    "gene": gene,
+                    "tp": tp,
+                    "fn": fn,
+                    "fp": fp,
+                    "discordance_rate": (fn + fp) / (tp + fn + fp),
+                    "samples": g["sample"].nunique(),
+                    "odds_ratio": odds,
+                    "p_value": p,
+                }
+            )
     out = pd.DataFrame(rows)
     if not out.empty:
         out["q_value"] = bh(out["p_value"])
@@ -191,8 +274,13 @@ def class_summary(df):
     disc = df[df["status"] != "TP"]
     if disc.empty:
         return pd.DataFrame(columns=["truth", "query", "status", *CLASS_ORDER])
-    table = disc.pivot_table(index=["truth", "query", "status"], columns="class",
-                             values="pos", aggfunc="count", fill_value=0)  # fmt: skip
+    table = disc.pivot_table(
+        index=["truth", "query", "status"],
+        columns="class",
+        values="pos",
+        aggfunc="count",
+        fill_value=0,
+    )
     for c in CLASS_ORDER:
         if c not in table.columns:
             table[c] = 0
@@ -218,44 +306,82 @@ def write_mqc(prefix, metrics, per_pair, power, classes):
             power[["truth", "query", "micro_recall"]].rename(
                 columns={"micro_recall": "power_adjusted_recall"}
             ),
-            on=["truth", "query"], how="left",
-        )  # fmt: skip
+            on=["truth", "query"],
+            how="left",
+        )
     overall.insert(0, "comparison", overall["truth"] + " vs " + overall["query"])
     for col in ("n_samples", "tp_baseline", "fn", "tp_call", "fp"):
         overall[col] = pd.to_numeric(overall[col], errors="coerce").astype("Int64")
-    cols = ["comparison", "n_samples", "tp_baseline", "fn", "tp_call", "fp", "micro_recall",
-            "micro_precision", "micro_f1", "macro_recall_mean", "macro_precision_mean"]  # fmt: skip
+    cols = [
+        "comparison",
+        "n_samples",
+        "tp_baseline",
+        "fn",
+        "tp_call",
+        "fp",
+        "micro_recall",
+        "micro_precision",
+        "micro_f1",
+        "macro_recall_mean",
+        "macro_precision_mean",
+    ]
     if "power_adjusted_recall" in overall.columns:
         cols.append("power_adjusted_recall")
     with open(f"{prefix}_metrics_mqc.tsv", "w") as fh:
-        fh.write(mqc_header("metrics", "Recall and precision",
-                            "Per comparison, summed over samples (micro) and mean over samples "
-                            "(macro).", "table"))  # fmt: skip
+        fh.write(
+            mqc_header(
+                "metrics",
+                "Recall and precision",
+                "Per comparison, summed over samples (micro) and mean over samples " "(macro).",
+                "table",
+            )
+        )
         overall[cols].to_csv(fh, sep="\t", index=False, na_rep="NA", float_format="%.4f")
 
     pairs = per_pair[per_pair["stratum_type"] == "overall"].copy()
     pairs.insert(0, "comparison", pairs["sample"] + ": " + pairs["truth"] + " vs " + pairs["query"])
     with open(f"{prefix}_per_sample_mqc.tsv", "w") as fh:
-        fh.write(mqc_header("per_sample", "Recall and precision per sample",
-                            "Every sample and technology pair.", "table"))  # fmt: skip
-        pairs[["comparison", "tp_baseline", "fn", "tp_call", "fp", "recall", "precision",
-               "f1"]].to_csv(fh, sep="\t", index=False)  # fmt: skip
+        fh.write(
+            mqc_header(
+                "per_sample",
+                "Recall and precision per sample",
+                "Every sample and technology pair.",
+                "table",
+            )
+        )
+        pairs[
+            ["comparison", "tp_baseline", "fn", "tp_call", "fp", "recall", "precision", "f1"]
+        ].to_csv(fh, sep="\t", index=False)
 
     if not classes.empty:
         cl = classes.copy()
         cl.insert(0, "comparison", cl["truth"] + " vs " + cl["query"] + " " + cl["status"])
         with open(f"{prefix}_classes_mqc.tsv", "w") as fh:
-            fh.write(mqc_header("classes", "Discordance classes",
-                                "Why variants were missed (FN) or only called by the query "
-                                "(FP).", "bargraph"))  # fmt: skip
+            fh.write(
+                mqc_header(
+                    "classes",
+                    "Discordance classes",
+                    "Why variants were missed (FN) or only called by the query " "(FP).",
+                    "bargraph",
+                )
+            )
             cl[["comparison", *CLASS_ORDER]].to_csv(fh, sep="\t", index=False)
 
     vaf = metrics[metrics["stratum_type"] == "truth_vaf"]
-    lines = ["id: 'variantcomp_recall_vaf'", "section_name: 'Recall by truth VAF'",
-             "description: 'Micro recall per truth VAF bin.'", "plot_type: 'linegraph'",
-             "pconfig:", "  id: 'variantcomp_recall_vaf_plot'", "  title: 'Recall by truth VAF'",
-             "  xlab: 'VAF bin (lower edge)'", "  ylab: 'Recall'", "  ymin: 0", "  ymax: 1",
-             "data:"]  # fmt: skip
+    lines = [
+        "id: 'variantcomp_recall_vaf'",
+        "section_name: 'Recall by truth VAF'",
+        "description: 'Micro recall per truth VAF bin.'",
+        "plot_type: 'linegraph'",
+        "pconfig:",
+        "  id: 'variantcomp_recall_vaf_plot'",
+        "  title: 'Recall by truth VAF'",
+        "  xlab: 'VAF bin (lower edge)'",
+        "  ylab: 'Recall'",
+        "  ymin: 0",
+        "  ymax: 1",
+        "data:",
+    ]
     for (truth, query), group in vaf.groupby(["truth", "query"]):
         lines.append(f"  '{truth} vs {query}':")
         for _, row in group.iterrows():
@@ -278,15 +404,25 @@ def plot_metrics(per_pair, metrics, outdir):
     fig, ax = plt.subplots(figsize=(max(4, 1.8 * len(labels) + 2), 4))
     width = 0.25
     for i, metric in enumerate(["recall", "precision", "f1"]):
-        ax.bar(x + (i - 1) * width, overall[f"micro_{metric}"].astype(float), width,
-               label=metric, color=COLORS[metric], alpha=0.85)  # fmt: skip
+        ax.bar(
+            x + (i - 1) * width,
+            overall[f"micro_{metric}"].astype(float),
+            width,
+            label=metric,
+            color=COLORS[metric],
+            alpha=0.85,
+        )
         samples = per_pair[per_pair["stratum_type"] == "overall"]
         for j, (_, row) in enumerate(overall.iterrows()):
-            values = pd.to_numeric(samples[(samples["truth"] == row["truth"])
-                                           & (samples["query"] == row["query"])][metric],
-                                   errors="coerce").dropna()  # fmt: skip
-            ax.scatter(np.full(len(values), j + (i - 1) * width), values, color="black", s=10,
-                       zorder=3)  # fmt: skip
+            values = pd.to_numeric(
+                samples[(samples["truth"] == row["truth"]) & (samples["query"] == row["query"])][
+                    metric
+                ],
+                errors="coerce",
+            ).dropna()
+            ax.scatter(
+                np.full(len(values), j + (i - 1) * width), values, color="black", s=10, zorder=3
+            )
     ax.set_xticks(x, labels)
     ax.set_ylim(0, 1.05)
     ax.set_ylabel("value (bars: all samples; dots: per sample)")
@@ -302,8 +438,12 @@ def plot_vaf(metrics, outdir):
         return
     fig, ax = plt.subplots(figsize=(6, 4))
     for (truth, query), group in vaf.groupby(["truth", "query"]):
-        ax.plot(group["stratum"], group["micro_recall"].astype(float), marker="o",
-                label=f"{truth} vs {query}")  # fmt: skip
+        ax.plot(
+            group["stratum"],
+            group["micro_recall"].astype(float),
+            marker="o",
+            label=f"{truth} vs {query}",
+        )
     ax.set_ylim(0, 1.05)
     ax.set_xlabel("truth VAF")
     ax.set_ylabel("recall")
@@ -373,16 +513,21 @@ def main():
     # VAFs as numbers (NA -> NaN)
     for col in ("truth_vaf", "query_vaf"):
         variants[col] = pd.to_numeric(variants[col], errors="coerce")
-    print(f"INFO: {len(variants)} variants, {variants.groupby(['truth', 'query']).ngroups} "
-          "comparisons", file=sys.stderr)  # fmt: skip
+    print(
+        f"INFO: {len(variants)} variants, {variants.groupby(['truth', 'query']).ngroups} "
+        "comparisons",
+        file=sys.stderr,
+    )
 
     enrich = enrichment(variants, args.low_vaf)
     genes = gene_summary(variants)
     classes = class_summary(variants)
-    enrich.to_csv(f"{args.prefix}.enrichment.tsv", sep="\t", index=False, na_rep="NA",
-                  float_format="%.4g")  # fmt: skip
-    genes.to_csv(f"{args.prefix}.genes.tsv", sep="\t", index=False, na_rep="NA",
-                 float_format="%.4g")  # fmt: skip
+    enrich.to_csv(
+        f"{args.prefix}.enrichment.tsv", sep="\t", index=False, na_rep="NA", float_format="%.4g"
+    )
+    genes.to_csv(
+        f"{args.prefix}.genes.tsv", sep="\t", index=False, na_rep="NA", float_format="%.4g"
+    )
     classes.to_csv(f"{args.prefix}.classes.tsv", sep="\t", index=False)
     write_mqc(args.prefix, metrics, per_pair, power, classes)
 
@@ -394,8 +539,11 @@ def main():
     if not enrich.empty:
         plot_enrichment(enrich, plots)
     n_sig = int((enrich["q_value"] < 0.05).sum()) if not enrich.empty else 0
-    print(f"INFO: {len(enrich)} enrichment tests ({n_sig} with q < 0.05), {len(genes)} gene rows; "
-          f"plots in {plots}/", file=sys.stderr)  # fmt: skip
+    print(
+        f"INFO: {len(enrich)} enrichment tests ({n_sig} with q < 0.05), {len(genes)} gene rows; "
+        f"plots in {plots}/",
+        file=sys.stderr,
+    )
 
 
 if __name__ == "__main__":

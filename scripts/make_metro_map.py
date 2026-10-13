@@ -30,11 +30,27 @@ MONO = "DejaVu Sans Mono, Menlo, Consolas, monospace"
 # use cases / options: key -> (colour, start icon label, legend text); the order is
 # the left-to-right order of the vertical lines
 LINES = {
-    "regions": ("#3d95fd", "bed", "Targeted technologies: target BEDs (+ --regions_bed / --exclude_bed)"),
-    "core": ("#24B064", "vcf", "Always: compare the VCF of every technology with the truth technology"),
+    "regions": (
+        "#3d95fd",
+        "bed",
+        "Targeted technologies: target BEDs (+ --regions_bed / --exclude_bed)",
+    ),
+    "core": (
+        "#24B064",
+        "vcf",
+        "Always: compare the VCF of every technology with the truth technology",
+    ),
     "bam": ("#F18046", "bam", "With alignments (BAM/CRAM): callable regions and read evidence"),
-    "required": ("#ECDC86", "csv", "--known_variants, mode required: clinical checklist (PASS/FAIL)"),
-    "truthset": ("#FA6863", "vcf", "--known_variants, mode benchmark: external truth set (e.g. SEQC2)"),
+    "required": (
+        "#ECDC86",
+        "csv",
+        "--known_variants, mode required: clinical checklist (PASS/FAIL)",
+    ),
+    "truthset": (
+        "#FA6863",
+        "vcf",
+        "--known_variants, mode benchmark: external truth set (e.g. SEQC2)",
+    ),
     "annot": ("#E879E3", "bed", "With --gene_bed / --stratification: genes and genomic context"),
 }
 ALL = list(LINES)
@@ -42,77 +58,239 @@ ALL = list(LINES)
 # subworkflow boxes: (subworkflow name(s), purpose, steps)
 # step: (number, what happens, tools, lines that run this step)
 BANDS = [
-    ("PIPELINE_INITIALISATION, CHECK_SAMPLESHEET, PREPARE_ALIGNMENTS", "read and check the samplesheet", [
-        ("1.1", "Read the samplesheet, check every column", "nf-schema", ["regions", "core", "bam"]),
-        ("1.2", "Check rows: truth technology per sample, one BED per technology",
-         "check_sheets.py", ["regions", "core", "bam"]),
-        ("1.3", "Index alignments without an index", "samtools index", ["bam"]),
-    ]),
-    ("PREPARE_REFERENCE", "index the reference genome", [
-        ("2.1", "Unpack and index the reference FASTA", "gunzip, samtools faidx", ["core"]),
-        ("2.2", "Genome BED: one interval per reference contig", "gawk", ["core"]),
-    ]),
-    ("PREPARE_REGIONS", "build the common comparison region", [
-        ("3.1", "Check target BEDs against the reference, rename contigs", "check_reference.py", ["regions"]),
-        ("3.2", "Sort the BEDs in reference order", "bedtools sort", ["regions"]),
-        ("3.3", "Keep bases targeted by every technology", "bedtools multiinter, gawk, merge", ["regions"]),
-        ("3.4", "Restrict to --regions_bed, remove --exclude_bed (optional)",
-         "bedtools intersect, subtract", ["regions"]),
-        ("3.5", "Common region (genome if no target BEDs) and its size",
-         "bedtools merge, region_summary.py", ["regions", "core"]),
-    ]),
-    ("COVERAGE", "find the bases callable in all technologies of a sample", [
-        ("4.1", "Check alignment contigs against the reference", "samtools idxstats, check_reference.py", ["bam"]),
-        ("4.2", "Depth per base and per common-region interval", "mosdepth", ["bam"]),
-        ("4.3", "Callable bases per alignment (depth >= --min_coverage)",
-         "mosdepth_callable.py, bedtools sort", ["bam"]),
-        ("4.4", "Bases callable in all alignments of a sample (in common region)",
-         "bedtools multiinter, gawk, intersect", ["bam"]),
-    ]),
-    ("PREPROCESS_VCF", "normalize every VCF in the same way", [
-        ("5.1", "Check VCF contigs, contig lengths and sample names",
-         "bcftools view -h, query, check_reference.py", ["core"]),
-        ("5.2", "Keep tumor (+ normal) columns, recompress with BGZF", "bcftools view", ["core"]),
-        ("5.3", "Rename contigs to the reference (chr prefix, MT/chrM)", "bcftools annotate", ["core"]),
-        ("5.4", "Remove records on other contigs and gVCF blocks", "bcftools view", ["core"]),
-        ("5.5", "Rewrite the contig header from the reference", "bcftools reheader", ["core"]),
-        ("5.6", "Split multiallelics, left-align, split MNVs, deduplicate", "bcftools norm", ["core"]),
-        ("5.7", "Stop if too many REF alleles differ (other genome build)", "check_reference.py", ["core"]),
-        ("5.8", "Same VAF, depth and alt reads for every caller (from AD)", "harmonize_vcf.py", ["core"]),
-        ("5.9", "Uniform filters; keep the common (or callable) region", "bcftools view", ["core", "bam"]),
-    ]),
-    ("BENCHMARK", "compare every technology with the truth technology", [
-        ("6.1", "Match calls haplotype-aware: TP, FN, FP", "rtg vcfeval", ["core"]),
-        ("6.2", "Exact-allele and same-position matches", "bcftools isec", ["core"]),
-        ("6.3", "Recall, precision, F1 per sample (overall, type, VAF)", "benchmark_metrics.py", ["core"]),
-        ("6.4", "Combine samples: summed (micro) and mean (macro)", "aggregate_metrics.py", ["core"]),
-    ]),
-    ("DISCORDANCE", "explain why variants differ", [
-        ("7.1", "Positions of all compared variants of a sample", "bcftools query", ["bam"]),
-        ("7.2", "Read counts of every alignment at these positions",
-         "bcftools mpileup + call, bcftools norm", ["bam"]),
-        ("7.3", "Reason for every FN/FP; detection power of the query",
-         "classify_discordance.py", ["core", "bam"]),
-        ("7.4", "Check the stratification sheet, the gene and stratification BEDs",
-         "check_sheets.py, check_reference.py, bedtools sort", ["annot"]),
-        ("7.5", "Add genes and genomic context to every variant",
-         "bedtools map, intersect -c, annotate_variants.py", ["annot"]),
-    ]),
-    ("PREPARE_KNOWN_VARIANTS, KNOWN_VARIANTS", "check known variants", [
-        ("8.1", "Check the known-variant sheet; read the lists, check positions",
-         "check_sheets.py, known_variants.py prepare", ["required", "truthset"]),
-        ("8.2", "Normalize like the calls; stop on any REF mismatch",
-         "bcftools norm, check_reference.py", ["required", "truthset"]),
-        ("8.3", "PASS/FAIL of each variant per sample and technology",
-         "known_variants.py check", ["bam", "required"]),
-        ("8.4", "Checklist summary over all samples", "known_summary.py", ["required"]),
-        ("8.5", "Recall/precision of every technology vs the truth set",
-         "rtg vcfeval, bcftools isec, benchmark_metrics.py", ["truthset"]),
-    ]),
-    ("REPORT", "summarize", [
-        ("9.1", "Enrichment statistics, gene table and plots", "variantcomp_report.py", ["core", "annot"]),
-        ("9.2", "Interactive report of all results", "MultiQC", [k for k in ALL if k != "regions"]),
-    ]),
+    (
+        "PIPELINE_INITIALISATION, CHECK_SAMPLESHEET, PREPARE_ALIGNMENTS",
+        "read and check the samplesheet",
+        [
+            (
+                "1.1",
+                "Read the samplesheet, check every column",
+                "nf-schema",
+                ["regions", "core", "bam"],
+            ),
+            (
+                "1.2",
+                "Check rows: truth technology per sample, one BED per technology",
+                "check_sheets.py",
+                ["regions", "core", "bam"],
+            ),
+            ("1.3", "Index alignments without an index", "samtools index", ["bam"]),
+        ],
+    ),
+    (
+        "PREPARE_REFERENCE",
+        "index the reference genome",
+        [
+            ("2.1", "Unpack and index the reference FASTA", "gunzip, samtools faidx", ["core"]),
+            ("2.2", "Genome BED: one interval per reference contig", "gawk", ["core"]),
+        ],
+    ),
+    (
+        "PREPARE_REGIONS",
+        "build the common comparison region",
+        [
+            (
+                "3.1",
+                "Check target BEDs against the reference, rename contigs",
+                "check_reference.py",
+                ["regions"],
+            ),
+            ("3.2", "Sort the BEDs in reference order", "bedtools sort", ["regions"]),
+            (
+                "3.3",
+                "Keep bases targeted by every technology",
+                "bedtools multiinter, gawk, merge",
+                ["regions"],
+            ),
+            (
+                "3.4",
+                "Restrict to --regions_bed, remove --exclude_bed (optional)",
+                "bedtools intersect, subtract",
+                ["regions"],
+            ),
+            (
+                "3.5",
+                "Common region (genome if no target BEDs) and its size",
+                "bedtools merge, region_summary.py",
+                ["regions", "core"],
+            ),
+        ],
+    ),
+    (
+        "COVERAGE",
+        "find the bases callable in all technologies of a sample",
+        [
+            (
+                "4.1",
+                "Check alignment contigs against the reference",
+                "samtools idxstats, check_reference.py",
+                ["bam"],
+            ),
+            ("4.2", "Depth per base and per common-region interval", "mosdepth", ["bam"]),
+            (
+                "4.3",
+                "Callable bases per alignment (depth >= --min_coverage)",
+                "mosdepth_callable.py, bedtools sort",
+                ["bam"],
+            ),
+            (
+                "4.4",
+                "Bases callable in all alignments of a sample (in common region)",
+                "bedtools multiinter, gawk, intersect",
+                ["bam"],
+            ),
+        ],
+    ),
+    (
+        "PREPROCESS_VCF",
+        "normalize every VCF in the same way",
+        [
+            (
+                "5.1",
+                "Check VCF contigs, contig lengths and sample names",
+                "bcftools view -h, query, check_reference.py",
+                ["core"],
+            ),
+            (
+                "5.2",
+                "Keep tumor (+ normal) columns, recompress with BGZF",
+                "bcftools view",
+                ["core"],
+            ),
+            (
+                "5.3",
+                "Rename contigs to the reference (chr prefix, MT/chrM)",
+                "bcftools annotate",
+                ["core"],
+            ),
+            ("5.4", "Remove records on other contigs and gVCF blocks", "bcftools view", ["core"]),
+            ("5.5", "Rewrite the contig header from the reference", "bcftools reheader", ["core"]),
+            (
+                "5.6",
+                "Split multiallelics, left-align, split MNVs, deduplicate",
+                "bcftools norm",
+                ["core"],
+            ),
+            (
+                "5.7",
+                "Stop if too many REF alleles differ (other genome build)",
+                "check_reference.py",
+                ["core"],
+            ),
+            (
+                "5.8",
+                "Same VAF, depth and alt reads for every caller (from AD)",
+                "harmonize_vcf.py",
+                ["core"],
+            ),
+            (
+                "5.9",
+                "Uniform filters; keep the common (or callable) region",
+                "bcftools view",
+                ["core", "bam"],
+            ),
+        ],
+    ),
+    (
+        "BENCHMARK",
+        "compare every technology with the truth technology",
+        [
+            ("6.1", "Match calls haplotype-aware: TP, FN, FP", "rtg vcfeval", ["core"]),
+            ("6.2", "Exact-allele and same-position matches", "bcftools isec", ["core"]),
+            (
+                "6.3",
+                "Recall, precision, F1 per sample (overall, type, VAF)",
+                "benchmark_metrics.py",
+                ["core"],
+            ),
+            (
+                "6.4",
+                "Combine samples: summed (micro) and mean (macro)",
+                "aggregate_metrics.py",
+                ["core"],
+            ),
+        ],
+    ),
+    (
+        "DISCORDANCE",
+        "explain why variants differ",
+        [
+            ("7.1", "Positions of all compared variants of a sample", "bcftools query", ["bam"]),
+            (
+                "7.2",
+                "Read counts of every alignment at these positions",
+                "bcftools mpileup + call, bcftools norm",
+                ["bam"],
+            ),
+            (
+                "7.3",
+                "Reason for every FN/FP; detection power of the query",
+                "classify_discordance.py",
+                ["core", "bam"],
+            ),
+            (
+                "7.4",
+                "Check the stratification sheet, the gene and stratification BEDs",
+                "check_sheets.py, check_reference.py, bedtools sort",
+                ["annot"],
+            ),
+            (
+                "7.5",
+                "Add genes and genomic context to every variant",
+                "bedtools map, intersect -c, annotate_variants.py",
+                ["annot"],
+            ),
+        ],
+    ),
+    (
+        "PREPARE_KNOWN_VARIANTS, KNOWN_VARIANTS",
+        "check known variants",
+        [
+            (
+                "8.1",
+                "Check the known-variant sheet; read the lists, check positions",
+                "check_sheets.py, known_variants.py prepare",
+                ["required", "truthset"],
+            ),
+            (
+                "8.2",
+                "Normalize like the calls; stop on any REF mismatch",
+                "bcftools norm, check_reference.py",
+                ["required", "truthset"],
+            ),
+            (
+                "8.3",
+                "PASS/FAIL of each variant per sample and technology",
+                "known_variants.py check",
+                ["bam", "required"],
+            ),
+            ("8.4", "Checklist summary over all samples", "known_summary.py", ["required"]),
+            (
+                "8.5",
+                "Recall/precision of every technology vs the truth set",
+                "rtg vcfeval, bcftools isec, benchmark_metrics.py",
+                ["truthset"],
+            ),
+        ],
+    ),
+    (
+        "REPORT",
+        "summarize",
+        [
+            (
+                "9.1",
+                "Enrichment statistics, gene table and plots",
+                "variantcomp_report.py",
+                ["core", "annot"],
+            ),
+            (
+                "9.2",
+                "Interactive report of all results",
+                "MultiQC",
+                [k for k in ALL if k != "regions"],
+            ),
+        ],
+    ),
 ]
 
 # longer explanation of every step for the README table (the map shows the short text)
@@ -159,14 +337,14 @@ DETAILS = {
 }
 
 # geometry
-TRACK_X0, TRACK_DX = 90, 62     # x of the first vertical line, distance between lines
-LABEL_X = 470                   # step number and text
-TOOLS_X = 1110                  # tools column
+TRACK_X0, TRACK_DX = 90, 62  # x of the first vertical line, distance between lines
+LABEL_X = 470  # step number and text
+TOOLS_X = 1110  # tools column
 WIDTH = 1620
-ROW = 38                        # height of a step row
-BAND_HEAD = 44                  # height of a box header
-BAND_GAP = 14                   # space between boxes
-TOP = 330                       # y of the first box
+ROW = 38  # height of a step row
+BAND_HEAD = 44  # height of a box header
+BAND_GAP = 14  # space between boxes
+TOP = 330  # y of the first box
 
 
 def track_x(line):
@@ -220,65 +398,100 @@ def file_icon(cx, y, label, colour):
 
 def build_svg():
     boxes, stations, height = layout()
-    out = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{WIDTH}" height="{height}" '
-           f'viewBox="0 0 {WIDTH} {height}">', f'<rect width="{WIDTH}" height="{height}" fill="#fff"/>']  # fmt: skip
+    out = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{WIDTH}" height="{height}" '
+        f'viewBox="0 0 {WIDTH} {height}">',
+        f'<rect width="{WIDTH}" height="{height}" fill="#fff"/>',
+    ]
     # title
-    out.append(f'<text x="40" y="56" font-family="{FONT}" font-size="30" font-weight="bold">'
-               "core-unit-bioinformatics/workflow-nxf-somatic-variantcomp</text>")  # fmt: skip
-    out.append(f'<text x="40" y="88" font-family="{FONT}" font-size="17" fill="#444">'
-               "Each box is a subworkflow, each row a step every sample goes through (top to bottom). "
-               "Each line is a use case: it stops at the steps that run in it.</text>")  # fmt: skip
+    out.append(
+        f'<text x="40" y="56" font-family="{FONT}" font-size="30" font-weight="bold">'
+        "core-unit-bioinformatics/workflow-nxf-somatic-variantcomp</text>"
+    )
+    out.append(
+        f'<text x="40" y="88" font-family="{FONT}" font-size="17" fill="#444">'
+        "Each box is a subworkflow, each row a step every sample goes through (top to bottom). "
+        "Each line is a use case: it stops at the steps that run in it.</text>"
+    )
     # legend: one row per line, right of the file icons
     for i, (colour, _icon, text) in enumerate(LINES.values()):
         y = 136 + 30 * i
-        out.append(f'<line x1="{LABEL_X}" y1="{y}" x2="{LABEL_X + 50}" y2="{y}" stroke="{colour}" '
-                   'stroke-width="10" stroke-linecap="round"/>')  # fmt: skip
-        out.append(f'<text x="{LABEL_X + 66}" y="{y + 6}" font-family="{FONT}" font-size="17">{escape(text)}</text>')
+        out.append(
+            f'<line x1="{LABEL_X}" y1="{y}" x2="{LABEL_X + 50}" y2="{y}" stroke="{colour}" '
+            'stroke-width="10" stroke-linecap="round"/>'
+        )
+        out.append(
+            f'<text x="{LABEL_X + 66}" y="{y + 6}" font-family="{FONT}" font-size="17">{escape(text)}</text>'
+        )
 
     # subworkflow boxes with their header
     for y0, y1, (name, purpose, _steps) in boxes:
-        out.append(f'<rect x="30" y="{y0}" width="{WIDTH - 60}" height="{y1 - y0}" rx="12" '
-                   'fill="#f7f7f7" stroke="#9a9a9a" stroke-width="2" stroke-dasharray="7 5"/>')  # fmt: skip
-        out.append(f'<text x="{LABEL_X}" y="{y0 + 29}" font-family="{MONO}" font-size="17" font-weight="bold" '
-                   f'fill="#333">{escape(name)}</text>')  # fmt: skip
-        out.append(f'<text x="{WIDTH - 50}" y="{y0 + 29}" font-family="{FONT}" font-size="16" '
-                   f'font-style="italic" fill="#555" text-anchor="end">{escape(purpose)}</text>')  # fmt: skip
+        out.append(
+            f'<rect x="30" y="{y0}" width="{WIDTH - 60}" height="{y1 - y0}" rx="12" '
+            'fill="#f7f7f7" stroke="#9a9a9a" stroke-width="2" stroke-dasharray="7 5"/>'
+        )
+        out.append(
+            f'<text x="{LABEL_X}" y="{y0 + 29}" font-family="{MONO}" font-size="17" font-weight="bold" '
+            f'fill="#333">{escape(name)}</text>'
+        )
+        out.append(
+            f'<text x="{WIDTH - 50}" y="{y0 + 29}" font-family="{FONT}" font-size="16" '
+            f'font-style="italic" fill="#555" text-anchor="end">{escape(purpose)}</text>'
+        )
 
     # vertical lines: from the file icon to the last station of the line
     last = {line: max(y for y, step in stations if line in step[3]) for line in LINES}
     icon_y = 210
     for line, (colour, icon, _text) in LINES.items():
         x = track_x(line)
-        out.append(f'<line x1="{x}" y1="{icon_y + 50}" x2="{x}" y2="{last[line]}" stroke="{colour}" '
-                   'stroke-width="10" stroke-linecap="round"/>')  # fmt: skip
+        out.append(
+            f'<line x1="{x}" y1="{icon_y + 50}" x2="{x}" y2="{last[line]}" stroke="{colour}" '
+            'stroke-width="10" stroke-linecap="round"/>'
+        )
         out.append(file_icon(x, icon_y, icon, colour))
 
     # stations and step labels
     for y, (number, text, tools, lines) in stations:
         xs = [track_x(line) for line in lines]
         if len(xs) == 1:
-            out.append(f'<circle cx="{xs[0]}" cy="{y}" r="11" fill="#fff" stroke="#000" stroke-width="5"/>')
+            out.append(
+                f'<circle cx="{xs[0]}" cy="{y}" r="11" fill="#fff" stroke="#000" stroke-width="5"/>'
+            )
         elif max(xs) - min(xs) == TRACK_DX * (len(xs) - 1):
             # a step shared by use cases on neighbouring lines: one station across them
             x0, x1 = min(xs) - 14, max(xs) + 14
-            out.append(f'<rect x="{x0}" y="{y - 13}" width="{x1 - x0}" height="26" rx="13" fill="#fff" '
-                       'stroke="#000" stroke-width="5"/>')  # fmt: skip
+            out.append(
+                f'<rect x="{x0}" y="{y - 13}" width="{x1 - x0}" height="26" rx="13" fill="#fff" '
+                'stroke="#000" stroke-width="5"/>'
+            )
         else:
             # lines in between don't stop here: one station per line, joined by a bar
-            out.append(f'<line x1="{min(xs)}" y1="{y}" x2="{max(xs)}" y2="{y}" stroke="#000" stroke-width="7"/>')
+            out.append(
+                f'<line x1="{min(xs)}" y1="{y}" x2="{max(xs)}" y2="{y}" stroke="#000" stroke-width="7"/>'
+            )
             for x in xs:
-                out.append(f'<circle cx="{x}" cy="{y}" r="11" fill="#fff" stroke="#000" stroke-width="5"/>')
+                out.append(
+                    f'<circle cx="{x}" cy="{y}" r="11" fill="#fff" stroke="#000" stroke-width="5"/>'
+                )
         # thin guide from the right-most station to the label
-        out.append(f'<line x1="{max(xs) + 16}" y1="{y}" x2="{LABEL_X - 10}" y2="{y}" stroke="#d0d0d0" '
-                   'stroke-width="1.5" stroke-dasharray="2 4"/>')  # fmt: skip
-        out.append(f'<text x="{LABEL_X}" y="{y + 6}" font-family="{FONT}" font-size="17">'
-                   f'<tspan font-weight="bold">{number}</tspan>  {escape(text)}</text>')  # fmt: skip
-        out.append(f'<text x="{TOOLS_X}" y="{y + 6}" font-family="{MONO}" font-size="14" fill="#555">'
-                   f"{escape(tools)}</text>")  # fmt: skip
+        out.append(
+            f'<line x1="{max(xs) + 16}" y1="{y}" x2="{LABEL_X - 10}" y2="{y}" stroke="#d0d0d0" '
+            'stroke-width="1.5" stroke-dasharray="2 4"/>'
+        )
+        out.append(
+            f'<text x="{LABEL_X}" y="{y + 6}" font-family="{FONT}" font-size="17">'
+            f'<tspan font-weight="bold">{number}</tspan>  {escape(text)}</text>'
+        )
+        out.append(
+            f'<text x="{TOOLS_X}" y="{y + 6}" font-family="{MONO}" font-size="14" fill="#555">'
+            f"{escape(tools)}</text>"
+        )
 
-    out.append(f'<text x="40" y="{height - 16}" font-family="{FONT}" font-size="13" fill="#666">'
-               "Metro-map style: nf-core components (CC0), J. A. Fellows Yates, M. U. Garcia, L. Le Nezet. "
-               "Step details: README.md</text>")  # fmt: skip
+    out.append(
+        f'<text x="40" y="{height - 16}" font-family="{FONT}" font-size="13" fill="#666">'
+        "Metro-map style: nf-core components (CC0), J. A. Fellows Yates, M. U. Garcia, L. Le Nezet. "
+        "Step details: README.md</text>"
+    )
     out.append("</svg>")
     return "\n".join(out)
 
@@ -293,7 +506,11 @@ def markdown():
             # every step needs a longer explanation
             if number not in DETAILS:
                 sys.exit(f"ERROR: step {number} has no entry in DETAILS")
-            runs = "all use cases" if set(lines) >= set(ALL) - {"regions"} else ", ".join(names[x] for x in lines)
+            runs = (
+                "all use cases"
+                if set(lines) >= set(ALL) - {"regions"}
+                else ", ".join(names[x] for x in lines)
+            )
             rows.append(f"| {number} | **{text}.** {DETAILS[number]} | `{tools}` | {runs} |")
     return "\n".join(rows)
 

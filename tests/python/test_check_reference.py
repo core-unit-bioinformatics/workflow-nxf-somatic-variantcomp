@@ -44,14 +44,34 @@ def run(tmp_path, *args):
 def check_vcf(tmp_path, fai, header, records, *extra):
     (tmp_path / "header.vcf").write_text(header)
     (tmp_path / "contigs.txt").write_text("".join(f"{c}\n" for c in records))
-    return run(tmp_path, "contigs", "--type", "vcf", "--name", "test.vcf", "--fai", fai,
-               "--prefix", tmp_path / "out", "--vcf-header", tmp_path / "header.vcf",
-               "--record-contigs", tmp_path / "contigs.txt", *extra)  # fmt: skip
+    return run(
+        tmp_path,
+        "contigs",
+        "--type",
+        "vcf",
+        "--name",
+        "test.vcf",
+        "--fai",
+        fai,
+        "--prefix",
+        tmp_path / "out",
+        "--vcf-header",
+        tmp_path / "header.vcf",
+        "--record-contigs",
+        tmp_path / "contigs.txt",
+        *extra,
+    )
 
 
 def test_vcf_ok(tmp_path, fai):
-    result, report = check_vcf(tmp_path, fai, vcf_header([("chr1", 2000), ("chr2", 1000)]), ["chr1", "chr2"],
-                               "--samples", "TUMOR,NORMAL")  # fmt: skip
+    result, report = check_vcf(
+        tmp_path,
+        fai,
+        vcf_header([("chr1", 2000), ("chr2", 1000)]),
+        ["chr1", "chr2"],
+        "--samples",
+        "TUMOR,NORMAL",
+    )
     assert result.returncode == 0, result.stderr
     assert report["status"] == "ok"
     assert (tmp_path / "out.rename_chrs.tsv").read_text() == ""
@@ -107,8 +127,20 @@ def test_vcf_no_record_on_reference(tmp_path, fai):
 def test_bed(tmp_path, fai):
     bed = tmp_path / "in.bed"
     bed.write_text("track name=x\n1\t0\t100\tGENE1\nchr2\t900\t1000\tGENE2\ndecoy\t0\t5\n")
-    result, report = run(tmp_path, "contigs", "--type", "bed", "--name", "in.bed", "--fai", fai,
-                         "--prefix", tmp_path / "out", "--bed", bed)  # fmt: skip
+    result, report = run(
+        tmp_path,
+        "contigs",
+        "--type",
+        "bed",
+        "--name",
+        "in.bed",
+        "--fai",
+        fai,
+        "--prefix",
+        tmp_path / "out",
+        "--bed",
+        bed,
+    )
     assert result.returncode == 0, result.stderr
     assert (
         tmp_path / "out.harmonized.bed"
@@ -119,8 +151,20 @@ def test_bed(tmp_path, fai):
 def test_bed_beyond_contig_end(tmp_path, fai):
     bed = tmp_path / "in.bed"
     bed.write_text("chr2\t900\t1200\n")
-    result, _ = run(tmp_path, "contigs", "--type", "bed", "--name", "in.bed", "--fai", fai,
-                    "--prefix", tmp_path / "out", "--bed", bed)  # fmt: skip
+    result, _ = run(
+        tmp_path,
+        "contigs",
+        "--type",
+        "bed",
+        "--name",
+        "in.bed",
+        "--fai",
+        fai,
+        "--prefix",
+        tmp_path / "out",
+        "--bed",
+        bed,
+    )
     assert result.returncode == 1
     assert "end beyond their contig (e.g. chr2 at 1200, reference length 1000)" in result.stderr
 
@@ -130,8 +174,22 @@ def test_bam_idxstats(tmp_path, fai):
     idx.write_text("1\t2000\t10\t0\n2\t1000\t5\t0\nMT\t500\t1\t0\n*\t0\t0\t3\n")
     regions = tmp_path / "regions.bed"
     regions.write_text("chr1\t10\t20\nchrM\t0\t5\n")
-    result, report = run(tmp_path, "contigs", "--type", "bam", "--name", "x.bam", "--fai", fai,
-                         "--prefix", tmp_path / "out", "--idxstats", idx, "--regions", regions)  # fmt: skip
+    result, report = run(
+        tmp_path,
+        "contigs",
+        "--type",
+        "bam",
+        "--name",
+        "x.bam",
+        "--fai",
+        fai,
+        "--prefix",
+        tmp_path / "out",
+        "--idxstats",
+        idx,
+        "--regions",
+        regions,
+    )
     assert result.returncode == 0, result.stderr
     assert (tmp_path / "out.regions.bed").read_text() == "1\t10\t20\nMT\t0\t5\n"
     assert report["renamed_contigs"] == "1->chr1,2->chr2,MT->chrM"
@@ -140,21 +198,52 @@ def test_bam_idxstats(tmp_path, fai):
 def test_bam_other_build(tmp_path, fai):
     idx = tmp_path / "x.idxstats"
     idx.write_text("chr1\t2100\t10\t0\n")
-    result, _ = run(tmp_path, "contigs", "--type", "bam", "--name", "x.bam", "--fai", fai,
-                    "--prefix", tmp_path / "out", "--idxstats", idx)  # fmt: skip
+    result, _ = run(
+        tmp_path,
+        "contigs",
+        "--type",
+        "bam",
+        "--name",
+        "x.bam",
+        "--fai",
+        fai,
+        "--prefix",
+        tmp_path / "out",
+        "--idxstats",
+        idx,
+    )
     assert result.returncode == 1
     assert "another genome build" in result.stderr
 
 
-@pytest.mark.parametrize(("line", "code"), [
-    ("Lines   total/split/joined/realigned/mismatch_removed/dup_removed/skipped:\t1000/2/0/5/3/1/0", 0),
-    ("Lines   total/split/joined/realigned/mismatch_removed/dup_removed/skipped:\t100/0/0/0/50/0/0", 1),
-])  # fmt: skip
+@pytest.mark.parametrize(
+    ("line", "code"),
+    [
+        (
+            "Lines   total/split/joined/realigned/mismatch_removed/dup_removed/skipped:\t1000/2/0/5/3/1/0",
+            0,
+        ),
+        (
+            "Lines   total/split/joined/realigned/mismatch_removed/dup_removed/skipped:\t100/0/0/0/50/0/0",
+            1,
+        ),
+    ],
+)
 def test_ref_alleles(tmp_path, line, code):
     log = tmp_path / "x.norm.log"
     log.write_text("REF_MISMATCH\tchr1\t10\tA\tC\n" + line + "\n")
-    result, report = run(tmp_path, "ref-alleles", "--name", "x.vcf", "--norm-log", log,
-                         "--max-ref-mismatch", "0.01", "--prefix", tmp_path / "out")  # fmt: skip
+    result, report = run(
+        tmp_path,
+        "ref-alleles",
+        "--name",
+        "x.vcf",
+        "--norm-log",
+        log,
+        "--max-ref-mismatch",
+        "0.01",
+        "--prefix",
+        tmp_path / "out",
+    )
     assert result.returncode == code, result.stderr
     if code:
         assert "50 of 100 REF alleles (50.00%) differ from the reference" in result.stderr
@@ -175,9 +264,25 @@ def test_ref_alleles_without_summary(tmp_path):
 def test_mixed_naming_styles_fail(tmp_path, fai):
     bed = tmp_path / "mixed.bed"
     bed.write_text("1\t10\t20\nchr1\t30\t40\n")
-    result = subprocess.run([sys.executable, str(SCRIPT), "contigs", "--type", "bed", "--name", "mixed",
-                             "--fai", str(fai), "--prefix", str(tmp_path / "x"), "--bed", str(bed)],
-                            capture_output=True, text=True)  # fmt: skip
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "contigs",
+            "--type",
+            "bed",
+            "--name",
+            "mixed",
+            "--fai",
+            str(fai),
+            "--prefix",
+            str(tmp_path / "x"),
+            "--bed",
+            str(bed),
+        ],
+        capture_output=True,
+        text=True,
+    )
     assert result.returncode == 1
     assert "contigs 1, chr1 all correspond to the reference contig chr1" in result.stderr
 
@@ -185,8 +290,24 @@ def test_mixed_naming_styles_fail(tmp_path, fai):
 def test_no_contig_on_reference_fails(tmp_path, fai):
     bed = tmp_path / "other.bed"
     bed.write_text("scaffold_1\t10\t20\n")
-    result = subprocess.run([sys.executable, str(SCRIPT), "contigs", "--type", "bed", "--name", "other",
-                             "--fai", str(fai), "--prefix", str(tmp_path / "x"), "--bed", str(bed)],
-                            capture_output=True, text=True)  # fmt: skip
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "contigs",
+            "--type",
+            "bed",
+            "--name",
+            "other",
+            "--fai",
+            str(fai),
+            "--prefix",
+            str(tmp_path / "x"),
+            "--bed",
+            str(bed),
+        ],
+        capture_output=True,
+        text=True,
+    )
     assert result.returncode == 1
     assert "none of the 1 contigs (scaffold_1) is in the reference" in result.stderr

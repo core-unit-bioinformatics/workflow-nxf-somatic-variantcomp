@@ -37,8 +37,10 @@ def read_bed(path):
                 sys.exit(f"ERROR: {path}: line {line_no}: end {end} < start {start}")
             # merged input: an interval must start at or after the end of the previous one
             if fields[0] in last and start < last[fields[0]]:
-                sys.exit(f"ERROR: {path}: line {line_no}: intervals overlap or are unsorted; "
-                         "sort and merge the BED first")  # fmt: skip
+                sys.exit(
+                    f"ERROR: {path}: line {line_no}: intervals overlap or are unsorted; "
+                    "sort and merge the BED first"
+                )
             last[fields[0]] = end
             intervals.setdefault(fields[0], []).append((start, end))
     return intervals
@@ -89,13 +91,31 @@ def targets(args):
     genome = read_bed(args.genome)
     genome_bp = total_bp(genome)
     for name in args.genome_wide:
-        rows.append((name, "genome", sum(len(v) for v in genome.values()), genome_bp, common_bp,
-                     fraction(common_bp, genome_bp)))  # fmt: skip
-    rows.append(("common", "common", sum(len(v) for v in common.values()), common_bp, common_bp,
-                 fraction(common_bp, common_bp)))  # fmt: skip
+        rows.append(
+            (
+                name,
+                "genome",
+                sum(len(v) for v in genome.values()),
+                genome_bp,
+                common_bp,
+                fraction(common_bp, genome_bp),
+            )
+        )
+    rows.append(
+        (
+            "common",
+            "common",
+            sum(len(v) for v in common.values()),
+            common_bp,
+            common_bp,
+            fraction(common_bp, common_bp),
+        )
+    )
     if common_bp == 0:
-        sys.exit("ERROR: the common comparison region is empty: the target BEDs (and "
-                 "--regions_bed/--exclude_bed) don't overlap. Check the BEDs and the genome build.")  # fmt: skip
+        sys.exit(
+            "ERROR: the common comparison region is empty: the target BEDs (and "
+            "--regions_bed/--exclude_bed) don't overlap. Check the BEDs and the genome build."
+        )
     with open(args.output, "w") as fh:
         fh.write("region\ttype\tintervals\tbp\tbp_in_common\tfraction_in_common\n")
         fh.writelines("\t".join(str(x) for x in row) + "\n" for row in rows)
@@ -109,19 +129,29 @@ def callable_(args):
     # the callable region was intersected with the common region, so it must lie inside it
     callable_bp = overlap_bp(callable_bed, common)
     if callable_bp != total_bp(callable_bed):
-        sys.exit(f"ERROR: {args.callable_bed}: the callable region extends beyond the common "
-                 "region; it must be intersected with the common region first")  # fmt: skip
+        sys.exit(
+            f"ERROR: {args.callable_bed}: the callable region extends beyond the common "
+            "region; it must be intersected with the common region first"
+        )
     with open(args.output, "w") as fh:
         fh.write(
             "sample\talignments\tmode\tmin_coverage\tcommon_bp\tcallable_bp\tfraction_callable\n"
         )
-        fh.write(f"{args.sample}\t{args.alignments}\t{args.mode}\t{args.min_coverage}\t"
-                 f"{common_bp}\t{callable_bp}\t{fraction(callable_bp, common_bp)}\n")  # fmt: skip
-    print(f"INFO: {args.sample}: {callable_bp} of {common_bp} bp of the common region are "
-          f"callable in all {args.alignments} alignments", file=sys.stderr)  # fmt: skip
+        fh.write(
+            f"{args.sample}\t{args.alignments}\t{args.mode}\t{args.min_coverage}\t"
+            f"{common_bp}\t{callable_bp}\t{fraction(callable_bp, common_bp)}\n"
+        )
+    print(
+        f"INFO: {args.sample}: {callable_bp} of {common_bp} bp of the common region are "
+        f"callable in all {args.alignments} alignments",
+        file=sys.stderr,
+    )
     if callable_bp == 0:
-        print(f"WARNING: {args.sample}: no callable base; no variant of this sample will be "
-              "compared. Check the coverage (coverage/) and --min_coverage.", file=sys.stderr)  # fmt: skip
+        print(
+            f"WARNING: {args.sample}: no callable base; no variant of this sample will be "
+            "compared. Check the coverage (coverage/) and --min_coverage.",
+            file=sys.stderr,
+        )
 
 
 def main():

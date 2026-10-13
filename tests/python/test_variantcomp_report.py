@@ -29,8 +29,9 @@ def variants():
         rows.append(("FP", "SNV", np.nan, 0.03, "yes" if i < 6 else "no", "GENE_B"))
     for _ in range(2):
         rows.append(("FN", "DEL", 0.3, np.nan, "no", "GENE_A"))
-    df = pd.DataFrame(rows, columns=["status", "type", "truth_vaf", "query_vaf", "homopolymer",
-                                     "gene"])  # fmt: skip
+    df = pd.DataFrame(
+        rows, columns=["status", "type", "truth_vaf", "query_vaf", "homopolymer", "gene"]
+    )
     df["sample"], df["truth"], df["query"] = "S1", "wgs", "wes"
     df["pos"] = range(len(df))
     df["class"] = np.where(df["status"] == "TP", "concordant", "absent")
@@ -65,9 +66,11 @@ def test_check_variants_accepts_valid_table():
 
 @pytest.mark.parametrize(
     ("column", "value", "message"),
-    [("class", "outside_callable", "unknown discordance class(es) outside_callable"),
-     ("status", "TN", "unknown status value(s) TN")],
-)  # fmt: skip
+    [
+        ("class", "outside_callable", "unknown discordance class(es) outside_callable"),
+        ("status", "TN", "unknown status value(s) TN"),
+    ],
+)
 def test_check_variants_rejects_unknown_values(capsys, column, value, message):
     df = variants()
     df.loc[0, column] = value

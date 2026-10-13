@@ -47,10 +47,19 @@ def list_containers(workdir):
     images = set()
     for profile in INSPECT_PROFILES:
         out = run(
-            ["nextflow", "inspect", PIPELINE_DIR, "-profile", f"{profile},singularity",
-             "-format", "json"],
-            capture_output=True, text=True, cwd=workdir,
-        )  # fmt: skip
+            [
+                "nextflow",
+                "inspect",
+                PIPELINE_DIR,
+                "-profile",
+                f"{profile},singularity",
+                "-format",
+                "json",
+            ],
+            capture_output=True,
+            text=True,
+            cwd=workdir,
+        )
         # log lines may surround the JSON document
         data, _end = json.JSONDecoder().raw_decode(out.stdout[out.stdout.index("{") :])
         images |= {p["container"] for p in data["processes"] if p.get("container")}
@@ -58,9 +67,11 @@ def list_containers(workdir):
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__.split("\n")[0],
-                                     formatter_class=argparse.RawDescriptionHelpFormatter,
-                                     epilog="\n".join(__doc__.split("\n")[1:]))  # fmt: skip
+    parser = argparse.ArgumentParser(
+        description=__doc__.split("\n")[0],
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="\n".join(__doc__.split("\n")[1:]),
+    )
     parser.add_argument("--tag", required=True, help="git tag (or commit) to bundle")
     parser.add_argument("--outdir", required=True, type=Path)
     parser.add_argument("--images", action="store_true", help="pull the Singularity images")
@@ -73,8 +84,19 @@ def main():
 
     # 1. pipeline code at the tag
     archive = out / f"{NAME}-{args.tag}.tar.gz"
-    run(["git", "-C", PIPELINE_DIR, "archive", "--format=tar.gz", f"--prefix={NAME}/",
-         "-o", archive, args.tag])  # fmt: skip
+    run(
+        [
+            "git",
+            "-C",
+            PIPELINE_DIR,
+            "archive",
+            "--format=tar.gz",
+            f"--prefix={NAME}/",
+            "-o",
+            archive,
+            args.tag,
+        ]
+    )
 
     # 2. containers (also downloads the nf-schema plugin into NXF_HOME)
     plugins = out / "nxf_plugins"

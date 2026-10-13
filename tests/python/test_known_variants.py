@@ -52,8 +52,9 @@ def test_prepare_tsv_renames_and_sorts(tmp_path, ref):
     assert result.returncode == 0, result.stderr
     recs = list(pysam.VariantFile(str(out)))
     assert [(r.chrom, r.pos, r.id, r.info["KV_GENE"]) for r in recs] == [
-        ("chr1", 100, "G12D", "KRAS"), ("chr1", 500, "R175H", "TP53")
-    ]  # fmt: skip
+        ("chr1", 100, "G12D", "KRAS"),
+        ("chr1", 500, "R175H", "TP53"),
+    ]
 
 
 def test_prepare_unknown_contig_and_position_fail(tmp_path, ref):
@@ -84,8 +85,10 @@ def test_check_statuses(tmp_path, ref):
     fasta, seq = ref
     variants = {pos: (seq[pos - 1], alt_of(seq[pos - 1])) for pos in (100, 200, 300, 400)}
     tsv = tmp_path / "known.tsv"
-    tsv.write_text("chrom\tpos\tref\talt\n" + "".join(
-        f"chr1\t{p}\t{r}\t{a}\n" for p, (r, a) in variants.items()))  # fmt: skip
+    tsv.write_text(
+        "chrom\tpos\tref\talt\n"
+        + "".join(f"chr1\t{p}\t{r}\t{a}\n" for p, (r, a) in variants.items())
+    )
     known = tmp_path / "known.vcf.gz"
     assert (
         run(
@@ -106,15 +109,32 @@ def test_check_statuses(tmp_path, ref):
     regions = tmp_path / "regions.bed"
     regions.write_text("chr1\t0\t350\n")
     prefix = tmp_path / "S1"
-    result = run("check", "--known", str(known), "--sample", "S1", "--technology", "wes",
-                 "--normalized", str(normalized), "--compare", str(compare), "--regions",
-                 str(regions), "--prefix", str(prefix))  # fmt: skip
+    result = run(
+        "check",
+        "--known",
+        str(known),
+        "--sample",
+        "S1",
+        "--technology",
+        "wes",
+        "--normalized",
+        str(normalized),
+        "--compare",
+        str(compare),
+        "--regions",
+        str(regions),
+        "--prefix",
+        str(prefix),
+    )
     assert result.returncode == 0, result.stderr
     with open(f"{prefix}.known_variants.tsv") as fh:
         rows = {int(r["pos"]): r for r in csv.DictReader(fh, delimiter="\t")}
     assert {p: r["status"] for p, r in rows.items()} == {
-        100: "PASS", 200: "FAIL_filtered", 300: "FAIL_not_called", 400: "FAIL_outside_region"
-    }  # fmt: skip
+        100: "PASS",
+        200: "FAIL_filtered",
+        300: "FAIL_not_called",
+        400: "FAIL_outside_region",
+    }
     assert rows[200]["filter"] == "weak_evidence"
     with open(f"{prefix}.known_summary.tsv") as fh:
         summary = next(csv.DictReader(fh, delimiter="\t"))
@@ -132,40 +152,94 @@ def test_check_statuses(tmp_path, ref):
 def test_prepare_invalid_tsv_values_fail(tmp_path, ref, row, message):
     tsv = tmp_path / "known.tsv"
     tsv.write_text("chrom\tpos\tref\talt\tvaf\n" + row + "\n")
-    result = run("prepare", "--input", str(tsv), "--fai", f"{ref[0]}.fai", "--output", str(tmp_path / "k.vcf.gz"))
+    result = run(
+        "prepare",
+        "--input",
+        str(tsv),
+        "--fai",
+        f"{ref[0]}.fai",
+        "--output",
+        str(tmp_path / "k.vcf.gz"),
+    )
     assert result.returncode == 1
     assert message in result.stderr
 
 
 def test_check_evidence_of_unknown_technology_fails(tmp_path, ref):
     known = tmp_path / "known.vcf"
-    known.write_text(CALL_HEADER.replace("#CHROM", '##INFO=<ID=KV_GENE,Number=1,Type=String,Description="g">\n'
-                                         '##INFO=<ID=KV_LABEL,Number=1,Type=String,Description="l">\n#CHROM')
-                     + "chr1\t10\tv1\tA\tC\t.\t.\tKV_GENE=G\n")  # fmt: skip
+    known.write_text(
+        CALL_HEADER.replace(
+            "#CHROM",
+            '##INFO=<ID=KV_GENE,Number=1,Type=String,Description="g">\n'
+            '##INFO=<ID=KV_LABEL,Number=1,Type=String,Description="l">\n#CHROM',
+        )
+        + "chr1\t10\tv1\tA\tC\t.\t.\tKV_GENE=G\n"
+    )
     calls = tmp_path / "calls.vcf"
     calls.write_text(CALL_HEADER)
     bed = tmp_path / "r.bed"
     bed.write_text("chr1\t0\t100\n")
-    result = run("check", "--known", str(known), "--sample", "S1", "--technology", "wes",
-                 "--normalized", str(calls), "--compare", str(calls), "--regions", str(bed),
-                 "--evidence", f"wgs={calls}", "--prefix", str(tmp_path / "x"))  # fmt: skip
+    result = run(
+        "check",
+        "--known",
+        str(known),
+        "--sample",
+        "S1",
+        "--technology",
+        "wes",
+        "--normalized",
+        str(calls),
+        "--compare",
+        str(calls),
+        "--regions",
+        str(bed),
+        "--evidence",
+        f"wgs={calls}",
+        "--prefix",
+        str(tmp_path / "x"),
+    )
     assert result.returncode == 1
-    assert "--evidence 'wgs=" in result.stderr and "technology of --technology (wes)" in result.stderr
+    assert (
+        "--evidence 'wgs=" in result.stderr and "technology of --technology (wes)" in result.stderr
+    )
 
 
 def test_check_output_order_does_not_depend_on_input_order(tmp_path, ref):
     known = tmp_path / "known.vcf"
-    known.write_text(CALL_HEADER.replace("#CHROM", '##INFO=<ID=KV_GENE,Number=1,Type=String,Description="g">\n'
-                                         '##INFO=<ID=KV_LABEL,Number=1,Type=String,Description="l">\n#CHROM')
-                     + "chr1\t10\tv1\tA\tC\t.\t.\tKV_GENE=G;KV_LABEL=v1\n")  # fmt: skip
+    known.write_text(
+        CALL_HEADER.replace(
+            "#CHROM",
+            '##INFO=<ID=KV_GENE,Number=1,Type=String,Description="g">\n'
+            '##INFO=<ID=KV_LABEL,Number=1,Type=String,Description="l">\n#CHROM',
+        )
+        + "chr1\t10\tv1\tA\tC\t.\t.\tKV_GENE=G;KV_LABEL=v1\n"
+    )
     calls = tmp_path / "calls.vcf"
     calls.write_text(CALL_HEADER)
     bed = tmp_path / "r.bed"
     bed.write_text("chr1\t0\t100\n")
     # technologies given as wgs, wes: the tables list wes first
-    result = run("check", "--known", str(known), "--sample", "S1", "--technology", "wgs", "wes",
-                 "--normalized", str(calls), str(calls), "--compare", str(calls), str(calls),
-                 "--regions", str(bed), str(bed), "--prefix", str(tmp_path / "x"))  # fmt: skip
+    result = run(
+        "check",
+        "--known",
+        str(known),
+        "--sample",
+        "S1",
+        "--technology",
+        "wgs",
+        "wes",
+        "--normalized",
+        str(calls),
+        str(calls),
+        "--compare",
+        str(calls),
+        str(calls),
+        "--regions",
+        str(bed),
+        str(bed),
+        "--prefix",
+        str(tmp_path / "x"),
+    )
     assert result.returncode == 0, result.stderr
     summary = (tmp_path / "x.known_summary.tsv").read_text().splitlines()
     assert [line.split("\t")[1] for line in summary[1:]] == ["wes", "wgs"]

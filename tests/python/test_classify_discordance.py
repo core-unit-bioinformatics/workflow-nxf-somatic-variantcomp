@@ -24,8 +24,18 @@ PILEUP_HEADER = """##fileformat=VCFv4.2
 ##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Depth">
 #CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tbam
 """
-VARIANT_COLUMNS = ["sample", "truth", "query", "status", "chrom", "pos", "ref", "alt",
-                   "truth_vaf", "query_vaf"]  # fmt: skip
+VARIANT_COLUMNS = [
+    "sample",
+    "truth",
+    "query",
+    "status",
+    "chrom",
+    "pos",
+    "ref",
+    "alt",
+    "truth_vaf",
+    "query_vaf",
+]
 
 
 def write(path, text):
@@ -68,22 +78,43 @@ def run(tmp_path):
                 (400, 5, 0),
                 (500, 99, 1),
                 (600, 200, 0),
-            ]  # fmt: skip
+            ]
         ),
     )
-    truth_tumor = write(tmp_path / "truth_tumor.vcf", PILEUP_HEADER + pile.format(
-        pos=700, ref=50, alt=0, dp=50))  # fmt: skip
-    normal = write(tmp_path / "normal.vcf", PILEUP_HEADER + pile.format(
-        pos=300, ref=50, alt=48, dp=98))  # fmt: skip
+    truth_tumor = write(
+        tmp_path / "truth_tumor.vcf", PILEUP_HEADER + pile.format(pos=700, ref=50, alt=0, dp=50)
+    )
+    normal = write(
+        tmp_path / "normal.vcf", PILEUP_HEADER + pile.format(pos=300, ref=50, alt=48, dp=98)
+    )
     prefix = tmp_path / "out"
     subprocess.run(
-        [sys.executable, str(BIN / "classify_discordance.py"), "--variants",
-         str(tmp_path / "variants.tsv"), "--truth-normalized", truth_norm, "--query-normalized",
-         query_norm, "--truth-tumor-evidence", truth_tumor, "--query-tumor-evidence", query_tumor,
-         "--normal-evidence", normal, "--prefix", str(prefix), "--sample", "S1", "--truth", "wgs",
-         "--query", "wes"],
+        [
+            sys.executable,
+            str(BIN / "classify_discordance.py"),
+            "--variants",
+            str(tmp_path / "variants.tsv"),
+            "--truth-normalized",
+            truth_norm,
+            "--query-normalized",
+            query_norm,
+            "--truth-tumor-evidence",
+            truth_tumor,
+            "--query-tumor-evidence",
+            query_tumor,
+            "--normal-evidence",
+            normal,
+            "--prefix",
+            str(prefix),
+            "--sample",
+            "S1",
+            "--truth",
+            "wgs",
+            "--query",
+            "wes",
+        ],
         check=True,
-    )  # fmt: skip
+    )
     with open(f"{prefix}.discordance.tsv") as fh:
         rows = {int(r["pos"]): r for r in csv.DictReader(fh, delimiter="\t")}
     with open(f"{prefix}.power.tsv") as fh:
@@ -127,11 +158,28 @@ def classify(tmp_path, variants, normalized, *extra):
     """Run the script on a variant table and one normalized VCF (for truth and query)."""
     vcf = write(tmp_path / "norm.vcf", normalized)
     return subprocess.run(
-        [sys.executable, str(BIN / "classify_discordance.py"), "--variants",
-         write(tmp_path / "v.tsv", variants), "--truth-normalized", vcf, "--query-normalized", vcf,
-         "--prefix", str(tmp_path / "x"), "--sample", "S1", "--truth", "wgs", "--query", "wes", *extra],
-        capture_output=True, text=True,
-    )  # fmt: skip
+        [
+            sys.executable,
+            str(BIN / "classify_discordance.py"),
+            "--variants",
+            write(tmp_path / "v.tsv", variants),
+            "--truth-normalized",
+            vcf,
+            "--query-normalized",
+            vcf,
+            "--prefix",
+            str(tmp_path / "x"),
+            "--sample",
+            "S1",
+            "--truth",
+            "wgs",
+            "--query",
+            "wes",
+            *extra,
+        ],
+        capture_output=True,
+        text=True,
+    )
 
 
 def test_row_of_another_comparison_fails(tmp_path):
@@ -150,7 +198,9 @@ def test_invalid_status_fails(tmp_path):
 
 def test_unharmonized_vcf_fails(tmp_path):
     table = "\t".join(VARIANT_COLUMNS) + "\n"
-    result = classify(tmp_path, table, "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n")
+    result = classify(
+        tmp_path, table, "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n"
+    )
     assert result.returncode == 1
     assert "INFO/VC_T_VAF is not defined" in result.stderr
 

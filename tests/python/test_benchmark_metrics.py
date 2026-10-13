@@ -63,8 +63,18 @@ def metrics(tmp_path):
         "isec-exact": exact,
         "isec-position": position,
     }
-    cmd = [sys.executable, str(BIN / "benchmark_metrics.py"), "--sample", "S1", "--truth", "wgs",
-           "--query", "wes", "--prefix", str(tmp_path / "S1_wes")]  # fmt: skip
+    cmd = [
+        sys.executable,
+        str(BIN / "benchmark_metrics.py"),
+        "--sample",
+        "S1",
+        "--truth",
+        "wgs",
+        "--query",
+        "wes",
+        "--prefix",
+        str(tmp_path / "S1_wes"),
+    ]
     for key, path in files.items():
         cmd += [f"--{key}", str(path)]
     subprocess.run(cmd, check=True)
@@ -79,8 +89,11 @@ def test_overall_and_types(metrics):
     rows = read_tsv(f"{metrics}.metrics.tsv")
     overall = row(rows, "overall", "all")
     assert (overall["tp_baseline"], overall["fn"], overall["tp_call"], overall["fp"]) == (
-        "1", "2", "1", "2"
-    )  # fmt: skip
+        "1",
+        "2",
+        "1",
+        "2",
+    )
     assert overall["recall"] == "0.3333"
     assert overall["precision"] == "0.3333"
     indel = row(rows, "variant_type", "INDEL")
@@ -113,8 +126,12 @@ def test_match_strata(metrics):
 def test_variant_table(metrics):
     rows = read_tsv(f"{metrics}.variants.tsv")
     assert [(r["pos"], r["status"]) for r in rows] == [
-        ("100", "TP"), ("200", "FN"), ("200", "FP"), ("300", "FN"), ("400", "FP")
-    ]  # fmt: skip
+        ("100", "TP"),
+        ("200", "FN"),
+        ("200", "FP"),
+        ("300", "FN"),
+        ("400", "FP"),
+    ]
     tp = rows[0]
     assert (tp["truth_vaf"], tp["query_vaf"]) == ("0.3000", "0.2800")
 
@@ -124,8 +141,17 @@ def test_aggregate(metrics, tmp_path):
     text = Path(f"{metrics}.metrics.tsv").read_text().replace("S1\t", "S2\t")
     second.write_text(text)
     prefix = tmp_path / "agg"
-    subprocess.run([sys.executable, str(BIN / "aggregate_metrics.py"), f"{metrics}.metrics.tsv",
-                    str(second), "--prefix", str(prefix)], check=True)  # fmt: skip
+    subprocess.run(
+        [
+            sys.executable,
+            str(BIN / "aggregate_metrics.py"),
+            f"{metrics}.metrics.tsv",
+            str(second),
+            "--prefix",
+            str(prefix),
+        ],
+        check=True,
+    )
     agg = read_tsv(f"{prefix}.aggregated.tsv")
     overall = row(agg, "overall", "all")
     assert overall["n_samples"] == "2"
@@ -140,11 +166,28 @@ def test_match_strata_restricted_to_regions(tmp_path, metrics):
     # rerun with a region that excludes chr1:300 (truth FN) and chr1:400 (query FP)
     bed = tmp_path / "regions.bed"
     bed.write_text("chr1\t0\t250\n")
-    cmd = [sys.executable, str(BIN / "benchmark_metrics.py"), "--sample", "S1", "--truth", "wgs",
-           "--query", "wes", "--prefix", str(tmp_path / "restricted"),
-           "--regions", str(bed)]  # fmt: skip
-    for key, name in (("tp-baseline", "tpb.vcf"), ("fn", "fn.vcf"), ("tp", "tp.vcf"), ("fp", "fp.vcf"),
-                      ("isec-exact", "isec_exact"), ("isec-position", "isec_position")):  # fmt: skip
+    cmd = [
+        sys.executable,
+        str(BIN / "benchmark_metrics.py"),
+        "--sample",
+        "S1",
+        "--truth",
+        "wgs",
+        "--query",
+        "wes",
+        "--prefix",
+        str(tmp_path / "restricted"),
+        "--regions",
+        str(bed),
+    ]
+    for key, name in (
+        ("tp-baseline", "tpb.vcf"),
+        ("fn", "fn.vcf"),
+        ("tp", "tp.vcf"),
+        ("fp", "fp.vcf"),
+        ("isec-exact", "isec_exact"),
+        ("isec-position", "isec_position"),
+    ):
         cmd += [f"--{key}", str(tmp_path / name)]
     subprocess.run(cmd, check=True)
     exact = row(read_tsv(tmp_path / "restricted.metrics.tsv"), "match", "exact")
@@ -152,10 +195,30 @@ def test_match_strata_restricted_to_regions(tmp_path, metrics):
 
 
 def test_missing_isec_sites_fails(tmp_path, metrics):
-    cmd = [sys.executable, str(BIN / "benchmark_metrics.py"), "--sample", "S1", "--truth", "wgs",
-           "--query", "wes", "--prefix", str(tmp_path / "x"), "--tp-baseline", str(tmp_path / "tpb.vcf"),
-           "--fn", str(tmp_path / "fn.vcf"), "--tp", str(tmp_path / "tp.vcf"), "--fp", str(tmp_path / "fp.vcf"),
-           "--isec-exact", str(tmp_path), "--isec-position", str(tmp_path / "isec_position")]  # fmt: skip
+    cmd = [
+        sys.executable,
+        str(BIN / "benchmark_metrics.py"),
+        "--sample",
+        "S1",
+        "--truth",
+        "wgs",
+        "--query",
+        "wes",
+        "--prefix",
+        str(tmp_path / "x"),
+        "--tp-baseline",
+        str(tmp_path / "tpb.vcf"),
+        "--fn",
+        str(tmp_path / "fn.vcf"),
+        "--tp",
+        str(tmp_path / "tp.vcf"),
+        "--fp",
+        str(tmp_path / "fp.vcf"),
+        "--isec-exact",
+        str(tmp_path),
+        "--isec-position",
+        str(tmp_path / "isec_position"),
+    ]
     result = subprocess.run(cmd, capture_output=True, text=True)
     assert result.returncode == 1
     assert "sites.txt does not exist" in result.stderr
@@ -167,8 +230,17 @@ def run_aggregate(tmp_path, *texts):
     for i, text in enumerate(texts):
         paths.append(tmp_path / f"m{i}.tsv")
         paths[-1].write_text(text)
-    return subprocess.run([sys.executable, str(BIN / "aggregate_metrics.py"), *map(str, paths),
-                           "--prefix", str(tmp_path / "agg")], capture_output=True, text=True)  # fmt: skip
+    return subprocess.run(
+        [
+            sys.executable,
+            str(BIN / "aggregate_metrics.py"),
+            *map(str, paths),
+            "--prefix",
+            str(tmp_path / "agg"),
+        ],
+        capture_output=True,
+        text=True,
+    )
 
 
 METRICS_HEADER = "sample\ttruth\tquery\tstratum_type\tstratum\ttp_baseline\tfn\ttp_call\tfp\trecall\tprecision\tf1\n"
@@ -182,9 +254,13 @@ def test_aggregate_duplicate_rows_fail(tmp_path):
 
 
 def test_aggregate_invalid_values_fail(tmp_path):
-    result = run_aggregate(tmp_path, METRICS_HEADER + "S1\twgs\twes\toverall\tall\t-1\t1\t9\t1\t0.9\t0.9\t0.9\n")
+    result = run_aggregate(
+        tmp_path, METRICS_HEADER + "S1\twgs\twes\toverall\tall\t-1\t1\t9\t1\t0.9\t0.9\t0.9\n"
+    )
     assert result.returncode == 1
     assert "tp_baseline '-1' is not a non-negative integer" in result.stderr
-    result = run_aggregate(tmp_path, METRICS_HEADER + "S1\twgs\twes\toverall\tall\t9\t1\t9\t1\t1.9\t0.9\t0.9\n")
+    result = run_aggregate(
+        tmp_path, METRICS_HEADER + "S1\twgs\twes\toverall\tall\t9\t1\t9\t1\t1.9\t0.9\t0.9\n"
+    )
     assert result.returncode == 1
     assert "recall '1.9' is not a number within [0, 1]" in result.stderr

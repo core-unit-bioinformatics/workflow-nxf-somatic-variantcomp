@@ -310,10 +310,16 @@ class Dataset:
         md5 = fetch_md5_table(f"{base}/{scfg['md5']}", self.cache / "annotation" / scfg["md5"])
         rows = []
         for name, rel in scfg["files"].items():
-            src = download(f"{base}/{rel}", self.cache / "annotation" / Path(rel).name,
-                           md5.get(Path(rel).name))  # fmt: skip
-            self.sources.append((f"annotation/stratification/{name}.bed", f"{base}/{rel}",
-                                 md5.get(Path(rel).name, "n/a")))  # fmt: skip
+            src = download(
+                f"{base}/{rel}", self.cache / "annotation" / Path(rel).name, md5.get(Path(rel).name)
+            )
+            self.sources.append(
+                (
+                    f"annotation/stratification/{name}.bed",
+                    f"{base}/{rel}",
+                    md5.get(Path(rel).name, "n/a"),
+                )
+            )
             dest = ann_dir / "stratification" / f"{name}.bed"
             with gzip.open(src, "rt") as fin, dest.open("w") as fout:
                 for line in fin:
@@ -456,8 +462,11 @@ class Dataset:
         known.mkdir(exist_ok=True)
         req = self.cfg["known_required"]
         lines = ["chrom,pos,ref,alt,gene,label"]
-        lines += [",".join(str(x) for x in v) for v in req["variants"]
-                  if not self.contigs or v[0] in self.contigs]  # fmt: skip
+        lines += [
+            ",".join(str(x) for x in v)
+            for v in req["variants"]
+            if not self.contigs or v[0] in self.contigs
+        ]
         (known / "required_demo.csv").write_text("\n".join(lines) + "\n")
         rows = [
             "name,sample,mode,variants,regions",

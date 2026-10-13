@@ -20,16 +20,33 @@ def run(tmp_path, mode, quantized, regions, rename="", extra=()):
     (tmp_path / "ref.fa.fai").write_text("chr1\t1000\t6\t60\t61\nchr2\t1000\t1100\t60\t61\n")
     out = tmp_path / "callable.bed"
     proc = subprocess.run(
-        [sys.executable, str(SCRIPT), "--mode", mode, "--quantized", str(q), "--regions", str(r),
-         "--rename", str(tmp_path / "rename.tsv"), "--fai", str(tmp_path / "ref.fa.fai"),
-         "--output", str(out), *extra],
-        capture_output=True, text=True,
-    )  # fmt: skip
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--mode",
+            mode,
+            "--quantized",
+            str(q),
+            "--regions",
+            str(r),
+            "--rename",
+            str(tmp_path / "rename.tsv"),
+            "--fai",
+            str(tmp_path / "ref.fa.fai"),
+            "--output",
+            str(out),
+            *extra,
+        ],
+        capture_output=True,
+        text=True,
+    )
     lines = out.read_text().splitlines() if out.exists() else []
     return proc, lines
 
 
-QUANTIZED = "1\t0\t100\tLOW_COVERAGE\n1\t100\t400\tCALLABLE\n2\t0\t50\tCALLABLE\nGL1\t0\t9\tCALLABLE\n"
+QUANTIZED = (
+    "1\t0\t100\tLOW_COVERAGE\n1\t100\t400\tCALLABLE\n2\t0\t50\tCALLABLE\nGL1\t0\t9\tCALLABLE\n"
+)
 REGIONS = "1\t0\t200\t12.5\n1\t300\t400\t3.0\n"
 
 
@@ -41,8 +58,9 @@ def test_base_mode_keeps_callable_label_renames_and_drops_unknown_contigs(tmp_pa
 
 
 def test_region_mode_uses_mean_depth_threshold(tmp_path):
-    proc, lines = run(tmp_path, "region", QUANTIZED, REGIONS, rename="1\tchr1\n",
-                      extra=["--min-coverage", "10"])  # fmt: skip
+    proc, lines = run(
+        tmp_path, "region", QUANTIZED, REGIONS, rename="1\tchr1\n", extra=["--min-coverage", "10"]
+    )
     assert proc.returncode == 0, proc.stderr
     assert lines == ["chr1\t0\t200"]
 
@@ -60,8 +78,9 @@ def test_unexpected_quantize_label_is_an_error(tmp_path):
 
 
 def test_non_numeric_depth_is_an_error(tmp_path):
-    proc, _ = run(tmp_path, "region", QUANTIZED, "chr1\t0\t10\tCALLABLE\n",
-                  extra=["--min-coverage", "10"])  # fmt: skip
+    proc, _ = run(
+        tmp_path, "region", QUANTIZED, "chr1\t0\t10\tCALLABLE\n", extra=["--min-coverage", "10"]
+    )
     assert proc.returncode == 1
     assert "is not a number" in proc.stderr
 

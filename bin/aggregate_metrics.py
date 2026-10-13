@@ -35,8 +35,14 @@ COUNTS = ["tp_baseline", "fn", "tp_call", "fp"]
 METRICS = ["recall", "precision", "f1"]
 REQUIRED = ["sample", *KEYS, *COUNTS, *METRICS]
 # order of the stratum types in the outputs; unknown types go last
-ORDER = {"overall": 0, "variant_type": 1, "truth_vaf": 2, "query_vaf": 3, "match": 4,
-         "power_adjusted": 5}  # fmt: skip
+ORDER = {
+    "overall": 0,
+    "variant_type": 1,
+    "truth_vaf": 2,
+    "query_vaf": 3,
+    "match": 4,
+    "power_adjusted": 5,
+}
 
 
 def safe_ratio(num, den):
@@ -49,23 +55,29 @@ def read_metrics(path):
     data = pd.read_csv(path, sep="\t", dtype=str, keep_default_na=False)
     missing = [c for c in REQUIRED if c not in data.columns]
     if missing:
-        sys.exit(f"ERROR: {path}: missing column(s) {', '.join(missing)}; expected a metrics table "
-                 "of benchmark_metrics.py or classify_discordance.py")  # fmt: skip
+        sys.exit(
+            f"ERROR: {path}: missing column(s) {', '.join(missing)}; expected a metrics table "
+            "of benchmark_metrics.py or classify_discordance.py"
+        )
     for column in COUNTS:
         # counts: non-negative integers or NA
         bad = data[~data[column].str.fullmatch(r"\d+|NA")]
         if len(bad):
             line = bad.index[0] + 2
-            sys.exit(f"ERROR: {path}: line {line}: {column} '{bad[column].iloc[0]}' is not a "
-                     "non-negative integer or NA")  # fmt: skip
+            sys.exit(
+                f"ERROR: {path}: line {line}: {column} '{bad[column].iloc[0]}' is not a "
+                "non-negative integer or NA"
+            )
     for column in METRICS:
         # metrics: numbers within [0, 1] or NA
         values = pd.to_numeric(data[column].replace("NA", None), errors="coerce")
         bad = data[(values.isna() & (data[column] != "NA")) | (values < 0) | (values > 1)]
         if len(bad):
             line = bad.index[0] + 2
-            sys.exit(f"ERROR: {path}: line {line}: {column} '{bad[column].iloc[0]}' is not a "
-                     "number within [0, 1] or NA")  # fmt: skip
+            sys.exit(
+                f"ERROR: {path}: line {line}: {column} '{bad[column].iloc[0]}' is not a "
+                "number within [0, 1] or NA"
+            )
     return data
 
 
@@ -97,9 +109,11 @@ def main():
     duplicated = data[data.duplicated(["sample", *KEYS], keep=False)]
     if len(duplicated):
         first = duplicated.iloc[0]
-        sys.exit(f"ERROR: {len(duplicated)} rows for the same sample and stratum, e.g. "
-                 f"{first['sample']} {first['truth']} vs {first['query']} {first['stratum_type']} "
-                 f"{first['stratum']}; was a metrics file given twice?")  # fmt: skip
+        sys.exit(
+            f"ERROR: {len(duplicated)} rows for the same sample and stratum, e.g. "
+            f"{first['sample']} {first['truth']} vs {first['query']} {first['stratum_type']} "
+            f"{first['stratum']}; was a metrics file given twice?"
+        )
 
     # per-pair table, sorted by the stratum type order above
     data["_order"] = data["stratum_type"].map(ORDER).fillna(len(ORDER))
@@ -120,10 +134,14 @@ def main():
             row[f"macro_{m}_mean"] = values.mean() if len(values) else math.nan
             row[f"macro_{m}_sd"] = values.std(ddof=1) if len(values) > 1 else math.nan
         rows.append(row)
-    pd.DataFrame(rows).to_csv(f"{args.prefix}.aggregated.tsv", sep="\t", index=False, na_rep="NA",
-                              float_format="%.4f")  # fmt: skip
-    print(f"INFO: {len(args.metrics)} files, {len(data)} rows, {data['sample'].nunique()} samples "
-          f"-> {len(rows)} aggregated rows", file=sys.stderr)  # fmt: skip
+    pd.DataFrame(rows).to_csv(
+        f"{args.prefix}.aggregated.tsv", sep="\t", index=False, na_rep="NA", float_format="%.4f"
+    )
+    print(
+        f"INFO: {len(args.metrics)} files, {len(data)} rows, {data['sample'].nunique()} samples "
+        f"-> {len(rows)} aggregated rows",
+        file=sys.stderr,
+    )
 
 
 if __name__ == "__main__":

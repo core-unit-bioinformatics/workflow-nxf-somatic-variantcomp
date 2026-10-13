@@ -27,8 +27,17 @@ def test_merge_adds_gene_and_stratum_columns(tmp_path):
     (tmp_path / "genes.bed").write_text("chr1\t199\t202\t2\tTP53\nchr1\t99\t100\t1\t.\n")
     (tmp_path / "hp.bed").write_text("chr1\t99\t100\t1\t0\nchr1\t199\t202\t2\t2\n")
     out = tmp_path / "annotated.tsv"
-    proc = run("merge", "--table", str(tmp_path / "v.tsv"), "--genes", str(tmp_path / "genes.bed"),
-               "--stratum", f"homopolymer={tmp_path / 'hp.bed'}", "--output", str(out))  # fmt: skip
+    proc = run(
+        "merge",
+        "--table",
+        str(tmp_path / "v.tsv"),
+        "--genes",
+        str(tmp_path / "genes.bed"),
+        "--stratum",
+        f"homopolymer={tmp_path / 'hp.bed'}",
+        "--output",
+        str(out),
+    )
     assert proc.returncode == 0, proc.stderr
     with open(out, newline="") as fh:
         rows = list(csv.DictReader(fh, delimiter="\t"))
@@ -38,8 +47,15 @@ def test_merge_adds_gene_and_stratum_columns(tmp_path):
 def test_merge_missing_variant_is_an_error(tmp_path):
     (tmp_path / "v.tsv").write_text(TABLE)
     (tmp_path / "genes.bed").write_text("chr1\t99\t100\t1\tKRAS\n")
-    proc = run("merge", "--table", str(tmp_path / "v.tsv"), "--genes", str(tmp_path / "genes.bed"),
-               "--output", str(tmp_path / "a.tsv"))  # fmt: skip
+    proc = run(
+        "merge",
+        "--table",
+        str(tmp_path / "v.tsv"),
+        "--genes",
+        str(tmp_path / "genes.bed"),
+        "--output",
+        str(tmp_path / "a.tsv"),
+    )
     assert proc.returncode == 1
     assert "1 variant(s) missing (rows 2)" in proc.stderr
 
@@ -47,8 +63,15 @@ def test_merge_missing_variant_is_an_error(tmp_path):
 def test_merge_invalid_stratum_name_is_an_error(tmp_path):
     (tmp_path / "v.tsv").write_text(TABLE)
     (tmp_path / "s.bed").write_text("chr1\t99\t100\t1\t0\nchr1\t199\t202\t2\t0\n")
-    proc = run("merge", "--table", str(tmp_path / "v.tsv"), "--stratum", f"ref={tmp_path / 's.bed'}",
-               "--output", str(tmp_path / "a.tsv"))  # fmt: skip
+    proc = run(
+        "merge",
+        "--table",
+        str(tmp_path / "v.tsv"),
+        "--stratum",
+        f"ref={tmp_path / 's.bed'}",
+        "--output",
+        str(tmp_path / "a.tsv"),
+    )
     assert proc.returncode == 1
     assert "stratum name 'ref' is invalid or already a column" in proc.stderr
 

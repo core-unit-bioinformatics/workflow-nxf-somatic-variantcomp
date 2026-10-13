@@ -52,13 +52,38 @@ import pysam
 # variant types of harmonize_vcf.py grouped for the variant_type stratum
 TYPE_GROUP = {"SNV": "SNV", "MNV": "SNV", "INS": "INDEL", "DEL": "INDEL", "COMPLEX": "INDEL"}
 VARIANT_COLUMNS = [
-    "sample", "truth", "query", "status", "chrom", "pos", "ref", "alt", "type", "length",
-    "truth_vaf", "truth_dp", "truth_alt", "query_vaf", "query_dp", "query_alt", "query_filter",
-]  # fmt: skip
+    "sample",
+    "truth",
+    "query",
+    "status",
+    "chrom",
+    "pos",
+    "ref",
+    "alt",
+    "type",
+    "length",
+    "truth_vaf",
+    "truth_dp",
+    "truth_alt",
+    "query_vaf",
+    "query_dp",
+    "query_alt",
+    "query_filter",
+]
 METRIC_COLUMNS = [
-    "sample", "truth", "query", "stratum_type", "stratum", "tp_baseline", "fn", "tp_call", "fp",
-    "recall", "precision", "f1",
-]  # fmt: skip
+    "sample",
+    "truth",
+    "query",
+    "stratum_type",
+    "stratum",
+    "tp_baseline",
+    "fn",
+    "tp_call",
+    "fp",
+    "recall",
+    "precision",
+    "f1",
+]
 HARMONIZED_TAGS = ("VC_TYPE", "VC_LEN", "VC_T_VAF", "VC_T_DP", "VC_T_ALT")
 
 
@@ -106,22 +131,31 @@ def read_records(path, what):
         for rec in vcf:
             info = {t: rec.info.get(t) for t in HARMONIZED_TAGS if t in tags}
             for alt in rec.alts or ():
-                records.append({
-                    "chrom": rec.chrom,
-                    "pos": rec.pos,
-                    "ref": rec.ref,
-                    "alt": alt,
-                    # type and length from the harmonized tags, else from the alleles
-                    "type": info.get("VC_TYPE") or variant_type(rec.ref, alt),
-                    "length": info["VC_LEN"] if info.get("VC_LEN") is not None else len(alt) - len(rec.ref),
-                    "vaf": info.get("VC_T_VAF"),
-                    "dp": info.get("VC_T_DP"),
-                    "alt_count": info.get("VC_T_ALT"),
-                    "filter": ";".join(rec.filter.keys()) or ".",
-                })  # fmt: skip
+                records.append(
+                    {
+                        "chrom": rec.chrom,
+                        "pos": rec.pos,
+                        "ref": rec.ref,
+                        "alt": alt,
+                        # type and length from the harmonized tags, else from the alleles
+                        "type": info.get("VC_TYPE") or variant_type(rec.ref, alt),
+                        "length": (
+                            info["VC_LEN"]
+                            if info.get("VC_LEN") is not None
+                            else len(alt) - len(rec.ref)
+                        ),
+                        "vaf": info.get("VC_T_VAF"),
+                        "dp": info.get("VC_T_DP"),
+                        "alt_count": info.get("VC_T_ALT"),
+                        "filter": ";".join(rec.filter.keys()) or ".",
+                    }
+                )
     if records and missing_tags:
-        print(f"INFO: {what}: {path}: no {', '.join(missing_tags)} in the header (e.g. an external "
-              "truth set); type/length from REF/ALT, VAF strata 'unknown'", file=sys.stderr)  # fmt: skip
+        print(
+            f"INFO: {what}: {path}: no {', '.join(missing_tags)} in the header (e.g. an external "
+            "truth set); type/length from REF/ALT, VAF strata 'unknown'",
+            file=sys.stderr,
+        )
     return records
 
 
@@ -169,8 +203,10 @@ def read_isec_sites(folder, region_sets, by_position=False):
             fields = line.rstrip("\n").split("\t")
             # CHROM, POS, REF, ALT, flags (one character per input VCF: truth, query)
             if len(fields) < 5 or fields[4] not in ("10", "01", "11"):
-                sys.exit(f"ERROR: {path}: line {line_no}: expected CHROM POS REF ALT and flags "
-                         "10/01/11 (two input VCFs: truth, query)")  # fmt: skip
+                sys.exit(
+                    f"ERROR: {path}: line {line_no}: expected CHROM POS REF ALT and flags "
+                    "10/01/11 (two input VCFs: truth, query)"
+                )
             # only sites inside all comparison regions (vcfeval was restricted to them)
             if region_sets and not inside(fields[0], int(fields[1]), fields[2], region_sets):
                 continue
@@ -215,9 +251,18 @@ def metric_row(keys, stratum_type, stratum, tpb, fn, tpc, fp):
     """One metrics row; recall needs TP_baseline/FN, precision TP_call/FP (None = not used)."""
     recall = ratio(tpb, tpb + fn) if tpb is not None else math.nan
     precision = ratio(tpc, tpc + fp) if tpc is not None else math.nan
-    row = dict(keys, stratum_type=stratum_type, stratum=stratum, tp_baseline=tpb, fn=fn,
-               tp_call=tpc, fp=fp, recall=recall, precision=precision,
-               f1=f1(recall, precision))  # fmt: skip
+    row = dict(
+        keys,
+        stratum_type=stratum_type,
+        stratum=stratum,
+        tp_baseline=tpb,
+        fn=fn,
+        tp_call=tpc,
+        fp=fp,
+        recall=recall,
+        precision=precision,
+        f1=f1(recall, precision),
+    )
     return {k: fmt(v) if k not in keys else v for k, v in row.items()}
 
 
@@ -246,8 +291,11 @@ def main():
     fn = read_records(args.fn, f"{name} (fn)")
     tpc = read_records(args.tp, f"{name} (tp)")
     fp = read_records(args.fp, f"{name} (fp)")
-    print(f"INFO: {name}: vcfeval TP_baseline {len(tpb)}, FN {len(fn)}, TP_call {len(tpc)}, "
-          f"FP {len(fp)}", file=sys.stderr)  # fmt: skip
+    print(
+        f"INFO: {name}: vcfeval TP_baseline {len(tpb)}, FN {len(fn)}, TP_call {len(tpc)}, "
+        f"FP {len(fp)}",
+        file=sys.stderr,
+    )
 
     # overall
     rows = [metric_row(keys, "overall", "all", len(tpb), len(fn), len(tpc), len(fp))]
@@ -277,8 +325,11 @@ def main():
             rows.append(metric_row(keys, "query_vaf", label, None, None, in_bin(tpc), in_bin(fp)))
     n_unknown_vaf = sum(r["vaf"] is None for r in tpc + fp)
     if n_unknown_vaf:
-        print(f"WARNING: {name}: {n_unknown_vaf} query calls without VC_T_VAF (VAF stratum "
-              "'unknown')", file=sys.stderr)  # fmt: skip
+        print(
+            f"WARNING: {name}: {n_unknown_vaf} query calls without VC_T_VAF (VAF stratum "
+            "'unknown')",
+            file=sys.stderr,
+        )
 
     # exact and position-only matching (bcftools isec), optionally inside the regions
     region_sets = [load_regions(p) for p in args.regions]
@@ -308,23 +359,51 @@ def main():
                 )
                 # different representations (e.g. MNV vs SNVs) may have no call at this position
                 n_tp_unpaired += call is None
-            out.append(dict(keys, status=status, chrom=r["chrom"], pos=r["pos"], ref=r["ref"],
-                            alt=r["alt"], type=r["type"], length=r["length"],
-                            truth_vaf=fmt(r["vaf"]), truth_dp=fmt(r["dp"]),
-                            truth_alt=fmt(r["alt_count"]),
-                            query_vaf=fmt(call["vaf"]) if call else "NA",
-                            query_dp=fmt(call["dp"]) if call else "NA",
-                            query_alt=fmt(call["alt_count"]) if call else "NA",
-                            query_filter=call["filter"] if call else "NA"))  # fmt: skip
+            out.append(
+                dict(
+                    keys,
+                    status=status,
+                    chrom=r["chrom"],
+                    pos=r["pos"],
+                    ref=r["ref"],
+                    alt=r["alt"],
+                    type=r["type"],
+                    length=r["length"],
+                    truth_vaf=fmt(r["vaf"]),
+                    truth_dp=fmt(r["dp"]),
+                    truth_alt=fmt(r["alt_count"]),
+                    query_vaf=fmt(call["vaf"]) if call else "NA",
+                    query_dp=fmt(call["dp"]) if call else "NA",
+                    query_alt=fmt(call["alt_count"]) if call else "NA",
+                    query_filter=call["filter"] if call else "NA",
+                )
+            )
     for r in fp:
-        out.append(dict(keys, status="FP", chrom=r["chrom"], pos=r["pos"], ref=r["ref"],
-                        alt=r["alt"], type=r["type"], length=r["length"], truth_vaf="NA",
-                        truth_dp="NA", truth_alt="NA", query_vaf=fmt(r["vaf"]),
-                        query_dp=fmt(r["dp"]), query_alt=fmt(r["alt_count"]),
-                        query_filter=r["filter"]))  # fmt: skip
+        out.append(
+            dict(
+                keys,
+                status="FP",
+                chrom=r["chrom"],
+                pos=r["pos"],
+                ref=r["ref"],
+                alt=r["alt"],
+                type=r["type"],
+                length=r["length"],
+                truth_vaf="NA",
+                truth_dp="NA",
+                truth_alt="NA",
+                query_vaf=fmt(r["vaf"]),
+                query_dp=fmt(r["dp"]),
+                query_alt=fmt(r["alt_count"]),
+                query_filter=r["filter"],
+            )
+        )
     if n_tp_unpaired:
-        print(f"INFO: {name}: {n_tp_unpaired} TP in the truth representation without a query call "
-              "at the same position (other representation); query values NA", file=sys.stderr)  # fmt: skip
+        print(
+            f"INFO: {name}: {n_tp_unpaired} TP in the truth representation without a query call "
+            "at the same position (other representation); query values NA",
+            file=sys.stderr,
+        )
     out.sort(key=lambda r: (r["chrom"], r["pos"], r["ref"], r["alt"], r["status"]))
     with open(f"{args.prefix}.variants.tsv", "w", newline="") as fh:
         writer = csv.DictWriter(fh, fieldnames=VARIANT_COLUMNS, delimiter="\t", lineterminator="\n")

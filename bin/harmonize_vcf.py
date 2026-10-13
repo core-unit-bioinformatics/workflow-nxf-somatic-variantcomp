@@ -70,11 +70,21 @@ from collections import Counter
 import pysam
 
 INFO_LINES = [
-    ("VC_T_VAF", "1", "Float", "Tumor variant allele fraction (AD[1]/sum(AD), else FORMAT/AF; variantcomp)"),
+    (
+        "VC_T_VAF",
+        "1",
+        "Float",
+        "Tumor variant allele fraction (AD[1]/sum(AD), else FORMAT/AF; variantcomp)",
+    ),
     ("VC_T_DP", "1", "Integer", "Tumor depth (FORMAT/DP, else sum(AD); variantcomp)"),
     ("VC_T_ALT", "1", "Integer", "Tumor alt read count (AD[1], else round(AF*DP); variantcomp)"),
     ("VC_T_SRC", "1", "String", "Source of the tumor values: AD or AF_DP (variantcomp)"),
-    ("VC_N_VAF", "1", "Float", "Normal variant allele fraction (AD[1]/sum(AD), else FORMAT/AF; variantcomp)"),
+    (
+        "VC_N_VAF",
+        "1",
+        "Float",
+        "Normal variant allele fraction (AD[1]/sum(AD), else FORMAT/AF; variantcomp)",
+    ),
     ("VC_N_DP", "1", "Integer", "Normal depth (FORMAT/DP, else sum(AD); variantcomp)"),
     ("VC_N_ALT", "1", "Integer", "Normal alt read count (AD[1], else round(AF*DP); variantcomp)"),
     ("VC_N_SRC", "1", "String", "Source of the normal values: AD or AF_DP (variantcomp)"),
@@ -125,8 +135,10 @@ def read_counts(sample, fmt_keys, counts=None, role=""):
             counts[f"{role}_af_nan"] += 1
     # a split record has exactly one ref and one alt depth
     if ad is not None and any(x is not None for x in ad) and len(ad) != 2:
-        raise HarmonizeError(f"FORMAT/AD has {len(ad)} values {ad}; expected 2 (ref, alt) "
-                             "in a split record; was the VCF split with bcftools norm -m-any?")  # fmt: skip
+        raise HarmonizeError(
+            f"FORMAT/AD has {len(ad)} values {ad}; expected 2 (ref, alt) "
+            "in a split record; was the VCF split with bcftools norm -m-any?"
+        )
     if ad is not None and any(x is not None and x < 0 for x in ad):
         raise HarmonizeError(f"FORMAT/AD {ad} has a negative value")
     if dp is not None and dp < 0:
@@ -197,8 +209,12 @@ def main():
     parser.add_argument("--normal", help="normal sample name (omit for tumor-only)")
     parser.add_argument("--index", action="store_true", help="write a tabix index")
     parser.add_argument("--summary", help="write key<TAB>value counts to this file")
-    parser.add_argument("--max-missing-vaf", type=float, default=0.0,
-                        help="maximum fraction of tumor records without VAF (default 0)")  # fmt: skip
+    parser.add_argument(
+        "--max-missing-vaf",
+        type=float,
+        default=0.0,
+        help="maximum fraction of tumor records without VAF (default 0)",
+    )
     args = parser.parse_args()
     if not 0 <= args.max_missing_vaf <= 1:
         parser.error("--max-missing-vaf must be within [0, 1]")
@@ -208,15 +224,22 @@ def main():
     samples = list(vcf_in.header.samples)
     expected = [args.tumor] + ([args.normal] if args.normal else [])
     if samples != expected:
-        sys.exit(f"ERROR: {args.input}: expected the samples {expected} in this order, found "
-                 f"{samples}; check tumor_id/normal_id in the samplesheet")  # fmt: skip
+        sys.exit(
+            f"ERROR: {args.input}: expected the samples {expected} in this order, found "
+            f"{samples}; check tumor_id/normal_id in the samplesheet"
+        )
     # AD should be declared per allele (Number=R); anything else is reported
     if "AD" in vcf_in.header.formats and vcf_in.header.formats["AD"].number != "R":
-        print(f"WARNING: {args.input}: FORMAT/AD is declared with Number="
-              f"{vcf_in.header.formats['AD'].number}, expected R", file=sys.stderr)  # fmt: skip
+        print(
+            f"WARNING: {args.input}: FORMAT/AD is declared with Number="
+            f"{vcf_in.header.formats['AD'].number}, expected R",
+            file=sys.stderr,
+        )
     if "AD" not in vcf_in.header.formats and "AF" not in vcf_in.header.formats:
-        sys.exit(f"ERROR: {args.input}: neither FORMAT/AD nor FORMAT/AF is defined; VAFs can't "
-                 "be computed. Supported callers write FORMAT/AD (or FORMAT/AF + FORMAT/DP).")  # fmt: skip
+        sys.exit(
+            f"ERROR: {args.input}: neither FORMAT/AD nor FORMAT/AF is defined; VAFs can't "
+            "be computed. Supported callers write FORMAT/AD (or FORMAT/AF + FORMAT/DP)."
+        )
 
     header = add_header_lines(vcf_in.header)
     roles = [("T", args.tumor)] + ([("N", args.normal)] if args.normal else [])
@@ -228,8 +251,10 @@ def main():
             where = f"{args.input}: {rec.chrom}:{rec.pos} {rec.ref}>{','.join(rec.alts or ('.',))}"
             # the input must be split: exactly one ALT allele per record
             if len(rec.alts or ()) != 1:
-                sys.exit(f"ERROR: {where}: {len(rec.alts or ())} ALT alleles; split multiallelic "
-                         "records first (bcftools norm -m-any)")  # fmt: skip
+                sys.exit(
+                    f"ERROR: {where}: {len(rec.alts or ())} ALT alleles; split multiallelic "
+                    "records first (bcftools norm -m-any)"
+                )
             # symbolic alleles (<NON_REF>, <*>, <DEL>, ...) are not sequence variants
             if rec.alts[0].startswith("<"):
                 counts["records_dropped_symbolic"] += 1
@@ -246,7 +271,9 @@ def main():
                 # count which rule and which depth source was used for this sample
                 counts[f"{role}_source_{source}"] += 1
                 counts[f"{role}_depth_{depth_source}"] += 1
-                values.update({f"VC_{role}_VAF": vaf, f"VC_{role}_DP": depth, f"VC_{role}_ALT": alt})
+                values.update(
+                    {f"VC_{role}_VAF": vaf, f"VC_{role}_DP": depth, f"VC_{role}_ALT": alt}
+                )
                 if source not in ("none", "zero_depth"):
                     values[f"VC_{role}_SRC"] = source
             # somatic call: tumor heterozygous, normal reference
@@ -266,27 +293,45 @@ def main():
 
     # report what was done
     written = counts["records_written"]
-    print(f"INFO: {args.input}: {counts['records_read']} records read, {written} written, "
-          f"{counts['records_dropped_symbolic']} dropped (symbolic ALT)", file=sys.stderr)  # fmt: skip
+    print(
+        f"INFO: {args.input}: {counts['records_read']} records read, {written} written, "
+        f"{counts['records_dropped_symbolic']} dropped (symbolic ALT)",
+        file=sys.stderr,
+    )
     for role, name in roles:
-        print(f"INFO: {name}: values from AD in {counts[f'{role}_source_AD']}, from AF/DP in "
-              f"{counts[f'{role}_source_AF_DP']}, no reads in {counts[f'{role}_source_zero_depth']}, "
-              f"missing in {counts[f'{role}_source_none']} records; "
-              f"depth from DP in {counts[f'{role}_depth_DP']}, from sum(AD) in "
-              f"{counts[f'{role}_depth_AD_sum']} records", file=sys.stderr)  # fmt: skip
+        print(
+            f"INFO: {name}: values from AD in {counts[f'{role}_source_AD']}, from AF/DP in "
+            f"{counts[f'{role}_source_AF_DP']}, no reads in {counts[f'{role}_source_zero_depth']}, "
+            f"missing in {counts[f'{role}_source_none']} records; "
+            f"depth from DP in {counts[f'{role}_depth_DP']}, from sum(AD) in "
+            f"{counts[f'{role}_depth_AD_sum']} records",
+            file=sys.stderr,
+        )
     if counts["T_source_zero_depth"]:
-        print(f"WARNING: {args.tumor}: {counts['T_source_zero_depth']} records with no tumor reads "
-              "(AD 0,0); their VAF is undefined (missing)", file=sys.stderr)  # fmt: skip
+        print(
+            f"WARNING: {args.tumor}: {counts['T_source_zero_depth']} records with no tumor reads "
+            "(AD 0,0); their VAF is undefined (missing)",
+            file=sys.stderr,
+        )
     for role, name in roles:
         if counts[f"{role}_af_nan"]:
-            print(f"INFO: {name}: FORMAT/AF is NaN in {counts[f'{role}_af_nan']} records (treated as "
-                  "missing; AD is used where present)", file=sys.stderr)  # fmt: skip
+            print(
+                f"INFO: {name}: FORMAT/AF is NaN in {counts[f'{role}_af_nan']} records (treated as "
+                "missing; AD is used where present)",
+                file=sys.stderr,
+            )
     if counts["T_source_AF_DP"]:
-        print(f"WARNING: {args.tumor}: {counts['T_source_AF_DP']} records without FORMAT/AD; VAF taken "
-              "from FORMAT/AF, alt reads approximated as round(AF * DP)", file=sys.stderr)  # fmt: skip
+        print(
+            f"WARNING: {args.tumor}: {counts['T_source_AF_DP']} records without FORMAT/AD; VAF taken "
+            "from FORMAT/AF, alt reads approximated as round(AF * DP)",
+            file=sys.stderr,
+        )
     for key, n in sorted(skipped_format.items()):
-        print(f"WARNING: FORMAT/{key} could not be copied in {n} sample values (value does not "
-              "match its header definition)", file=sys.stderr)  # fmt: skip
+        print(
+            f"WARNING: FORMAT/{key} could not be copied in {n} sample values (value does not "
+            "match its header definition)",
+            file=sys.stderr,
+        )
     if args.summary:
         with open(args.summary, "w") as fh:
             fh.write("key\tvalue\n")
@@ -299,9 +344,11 @@ def main():
     # strict: VAF-based results need a tumor VAF for (almost) every record
     missing = counts["T_source_none"]
     if written and missing / written > args.max_missing_vaf:
-        sys.exit(f"ERROR: {args.input}: {missing} of {written} tumor records have no VAF (no usable "
-                 f"FORMAT/AD, no FORMAT/AF + FORMAT/DP); allowed fraction --max-missing-vaf "
-                 f"{args.max_missing_vaf}. Check that the caller writes FORMAT/AD.")  # fmt: skip
+        sys.exit(
+            f"ERROR: {args.input}: {missing} of {written} tumor records have no VAF (no usable "
+            f"FORMAT/AD, no FORMAT/AF + FORMAT/DP); allowed fraction --max-missing-vaf "
+            f"{args.max_missing_vaf}. Check that the caller writes FORMAT/AD."
+        )
 
 
 if __name__ == "__main__":

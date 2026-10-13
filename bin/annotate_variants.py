@@ -65,8 +65,10 @@ def read_bedtools_result(path, n_rows, what):
         for line_no, line in enumerate(fh, start=1):
             fields = line.rstrip("\n").split("\t")
             if len(fields) < 5:
-                sys.exit(f"ERROR: {path} ({what}): line {line_no}: expected 5 columns (BED4 + "
-                         f"result), found {len(fields)}")  # fmt: skip
+                sys.exit(
+                    f"ERROR: {path} ({what}): line {line_no}: expected 5 columns (BED4 + "
+                    f"result), found {len(fields)}"
+                )
             row = int(fields[3])
             if row in values:
                 sys.exit(f"ERROR: {path} ({what}): row {row} occurs twice")
@@ -74,8 +76,10 @@ def read_bedtools_result(path, n_rows, what):
     # every variant must be annotated exactly once
     missing = [r for r in range(1, n_rows + 1) if r not in values]
     if missing:
-        sys.exit(f"ERROR: {path} ({what}): {len(missing)} variant(s) missing (rows "
-                 f"{', '.join(map(str, missing[:5]))}{', ...' if len(missing) > 5 else ''})")  # fmt: skip
+        sys.exit(
+            f"ERROR: {path} ({what}): {len(missing)} variant(s) missing (rows "
+            f"{', '.join(map(str, missing[:5]))}{', ...' if len(missing) > 5 else ''})"
+        )
     return values
 
 
@@ -103,14 +107,17 @@ def merge(args):
             try:
                 row[name] = "yes" if int(counts[i]) > 0 else "no"
             except ValueError:
-                sys.exit(f"ERROR: {path} (stratum {name}): row {i}: count '{counts[i]}' is not an "
-                         "integer; was the file made with bedtools intersect -c?")  # fmt: skip
+                sys.exit(
+                    f"ERROR: {path} (stratum {name}): row {i}: count '{counts[i]}' is not an "
+                    "integer; was the file made with bedtools intersect -c?"
+                )
         new_columns.append(name)
         n_yes = sum(1 for row in rows if row[name] == "yes")
         print(f"INFO: stratum {name}: {n_yes} of {n} variants inside", file=sys.stderr)
     with open(args.output, "w", newline="") as fh:
-        writer = csv.DictWriter(fh, fieldnames=header + new_columns, delimiter="\t",
-                                lineterminator="\n")  # fmt: skip
+        writer = csv.DictWriter(
+            fh, fieldnames=header + new_columns, delimiter="\t", lineterminator="\n"
+        )
         writer.writeheader()
         writer.writerows(rows)
 

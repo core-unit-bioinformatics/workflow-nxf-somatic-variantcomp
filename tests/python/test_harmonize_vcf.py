@@ -89,7 +89,11 @@ def test_summary_counts_sources(tmp_path):
     assert result.returncode == 0, result.stderr
     values = dict(line.split("\t") for line in summary.read_text().splitlines()[1:])
     assert values["records_written"] == "2"
-    assert values["T_source_AD"] == "2" and values["T_depth_DP"] == "1" and values["T_depth_AD_sum"] == "1"
+    assert (
+        values["T_source_AD"] == "2"
+        and values["T_depth_DP"] == "1"
+        and values["T_depth_AD_sum"] == "1"
+    )
     # a normal without reads is only counted
     assert values["N_source_none"] == "1"
 

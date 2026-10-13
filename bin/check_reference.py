@@ -170,13 +170,17 @@ def write_mapping(names, reference, report, prefix):
             targets.setdefault(new, []).append(old)
     for new, olds in sorted(targets.items()):
         if len(olds) > 1:
-            report.errors.append(f"contigs {', '.join(sorted(olds))} all correspond to the reference "
-                                 f"contig {new}; the input mixes naming styles")  # fmt: skip
+            report.errors.append(
+                f"contigs {', '.join(sorted(olds))} all correspond to the reference "
+                f"contig {new}; the input mixes naming styles"
+            )
     # nothing on the reference at all: wrong reference or wrong file
     if names and len(unknown) == len(mapping):
-        report.errors.append(f"none of the {len(names)} contigs ({', '.join(sorted(names)[:5])}"
-                             f"{', ...' if len(names) > 5 else ''}) is in the reference; is the "
-                             "input on another genome?")  # fmt: skip
+        report.errors.append(
+            f"none of the {len(names)} contigs ({', '.join(sorted(names)[:5])}"
+            f"{', ...' if len(names) > 5 else ''}) is in the reference; is the "
+            "input on another genome?"
+        )
     with open(f"{prefix}.rename_chrs.tsv", "w") as fh:
         fh.writelines(f"{old}\t{new}\n" for old, new in sorted(renames.items()))
     report.set(
@@ -371,8 +375,10 @@ def ref_alleles(args):
         for line in fh:
             match = NORM_LINE.search(line) or match
     if match is None:
-        sys.exit(f"ERROR: {args.name}: {args.norm_log}: no summary line of bcftools norm found; "
-                 "the log must contain the stderr of `bcftools norm --check-ref x`")  # fmt: skip
+        sys.exit(
+            f"ERROR: {args.name}: {args.norm_log}: no summary line of bcftools norm found; "
+            "the log must contain the stderr of `bcftools norm --check-ref x`"
+        )
     counts = [int(x) for x in match.group(1).split("/")]
     if len(counts) != 7:
         sys.exit(f"ERROR: {args.name}: unexpected bcftools norm summary '{match.group(1)}'")

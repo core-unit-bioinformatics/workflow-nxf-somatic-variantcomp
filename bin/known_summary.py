@@ -87,9 +87,11 @@ def main():
 
     # MultiQC custom content: one table row per list, sample and technology
     with open(f"{args.prefix}_required_mqc.tsv", "w") as fh:
-        fh.write("# id: 'variantcomp_required'\n# section_name: 'Required variants'\n"
-                 "# description: 'Known variants that must be found in every technology "
-                 "(--known_variants, mode required).'\n# plot_type: 'table'\n")  # fmt: skip
+        fh.write(
+            "# id: 'variantcomp_required'\n# section_name: 'Required variants'\n"
+            "# description: 'Known variants that must be found in every technology "
+            "(--known_variants, mode required).'\n# plot_type: 'table'\n"
+        )
         fh.write("id\t" + "\t".join(["list", *SUMMARY_COLUMNS]) + "\n")
         for row in summary:
             row_id = f"{row['list']} {row['sample']} {row['technology']}"
@@ -98,13 +100,19 @@ def main():
     # one warning per variant that was not found as PASS
     failed = [r for r in variants if r["status"] != "PASS"]
     for r in failed:
-        print(f"WARNING: required variant {r['label']} {r['chrom']}:{r['pos']} {r['ref']}>{r['alt']} "
-              f"({r['gene']}) of list '{r['list']}' not found in {r['sample']} {r['technology']}: "
-              f"{r['status']}", file=sys.stderr)  # fmt: skip
+        print(
+            f"WARNING: required variant {r['label']} {r['chrom']}:{r['pos']} {r['ref']}>{r['alt']} "
+            f"({r['gene']}) of list '{r['list']}' not found in {r['sample']} {r['technology']}: "
+            f"{r['status']}",
+            file=sys.stderr,
+        )
     print(f"INFO: {len(variants)} required variant checks, {len(failed)} not PASS", file=sys.stderr)
     if failed and args.fail_on_missing:
-        print(f"ERROR: {len(failed)} required variant check(s) failed, see "
-              f"{args.prefix}.required_variants.tsv (--fail_on_missing_required)", file=sys.stderr)  # fmt: skip
+        print(
+            f"ERROR: {len(failed)} required variant check(s) failed, see "
+            f"{args.prefix}.required_variants.tsv (--fail_on_missing_required)",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
 

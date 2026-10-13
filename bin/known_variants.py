@@ -70,9 +70,15 @@ def read_known(path, vaf_tag=None):
             tag = next((t for t in tags if t in vcf.header.info), None)
             if vaf_tag and tag is None:
                 sys.exit(f"ERROR: {path}: --vaf-tag {vaf_tag} is not defined in the VCF header")
-            print(f"INFO: {path}: VAF from INFO/{tag}" if tag else f"INFO: {path}: no VAF tag "
-                  "(TVAF, VAF, AF) in the header; VAF-based strata will be 'unknown'",
-                  file=sys.stderr)  # fmt: skip
+            print(
+                (
+                    f"INFO: {path}: VAF from INFO/{tag}"
+                    if tag
+                    else f"INFO: {path}: no VAF tag "
+                    "(TVAF, VAF, AF) in the header; VAF-based strata will be 'unknown'"
+                ),
+                file=sys.stderr,
+            )
             # gene and label: INFO/GENE or KV_GENE; the ID column, else INFO/KV_LABEL
             gene_tag = next((t for t in ("GENE", "KV_GENE") if t in vcf.header.info), None)
             label_tag = "KV_LABEL" if "KV_LABEL" in vcf.header.info else None
@@ -87,8 +93,9 @@ def read_known(path, vaf_tag=None):
     with open_text(path) as fh:
         # CSV or TSV list, by file extension
         delimiter = "\t" if str(path).endswith((".tsv", ".tsv.gz")) else ","
-        reader = csv.DictReader((line for line in fh if not line.startswith("##")),
-                                delimiter=delimiter)  # fmt: skip
+        reader = csv.DictReader(
+            (line for line in fh if not line.startswith("##")), delimiter=delimiter
+        )
         header = [h.lower().lstrip("#") for h in reader.fieldnames or []]
         missing = [c for c in TSV_REQUIRED if c not in header]
         if missing:
@@ -112,8 +119,15 @@ def read_known(path, vaf_tag=None):
                     sys.exit(f"ERROR: {where}: vaf '{vaf}' is not a number")
                 if not 0 <= vaf <= 1:
                     sys.exit(f"ERROR: {where}: vaf {vaf} is outside [0, 1]")
-            yield (row["chrom"].strip(), int(row["pos"]), row["ref"].strip().upper(),
-                   row["alt"].strip().upper(), row.get("gene") or ".", row.get("label") or ".", vaf)  # fmt: skip
+            yield (
+                row["chrom"].strip(),
+                int(row["pos"]),
+                row["ref"].strip().upper(),
+                row["alt"].strip().upper(),
+                row.get("gene") or ".",
+                row.get("label") or ".",
+                vaf,
+            )
 
 
 def prepare(args):
@@ -135,8 +149,10 @@ def prepare(args):
             continue
         # position must lie on the contig (the REF alleles are checked by bcftools norm afterwards)
         if pos < 1 or pos - 1 + len(ref) > reference[ref_chrom]:
-            errors.append(f"{chrom}:{pos} {ref}>{alt} ({label}): position beyond the end of {ref_chrom} "
-                          f"(length {reference[ref_chrom]}): another genome build?")  # fmt: skip
+            errors.append(
+                f"{chrom}:{pos} {ref}>{alt} ({label}): position beyond the end of {ref_chrom} "
+                f"(length {reference[ref_chrom]}): another genome build?"
+            )
             continue
         # alleles must be plain bases (symbolic alleles can't be checked against a call)
         if not set(ref + alt) <= set("ACGTN") or ref == alt:
@@ -167,13 +183,17 @@ def prepare(args):
             info = {"KV_GENE": gene.replace(" ", "_"), "KV_LABEL": label.replace(" ", "_")}
             if vaf is not None:
                 info["VC_T_VAF"] = float(vaf)
-            rec = out.new_record(contig=chrom, start=pos - 1, alleles=(ref, alt), id=label,
-                                 info=info)  # fmt: skip
+            rec = out.new_record(
+                contig=chrom, start=pos - 1, alleles=(ref, alt), id=label, info=info
+            )
             out.write(rec)
     pysam.tabix_index(args.output, preset="vcf", force=True)
     n_vaf = sum(1 for r in records if r[6] is not None)
-    print(f"INFO: {', '.join(args.input)}: {len(seen)} known variants written "
-          f"({len(records) - len(seen)} duplicates removed, {n_vaf} with a VAF)", file=sys.stderr)  # fmt: skip
+    print(
+        f"INFO: {', '.join(args.input)}: {len(seen)} known variants written "
+        f"({len(records) - len(seen)} duplicates removed, {n_vaf} with a VAF)",
+        file=sys.stderr,
+    )
 
 
 def load_calls(path):
@@ -182,8 +202,10 @@ def load_calls(path):
     with pysam.VariantFile(path) as vcf:
         # the VC_* tags come from harmonize_vcf.py
         if "VC_T_VAF" not in vcf.header.info:
-            sys.exit(f"ERROR: {path}: INFO/VC_T_VAF is not defined; expected a VCF harmonized by "
-                     "harmonize_vcf.py")  # fmt: skip
+            sys.exit(
+                f"ERROR: {path}: INFO/VC_T_VAF is not defined; expected a VCF harmonized by "
+                "harmonize_vcf.py"
+            )
         for rec in vcf:
             for alt in rec.alts or ():
                 calls[(rec.chrom, rec.pos, rec.ref, alt)] = {
@@ -223,7 +245,9 @@ def load_evidence(path):
     with pysam.VariantFile(path) as vcf:
         # one alignment = one sample with FORMAT/AD (bcftools mpileup -a AD,DP)
         if len(vcf.header.samples) != 1 or "AD" not in vcf.header.formats:
-            sys.exit(f"ERROR: {path}: expected one sample with FORMAT/AD (bcftools mpileup -a AD,DP)")
+            sys.exit(
+                f"ERROR: {path}: expected one sample with FORMAT/AD (bcftools mpileup -a AD,DP)"
+            )
         sample = next(iter(vcf.header.samples))
         for rec in vcf:
             fmt = rec.samples[sample]
@@ -252,26 +276,38 @@ def check(args):
         # the known-variant VCF is the output of 'prepare' (+ bcftools norm)
         missing = [t for t in ("KV_GENE", "KV_LABEL") if t not in vcf.header.info]
         if missing:
-            sys.exit(f"ERROR: {args.known}: INFO/{', INFO/'.join(missing)} not defined; expected "
-                     "the output of 'known_variants.py prepare'")  # fmt: skip
+            sys.exit(
+                f"ERROR: {args.known}: INFO/{', INFO/'.join(missing)} not defined; expected "
+                "the output of 'known_variants.py prepare'"
+            )
         known = [
-            (rec.chrom, rec.pos, rec.ref, alt, rec.info.get("KV_GENE", "."),
-             rec.info.get("KV_LABEL", "."))
+            (
+                rec.chrom,
+                rec.pos,
+                rec.ref,
+                alt,
+                rec.info.get("KV_GENE", "."),
+                rec.info.get("KV_LABEL", "."),
+            )
             for rec in vcf
             for alt in rec.alts or ()
-        ]  # fmt: skip
+        ]
     if not known:
         sys.exit(f"ERROR: {args.known}: no known variants")
     # a required list is a short checklist; a long list is probably a benchmark set
     if len(known) >= MAX_REQUIRED:
-        print(f"WARNING: {args.known}: {len(known)} required variants; 'required' is meant for a "
-              f"checklist of fewer than {MAX_REQUIRED} variants (use mode 'benchmark' for truth sets)",
-              file=sys.stderr)  # fmt: skip
+        print(
+            f"WARNING: {args.known}: {len(known)} required variants; 'required' is meant for a "
+            f"checklist of fewer than {MAX_REQUIRED} variants (use mode 'benchmark' for truth sets)",
+            file=sys.stderr,
+        )
     # one value of each option per technology, in the same order
     lengths = {len(args.technology), len(args.normalized), len(args.compare), len(args.regions)}
     if len(lengths) != 1:
-        sys.exit("ERROR: give --technology, --normalized, --compare and --regions once per "
-                 "technology, in the same order")  # fmt: skip
+        sys.exit(
+            "ERROR: give --technology, --normalized, --compare and --regions once per "
+            "technology, in the same order"
+        )
     if len(set(args.technology)) != len(args.technology):
         sys.exit(f"ERROR: --technology {' '.join(args.technology)}: a technology is given twice")
     # optional tumor evidence: technology=VCF, technology must be one of --technology
@@ -279,8 +315,10 @@ def check(args):
     for item in args.evidence:
         tech, sep, path = item.partition("=")
         if not sep or tech not in args.technology:
-            sys.exit(f"ERROR: --evidence '{item}' must be TECHNOLOGY=VCF with a technology of "
-                     f"--technology ({', '.join(args.technology)})")  # fmt: skip
+            sys.exit(
+                f"ERROR: --evidence '{item}' must be TECHNOLOGY=VCF with a technology of "
+                f"--technology ({', '.join(args.technology)})"
+            )
         evidence_paths[tech] = path
 
     rows, summary = [], []
@@ -316,28 +354,49 @@ def check(args):
                 ev_dp = evidence[1].get((chrom, pos), 0)
                 ev_alt = evidence[0].get(key, 0)
             others = [a for a in by_position.get((chrom, pos), []) if a != f"{ref}>{alt}"]
-            rows.append({
-                "sample": args.sample, "technology": tech, "label": label, "gene": gene,
-                "chrom": chrom, "pos": pos, "ref": ref, "alt": alt, "status": status,
-                "in_region": "yes" if region else "no", "called": "yes" if call else "no",
-                "filter": call["filter"] if call else "NA",
-                "vaf": fmt(call["vaf"]) if call else "NA",
-                "depth": fmt(call["dp"]) if call else "NA",
-                "alt_reads": fmt(call["alt"]) if call else "NA",
-                "evidence_depth": fmt(ev_dp), "evidence_alt_reads": fmt(ev_alt),
-                "same_position_call": ",".join(others) or ".",
-            })  # fmt: skip
-        print(f"INFO: {args.sample} {tech}: {passed} of {len(known)} required variants PASS",
-              file=sys.stderr)  # fmt: skip
-        summary.append({"sample": args.sample, "technology": tech, "required": len(known),
-                        "passed": passed, "failed": len(known) - passed,
-                        "all_passed": "yes" if passed == len(known) else "no"})  # fmt: skip
+            rows.append(
+                {
+                    "sample": args.sample,
+                    "technology": tech,
+                    "label": label,
+                    "gene": gene,
+                    "chrom": chrom,
+                    "pos": pos,
+                    "ref": ref,
+                    "alt": alt,
+                    "status": status,
+                    "in_region": "yes" if region else "no",
+                    "called": "yes" if call else "no",
+                    "filter": call["filter"] if call else "NA",
+                    "vaf": fmt(call["vaf"]) if call else "NA",
+                    "depth": fmt(call["dp"]) if call else "NA",
+                    "alt_reads": fmt(call["alt"]) if call else "NA",
+                    "evidence_depth": fmt(ev_dp),
+                    "evidence_alt_reads": fmt(ev_alt),
+                    "same_position_call": ",".join(others) or ".",
+                }
+            )
+        print(
+            f"INFO: {args.sample} {tech}: {passed} of {len(known)} required variants PASS",
+            file=sys.stderr,
+        )
+        summary.append(
+            {
+                "sample": args.sample,
+                "technology": tech,
+                "required": len(known),
+                "passed": passed,
+                "failed": len(known) - passed,
+                "all_passed": "yes" if passed == len(known) else "no",
+            }
+        )
 
     # both tables have at least one row (known variants and technologies are not empty)
     for name, data in (("known_variants", rows), ("known_summary", summary)):
         with open(f"{args.prefix}.{name}.tsv", "w", newline="") as fh:
-            writer = csv.DictWriter(fh, fieldnames=list(data[0]), delimiter="\t",
-                                    lineterminator="\n")  # fmt: skip
+            writer = csv.DictWriter(
+                fh, fieldnames=list(data[0]), delimiter="\t", lineterminator="\n"
+            )
             writer.writeheader()
             writer.writerows(data)
 
@@ -362,8 +421,9 @@ def main():
     c.add_argument("--normalized", nargs="+", required=True, help="normalized VCF per technology")
     c.add_argument("--compare", nargs="+", required=True, help="compared VCF per technology")
     c.add_argument("--regions", nargs="+", required=True, help="comparison region per technology")
-    c.add_argument("--evidence", nargs="*", default=[],
-                   help="technology=tumor evidence VCF (optional)")  # fmt: skip
+    c.add_argument(
+        "--evidence", nargs="*", default=[], help="technology=tumor evidence VCF (optional)"
+    )
     c.add_argument("--prefix", required=True)
     args = parser.parse_args()
     prepare(args) if args.command == "prepare" else check(args)

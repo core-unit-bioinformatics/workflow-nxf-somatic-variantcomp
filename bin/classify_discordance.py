@@ -52,10 +52,18 @@ import pysam
 
 REQUIRED_COLUMNS = ["sample", "truth", "query", "status", "chrom", "pos", "ref", "alt", "truth_vaf"]
 EXTRA_COLUMNS = [
-    "class", "other_in_normalized", "other_filter", "other_vaf_normalized",
-    "other_tumor_dp", "other_tumor_alt", "normal_dp", "normal_alt", "normal_vaf",
-    "query_power", "detectable",
-]  # fmt: skip
+    "class",
+    "other_in_normalized",
+    "other_filter",
+    "other_vaf_normalized",
+    "other_tumor_dp",
+    "other_tumor_alt",
+    "normal_dp",
+    "normal_alt",
+    "normal_vaf",
+    "query_power",
+    "detectable",
+]
 
 
 def detection_power(depth, vaf, min_alt):
@@ -78,8 +86,10 @@ def load_calls(path):
     with pysam.VariantFile(path) as vcf:
         # the harmonized VAF tag must be defined (output of harmonize_vcf.py)
         if "VC_T_VAF" not in vcf.header.info:
-            sys.exit(f"ERROR: {path}: INFO/VC_T_VAF is not defined; expected a VCF harmonized "
-                     "by harmonize_vcf.py")  # fmt: skip
+            sys.exit(
+                f"ERROR: {path}: INFO/VC_T_VAF is not defined; expected a VCF harmonized "
+                "by harmonize_vcf.py"
+            )
         for rec in vcf:
             for alt in rec.alts or ():
                 # FILTER as written in the VCF ('PASS', or the failed filters joined by ';')
@@ -166,14 +176,18 @@ def read_variants(path, sample, truth, query):
         reader = csv.DictReader(fh, delimiter="\t")
         missing = [c for c in REQUIRED_COLUMNS if c not in (reader.fieldnames or [])]
         if missing:
-            sys.exit(f"ERROR: {path}: missing column(s) {', '.join(missing)}; expected the "
-                     "variants table of benchmark_metrics.py")  # fmt: skip
+            sys.exit(
+                f"ERROR: {path}: missing column(s) {', '.join(missing)}; expected the "
+                "variants table of benchmark_metrics.py"
+            )
         rows = list(reader)
     for i, row in enumerate(rows, start=2):
         # every row must belong to this comparison and have a valid status
         if (row["sample"], row["truth"], row["query"]) != (sample, truth, query):
-            sys.exit(f"ERROR: {path}: line {i}: row of {row['sample']} {row['truth']} vs "
-                     f"{row['query']}, expected {sample} {truth} vs {query}")  # fmt: skip
+            sys.exit(
+                f"ERROR: {path}: line {i}: row of {row['sample']} {row['truth']} vs "
+                f"{row['query']}, expected {sample} {truth} vs {query}"
+            )
         if row["status"] not in ("TP", "FN", "FP"):
             sys.exit(f"ERROR: {path}: line {i}: status '{row['status']}' is not TP, FN or FP")
         if not row["pos"].isdigit():
@@ -209,15 +223,27 @@ def main():
     parser.add_argument("--truth-tumor-evidence", help="pileup VCF of the truth tumor alignment")
     parser.add_argument("--query-tumor-evidence", help="pileup VCF of the query tumor alignment")
     parser.add_argument("--normal-evidence", nargs="*", default=[], help="pileup VCFs of normals")
-    parser.add_argument("--min-coverage", type=int, default=10, help="low_coverage below this depth")
-    parser.add_argument("--min-alt-reads", type=int, default=2,
-                        help="alt reads in the normals for germline_in_normal")  # fmt: skip
-    parser.add_argument("--germline-vaf", type=float, default=0.1,
-                        help="normal VAF for germline_in_normal")  # fmt: skip
-    parser.add_argument("--power-min-alt", type=int, default=3,
-                        help="alt reads a caller needs to call a variant")  # fmt: skip
-    parser.add_argument("--detection-power", type=float, default=0.95,
-                        help="power needed to count a truth variant as detectable")  # fmt: skip
+    parser.add_argument(
+        "--min-coverage", type=int, default=10, help="low_coverage below this depth"
+    )
+    parser.add_argument(
+        "--min-alt-reads",
+        type=int,
+        default=2,
+        help="alt reads in the normals for germline_in_normal",
+    )
+    parser.add_argument(
+        "--germline-vaf", type=float, default=0.1, help="normal VAF for germline_in_normal"
+    )
+    parser.add_argument(
+        "--power-min-alt", type=int, default=3, help="alt reads a caller needs to call a variant"
+    )
+    parser.add_argument(
+        "--detection-power",
+        type=float,
+        default=0.95,
+        help="power needed to count a truth variant as detectable",
+    )
     parser.add_argument("--prefix", required=True)
     args = parser.parse_args()
     # parameter ranges
@@ -262,19 +288,21 @@ def main():
                     detectable_tp += status == "TP"
                     detectable_fn += status == "FN"
 
-        row.update({
-            "class": row_class,
-            "other_in_normalized": "yes" if in_other else "no",
-            "other_filter": other_filter,
-            "other_vaf_normalized": fmt(other_vaf),
-            "other_tumor_dp": fmt(tumor_dp),
-            "other_tumor_alt": fmt(tumor_alt),
-            "normal_dp": fmt(normal_dp),
-            "normal_alt": fmt(normal_alt),
-            "normal_vaf": fmt(normal_vaf),
-            "query_power": fmt(power),
-            "detectable": "NA" if detectable is None else ("yes" if detectable else "no"),
-        })  # fmt: skip
+        row.update(
+            {
+                "class": row_class,
+                "other_in_normalized": "yes" if in_other else "no",
+                "other_filter": other_filter,
+                "other_vaf_normalized": fmt(other_vaf),
+                "other_tumor_dp": fmt(tumor_dp),
+                "other_tumor_alt": fmt(tumor_alt),
+                "normal_dp": fmt(normal_dp),
+                "normal_alt": fmt(normal_alt),
+                "normal_vaf": fmt(normal_vaf),
+                "query_power": fmt(power),
+                "detectable": "NA" if detectable is None else ("yes" if detectable else "no"),
+            }
+        )
 
     # input columns first, then the new ones (an input that already has them keeps its order)
     with open(args.variants, newline="") as fh:
@@ -290,20 +318,41 @@ def main():
     total = detectable_tp + detectable_fn
     recall = detectable_tp / total if total else math.nan
     with open(f"{args.prefix}.power.tsv", "w") as fh:
-        fh.write("sample\ttruth\tquery\tstratum_type\tstratum\ttp_baseline\tfn\ttp_call\tfp\t"
-                 "recall\tprecision\tf1\n")  # fmt: skip
-        fh.write("\t".join([args.sample, args.truth, args.query, "power_adjusted", "detectable",
-                            str(detectable_tp) if has_power else "NA",
-                            str(detectable_fn) if has_power else "NA", "NA", "NA",
-                            fmt(recall) if has_power else "NA", "NA", "NA"]) + "\n")  # fmt: skip
+        fh.write(
+            "sample\ttruth\tquery\tstratum_type\tstratum\ttp_baseline\tfn\ttp_call\tfp\t"
+            "recall\tprecision\tf1\n"
+        )
+        fh.write(
+            "\t".join(
+                [
+                    args.sample,
+                    args.truth,
+                    args.query,
+                    "power_adjusted",
+                    "detectable",
+                    str(detectable_tp) if has_power else "NA",
+                    str(detectable_fn) if has_power else "NA",
+                    "NA",
+                    "NA",
+                    fmt(recall) if has_power else "NA",
+                    "NA",
+                    "NA",
+                ]
+            )
+            + "\n"
+        )
 
     # log the class counts per status
     summary = ", ".join(f"{s} {c}: {n}" for (s, c), n in sorted(classes.items()))
-    print(f"INFO: {args.sample} {args.truth} vs {args.query}: {len(rows)} variants ({summary})",
-          file=sys.stderr)  # fmt: skip
+    print(
+        f"INFO: {args.sample} {args.truth} vs {args.query}: {len(rows)} variants ({summary})",
+        file=sys.stderr,
+    )
     if has_power:
-        print(f"INFO: detectable truth variants: {total} (TP {detectable_tp}, FN {detectable_fn})",
-              file=sys.stderr)  # fmt: skip
+        print(
+            f"INFO: detectable truth variants: {total} (TP {detectable_tp}, FN {detectable_fn})",
+            file=sys.stderr,
+        )
     else:
         print("INFO: no query tumor alignment: power-adjusted recall is NA", file=sys.stderr)
 
