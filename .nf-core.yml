@@ -47,7 +47,7 @@ template:
   description: Compare somatic variant calls of the same tumor/normal pairs across
     sequencing technologies (WGS, WES, panel)
   author: Kai Horny
-  version: 0.13.1-dev
+  version: 0.14.0-dev
   force: true
   outdir: workflow-nxf-somatic-variantcomp
   skip_features:
