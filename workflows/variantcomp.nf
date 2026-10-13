@@ -15,6 +15,7 @@ include { BENCHMARK              } from '../subworkflows/local/benchmark'
 include { DISCORDANCE            } from '../subworkflows/local/discordance'
 include { ANNOTATE_VARIANTS      } from '../subworkflows/local/annotate_variants'
 include { VARIANTCOMP_REPORT     } from '../modules/local/variantcomp_report/main'
+include { MQC_TABLES             } from '../modules/local/mqc_tables/main'
 include { PREPARE_KNOWN_VARIANTS } from '../subworkflows/local/prepare_known_variants'
 include { KNOWN_VARIANTS         } from '../subworkflows/local/known_variants'
 include { paramsSummaryMap       } from 'plugin/nf-schema'
@@ -219,6 +220,39 @@ workflow VARIANTCOMP {
             .map { metrics, per_pair, power, variants -> [[id: 'variantcomp'], metrics, per_pair, power, variants] }
     )
     ch_multiqc_files = ch_multiqc_files.mix(VARIANTCOMP_REPORT.out.multiqc.flatten())
+
+    //
+    // MODULE: MultiQC tables of the step summaries (input checks, normalization,
+    // harmonization, regions), one section each
+    //
+    def ch_summary_sections = CHECK_INPUTS.out.reports
+        .map { _meta, tsv -> tsv }
+        .collect()
+        .map { files -> [[id: 'input_checks', command: 'key-value', title: 'Input checks', description: 'Reference checks of every input at the start of the run (status, renamed and dropped contigs, REF mismatches; input_checks/).'], files] }
+        .mix(
+            PREPROCESS_VCF.out.norm_logs
+                .map { _meta, log -> log }
+                .collect()
+                .map { files -> [[id: 'normalization', command: 'norm-logs', title: 'Normalization (bcftools norm)', description: 'Records split, left-aligned, removed (REF mismatch, duplicates) per VCF and branch (pass / non_pass).'], files] },
+            PREPROCESS_VCF.out.summaries
+                .map { _meta, tsv -> tsv }
+                .collect()
+                .map { files -> [[id: 'harmonization', command: 'key-value', title: 'Harmonization (VAF, depth, alt reads)', description: 'Source of the VAF (FORMAT/AF or AD), depth and dropped records per VCF and branch (harmonize_vcf.py).'], files] },
+            PREPARE_REGIONS.out.summary
+                .map { _meta, tsv -> tsv }
+                .collect()
+                .map { files -> [[id: 'regions', command: 'table', title: 'Comparison region', description: 'Size of every target BED and of the common comparison region.'], files] }
+        )
+    if (params.callable_regions) {
+        ch_summary_sections = ch_summary_sections.mix(
+            COVERAGE.out.callable_summary
+                .map { _meta, tsv -> tsv }
+                .collect()
+                .map { files -> [[id: 'callable', command: 'table', title: 'Callable regions', description: 'Bases of the common region callable in all alignments of a sample.'], files] }
+        )
+    }
+    MQC_TABLES(ch_summary_sections)
+    ch_multiqc_files = ch_multiqc_files.mix(MQC_TABLES.out.multiqc)
 
     //
     // Collate and save software versions
