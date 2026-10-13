@@ -18,6 +18,8 @@ dependencies:
   - requests
   - pytest
   - ruff
+  # formatter of all Python code (bin/, scripts/, tests/)
+  - black
   # docs: PNG rendering of the metro map (scripts/make_metro_map.py)
   - cairosvg
   # bioinformatics tools (all have linux-aarch64 or noarch builds)

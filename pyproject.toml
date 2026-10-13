@@ -10,13 +10,18 @@ requires-python = ">=3.10"
 [project.urls]
 repository = "https://github.com/core-unit-bioinformatics/workflow-nxf-somatic-variantcomp"
 
+[tool.black]
+# black formats all Python code; ruff only lints (no formatting rules)
+line-length = 100
+target-version = ["py310"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP"]
-# line length is enforced by `ruff format`; long message strings can't be wrapped by it
+# line length is handled by black; long message strings can't be wrapped by it
 ignore = ["E501"]
 
 [tool.pytest.ini_options]

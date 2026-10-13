@@ -140,8 +140,9 @@ nf-core-style pipelines.
 ### Code style and comments
 
 - **Python, not R.** Scripts live in `bin/`: `#!/usr/bin/env python3`
-  shebang, executable, argparse, PEP8 (ruff, configured in
-  `pyproject.toml`), no workflow-engine logic, unit-tested with pytest
+  shebang, executable, argparse, PEP8: formatted with `black` and linted with
+  `ruff` (both configured in `pyproject.toml`; run `black bin scripts tests`
+  and `ruff check` before every commit), no workflow-engine logic, unit-tested with pytest
   (`tests/python/`). Plots use matplotlib, statistics scipy/pandas.
 - **Inline comments everywhere.** Every block of code executed by the
   pipeline (Python scripts and the shell code of modules) has comments that
