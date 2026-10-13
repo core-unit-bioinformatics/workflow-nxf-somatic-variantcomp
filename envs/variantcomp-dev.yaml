@@ -11,7 +11,7 @@ dependencies:
   - python=3.12
   - pysam
   - pandas
-  - scipy
+  - scipy>=1.11  # scipy.stats.false_discovery_control
   - matplotlib
   - upsetplot
   - pyyaml

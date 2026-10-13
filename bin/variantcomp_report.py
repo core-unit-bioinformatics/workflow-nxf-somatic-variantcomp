@@ -12,19 +12,26 @@ Outputs (prefix "variantcomp"):
                              (FN, FP, or both) enriched for a feature compared with
                              the concordant variants (TP)? Features: indel, low VAF
                              (< --low-vaf; truth VAF for FN/TP, query VAF for FP),
-                             and every stratification column (yes/no).
+                             VEP consequence group (non_synonymous, synonymous),
+                             HIGH/MODERATE impact, in_repeat and every
+                             stratification column (yes/no).
                              Fisher's exact test, odds ratio, Benjamini-Hochberg q.
   <prefix>.genes.tsv         per comparison and gene: TP/FN/FP counts, discordance
                              rate, Fisher's exact test of discordant vs. concordant
                              in the gene vs. all other genes, BH q
   <prefix>.classes.tsv       per comparison: counts of discordance classes
+  <prefix>.strata.tsv        per comparison, annotation and value (consequence_group,
+                             impact, variant_class, in_repeat, every stratification):
+                             TP, FN, FP, recall, precision and discordance rate
+                             (FN + FP) / (TP + FN + FP)
   *_mqc.*                    MultiQC custom content (tables, bar and line graphs)
   plots/*.png                recall/precision, recall by VAF, classes, enrichment
 
 Checks: the required columns of every input, status values TP/FN/FP and known
 discordance classes (an unknown class would be missing from the class summary).
 
-Why a script: the statistics (Fisher's exact test, Benjamini-Hochberg), plots and
+Why a script: the statistics (Fisher's exact test and Benjamini-Hochberg from SciPy),
+plots and
 MultiQC custom-content files are analysis code; no tool produces them from these
 tables.
 """
@@ -40,7 +47,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
-from scipy.stats import fisher_exact  # noqa: E402
+from scipy.stats import false_discovery_control, fisher_exact  # noqa: E402
 
 BASE_COLUMNS = {
     "sample",
@@ -72,7 +79,17 @@ BASE_COLUMNS = {
     "query_power",
     "detectable",
     "gene",
+    # annotation columns (annotate_variants.py merge) that are no yes/no feature
+    "consequence",
+    "consequence_group",
+    "impact",
+    "variant_class",
+    "biotype",
+    "repeat_unit",
+    "repeat_times",
 }
+# annotation columns the report is stratified by (if present), plus every yes/no column
+STRATA_COLUMNS = ["consequence_group", "impact", "variant_class", "in_repeat"]
 CLASS_ORDER = [
     "filtered_non_pass",
     "present_but_filtered",
@@ -149,21 +166,13 @@ def check_variants(variants, path):
 
 
 def bh(pvalues):
-    """Benjamini-Hochberg adjusted p-values (NaN kept, not counted as tests)."""
+    """Benjamini-Hochberg q-values (scipy.stats.false_discovery_control); NaN p-values
+    (test not defined) stay NaN and are not counted as tests."""
     p = np.asarray(pvalues, dtype=float)
     q = np.full_like(p, np.nan)
     ok = ~np.isnan(p)
-    if not ok.any():
-        return q
-    ps = p[ok]
-    # p-values in ascending order, scaled by n / rank
-    order = np.argsort(ps)
-    ranked = ps[order] * len(ps) / (np.arange(len(ps)) + 1)
-    # enforce monotonicity from the largest p-value downwards
-    ranked = np.minimum.accumulate(ranked[::-1])[::-1]
-    out = np.empty_like(ps)
-    out[order] = np.minimum(ranked, 1.0)
-    q[ok] = out
+    if ok.any():
+        q[ok] = false_discovery_control(p[ok], method="bh")
     return q
 
 
@@ -186,7 +195,13 @@ def feature_flags(df, low_vaf):
         "indel": df["type"].isin(["INS", "DEL", "COMPLEX"]),
         f"vaf_lt_{low_vaf:g}": vaf < low_vaf,
     }
-    # every other yes/no column is a stratification (from annotate_variants.py)
+    # VEP consequence group and impact (annotate_variants.py merge)
+    if "consequence_group" in df.columns:
+        features["non_synonymous"] = df["consequence_group"] == "non_synonymous"
+        features["synonymous"] = df["consequence_group"] == "synonymous"
+    if "impact" in df.columns:
+        features["high_or_moderate_impact"] = df["impact"].isin(["HIGH", "MODERATE"])
+    # every other yes/no column is a stratification or the repeat flag (annotate_variants.py)
     for col in df.columns:
         if col not in BASE_COLUMNS and set(df[col].dropna().unique()) <= {"yes", "no"}:
             features[col] = df[col] == "yes"
@@ -268,6 +283,77 @@ def gene_summary(df):
         out["q_value"] = bh(out["p_value"])
         out = out.sort_values(["truth", "query", "p_value", "gene"], na_position="last")
     return out
+
+
+def strata_summary(df):
+    """Per comparison, annotation column and value: counts, recall, precision, discordance rate."""
+    # annotation columns, then the yes/no stratification columns
+    columns = [c for c in STRATA_COLUMNS if c in df.columns]
+    columns += [
+        c
+        for c in df.columns
+        if c not in BASE_COLUMNS
+        and c not in columns
+        and set(df[c].dropna().unique()) <= {"yes", "no"}
+    ]
+    rows = []
+    for (truth, query), group in df.groupby(["truth", "query"], sort=True):
+        for column in columns:
+            for value, sub in group.groupby(column, sort=True):
+                tp = int((sub["status"] == "TP").sum())
+                fn = int((sub["status"] == "FN").sum())
+                fp = int((sub["status"] == "FP").sum())
+                rows.append(
+                    {
+                        "truth": truth,
+                        "query": query,
+                        "annotation": column,
+                        "value": value,
+                        "tp": tp,
+                        "fn": fn,
+                        "fp": fp,
+                        "recall": tp / (tp + fn) if tp + fn else math.nan,
+                        "precision": tp / (tp + fp) if tp + fp else math.nan,
+                        "discordance_rate": (fn + fp) / (tp + fn + fp),
+                    }
+                )
+    return pd.DataFrame(
+        rows,
+        columns=[
+            "truth",
+            "query",
+            "annotation",
+            "value",
+            "tp",
+            "fn",
+            "fp",
+            "recall",
+            "precision",
+            "discordance_rate",
+        ],
+    )
+
+
+def plot_strata(strata, outdir):
+    """Discordance rate per annotation value (one panel per annotation)."""
+    if strata.empty:
+        return
+    annotations = list(dict.fromkeys(strata["annotation"]))
+    fig, axes = plt.subplots(
+        len(annotations), 1, figsize=(8, 2.2 * len(annotations) + 0.5), squeeze=False
+    )
+    for ax, annotation in zip(axes[:, 0], annotations, strict=True):
+        data = strata[strata["annotation"] == annotation]
+        labels = (
+            data["truth"] + " vs " + data["query"] + ": " + data["value"].astype(str)
+        ).tolist()
+        ax.barh(labels, data["discordance_rate"], color="#2a6f97")
+        ax.set_xlim(0, 1)
+        ax.set_title(annotation, fontsize=10, loc="left")
+    axes[-1, 0].set_xlabel("discordance rate (FN + FP) / (TP + FN + FP)")
+    fig.tight_layout()
+    fig.savefig(outdir / "discordance_by_annotation.png", dpi=150)
+    plt.close(fig)
 
 
 def class_summary(df):
@@ -526,6 +612,35 @@ def main():
     enrich = enrichment(variants, args.low_vaf)
     genes = gene_summary(variants)
     classes = class_summary(variants)
+    strata = strata_summary(variants)
+    strata.to_csv(
+        f"{args.prefix}.strata.tsv", sep="\t", index=False, na_rep="NA", float_format="%.4f"
+    )
+    # MultiQC table of the stratified counts
+    if not strata.empty:
+        table = strata.copy()
+        table.insert(
+            0,
+            "id",
+            table["truth"]
+            + " vs "
+            + table["query"]
+            + " "
+            + table["annotation"]
+            + "="
+            + table["value"].astype(str),
+        )
+        with open(f"{args.prefix}_strata_mqc.tsv", "w") as fh:
+            fh.write(
+                mqc_header(
+                    "strata",
+                    "Discordance by annotation",
+                    "TP, FN, FP and discordance rate per VEP consequence group, "
+                    "impact, variant class, repeat context and stratification.",
+                    "table",
+                )
+            )
+            table.to_csv(fh, sep="\t", index=False, na_rep="NA", float_format="%.4f")
     enrich.to_csv(
         f"{args.prefix}.enrichment.tsv", sep="\t", index=False, na_rep="NA", float_format="%.4g"
     )
@@ -540,6 +655,7 @@ def main():
     plot_metrics(per_pair, metrics, plots)
     plot_vaf(metrics, plots)
     plot_classes(classes, plots)
+    plot_strata(strata, plots)
     if not enrich.empty:
         plot_enrichment(enrich, plots, args.fdr)
     n_sig = int((enrich["q_value"] < args.fdr).sum()) if not enrich.empty else 0

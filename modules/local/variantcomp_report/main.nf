@@ -14,6 +14,7 @@ process VARIANTCOMP_REPORT {
     tuple val(meta), path("${prefix}.enrichment.tsv"), emit: enrichment
     tuple val(meta), path("${prefix}.genes.tsv"), emit: genes
     tuple val(meta), path("${prefix}.classes.tsv"), emit: classes
+    tuple val(meta), path("${prefix}.strata.tsv"), emit: strata
     tuple val(meta), path("plots/*.png"), emit: plots, optional: true
     path "*_mqc.{tsv,yaml}", emit: multiqc
     tuple val("${task.process}"), val('python'), eval("python --version | sed 's/Python //'"), topic: versions, emit: versions_python
@@ -44,6 +45,6 @@ process VARIANTCOMP_REPORT {
     stub:
     prefix = task.ext.prefix ?: "variantcomp"
     """
-    touch ${prefix}.enrichment.tsv ${prefix}.genes.tsv ${prefix}.classes.tsv ${prefix}_metrics_mqc.tsv
+    touch ${prefix}.enrichment.tsv ${prefix}.genes.tsv ${prefix}.classes.tsv ${prefix}.strata.tsv ${prefix}_metrics_mqc.tsv
     """
 }

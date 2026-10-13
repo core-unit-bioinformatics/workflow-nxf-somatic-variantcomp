@@ -83,3 +83,24 @@ def test_check_variants_missing_column():
     with pytest.raises(SystemExit) as err:
         report.check_variants(variants().drop(columns="class"), "variants.tsv")
     assert "missing column(s) class" in str(err.value)
+
+
+def annotated():
+    df = variants()
+    df["consequence_group"] = ["non_synonymous"] * 10 + ["synonymous"] * 10 + ["other"] * 10
+    df["impact"] = "MODERATE"
+    df["in_repeat"] = np.where(df["status"] == "FP", "yes", "no")
+    return df
+
+
+def test_strata_summary_counts_per_value():
+    strata = report.strata_summary(annotated())
+    rows = strata[(strata["annotation"] == "in_repeat") & (strata["value"] == "yes")]
+    assert (rows["tp"].item(), rows["fn"].item(), rows["fp"].item()) == (0, 0, 8)
+    assert rows["discordance_rate"].item() == pytest.approx(1.0)
+    assert set(strata["annotation"]) == {"consequence_group", "impact", "in_repeat", "homopolymer"}
+
+
+def test_feature_flags_include_consequence_and_impact():
+    flags = report.feature_flags(annotated(), 0.1)
+    assert {"non_synonymous", "synonymous", "high_or_moderate_impact", "in_repeat"} <= set(flags)
