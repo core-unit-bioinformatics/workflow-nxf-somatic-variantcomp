@@ -7,7 +7,7 @@
 //  2. mosdepth per alignment (--quantize: LOW_COVERAGE / CALLABLE bins; --by: mean depth
 //     per common-region interval)
 //  3. callable intervals per alignment (mosdepth_callable.py: label or mean-depth
-//     threshold, contigs renamed to the reference), sorted (bedtools sort)
+//     threshold, contigs renamed to the reference)
 //  4. per sample: intersection of the callable intervals of all its alignments
 //     (BED_INTERSECT_ALL), restricted to the common region (bedtools intersect -sorted)
 //  5. summary per sample (region_summary.py)
@@ -19,7 +19,6 @@
 include { RENAME_BED                                } from '../../../modules/local/rename_bed/main'
 include { MOSDEPTH                                  } from '../../../modules/nf-core/mosdepth/main'
 include { MOSDEPTH_CALLABLE                         } from '../../../modules/local/mosdepth_callable/main'
-include { BEDTOOLS_SORT as BEDTOOLS_SORT_CALLABLE   } from '../../../modules/nf-core/bedtools/sort/main'
 include { BED_INTERSECT_ALL                         } from '../bed_intersect_all/main'
 include { BEDTOOLS_INTERSECT as BEDTOOLS_INTERSECT_COMMON } from '../../../modules/nf-core/bedtools/intersect/main'
 include { REGION_SUMMARY as REGION_SUMMARY_CALLABLE } from '../../../modules/local/region_summary/main'
@@ -72,7 +71,6 @@ workflow COVERAGE {
             .join(ch_rename),
         ch_fai
     )
-    BEDTOOLS_SORT_CALLABLE(MOSDEPTH_CALLABLE.out.bed, ch_fai.map { _meta, fai -> fai })
 
     // samples with a tumor alignment for every technology
     def ch_eligibility = ch_samplesheet
@@ -81,12 +79,13 @@ workflow COVERAGE {
         .map { sample, flags -> [sample, flags.every { flag -> flag }] }
 
     // 4. per eligible sample: bases callable in all its alignments, inside the common region
-    def ch_per_sample = BEDTOOLS_SORT_CALLABLE.out.sorted
-        .map { meta, bed -> [meta.sample, bed] }
+    //    (BED_INTERSECT_ALL sorts the callable BEDs; they are named by alignment)
+    def ch_per_sample = MOSDEPTH_CALLABLE.out.bed
+        .map { meta, bed -> [meta.sample, meta.id, bed] }
         .groupTuple()
         .join(ch_eligibility.filter { _sample, eligible -> eligible })
-        .map { sample, beds, _eligible -> [[id: "${sample}.callable_all".toString(), sample: sample, alignments: beds.size()], beds] }
-    BED_INTERSECT_ALL(ch_per_sample)
+        .map { sample, names, beds, _eligible -> [[id: "${sample}.callable_all".toString(), sample: sample, alignments: beds.size()], beds, names] }
+    BED_INTERSECT_ALL(ch_per_sample, ch_fai)
     BEDTOOLS_INTERSECT_COMMON(
         BED_INTERSECT_ALL.out.bed
             .combine(common_bed)

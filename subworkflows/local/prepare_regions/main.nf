@@ -3,9 +3,9 @@
 //
 //  1. the BEDs come checked and harmonized from CHECK_INPUTS (contig names renamed,
 //     unknown and mitochondrial contigs removed)
-//  2. sort in reference order (bedtools sort -g <fai>)
-//  3. intersection of all target BEDs (BED_INTERSECT_ALL); without any target BED
-//     (only WGS) the genome BED is used
+//  2. --regions_bed / --exclude_bed sorted in reference order (bedtools sort -g <fai>)
+//  3. intersection of all target BEDs (BED_INTERSECT_ALL: sort, multiinter, merge);
+//     without any target BED (only WGS) the genome BED is used
 //  4. optional: intersection with --regions_bed (bedtools intersect),
 //     removal of --exclude_bed (bedtools subtract)
 //  5. final merge (common_targets.bed) and summary per technology (region_summary.py)
@@ -36,29 +36,38 @@ workflow PREPARE_REGIONS {
         .map { entry -> [entry[0].technology, entry[7]] }
         .unique()
 
-    // 2. sort in reference order
+    // 2. --regions_bed / --exclude_bed sorted in reference order (bedtools intersect -sorted
+    //    and subtract need it); the target BEDs are sorted in BED_INTERSECT_ALL
     BEDTOOLS_SORT(
-        ch_beds.filter { meta, _bed -> meta.role in ['target', 'regions', 'exclude'] },
+        ch_beds.filter { meta, _bed -> meta.role in ['regions', 'exclude'] },
         ch_fai.map { _meta, fai -> fai }
     )
     def ch_sorted = BEDTOOLS_SORT.out.sorted.branch { meta, _bed ->
-        target: meta.role == 'target'
         regions: meta.role == 'regions'
         exclude: meta.role == 'exclude'
     }
 
-    // 3. intersection of all target BEDs; the genome if there is none
-    def ch_target_beds = ch_sorted.target
-        .map { _meta, bed -> bed }
-        .toSortedList { a, b -> a.name <=> b.name }
+    // 3. intersection of all target BEDs (named by technology); the genome if there is none
+    def genome_name = '_genome_wide'
     BED_INTERSECT_ALL(
-        ch_target_beds
+        ch_beds
+            .filter { meta, _bed -> meta.role == 'target' }
+            .toSortedList { a, b -> a[0].id <=> b[0].id }
             // wrap the list: combine would otherwise flatten it into the tuple
-            .map { beds -> [beds] }
+            .map { items -> [items] }
             .combine(genome_bed)
-            .map { beds, genome -> [[id: 'targets_intersection'], beds ?: [genome]] }
+            .map { items, genome ->
+                items
+                    ? [[id: 'targets_intersection'], items.collect { item -> item[1] }, items.collect { item -> item[0].id }]
+                    : [[id: 'targets_intersection'], [genome], [genome_name]]
+            },
+        ch_fai
     )
     def ch_common = BED_INTERSECT_ALL.out.bed
+    // the sorted target BEDs (for the summary and the output): [ meta(id: technology), bed ]
+    def ch_target_beds = BED_INTERSECT_ALL.out.sorted
+        .filter { _meta, name, _bed -> name != genome_name }
+        .map { _meta, name, bed -> [[id: name, role: 'target'], bed] }
 
     // 4. optional restriction and exclusion
     if (use_regions) {
@@ -86,7 +95,7 @@ workflow PREPARE_REGIONS {
         .toSortedList()
     REGION_SUMMARY(
         ch_common_bed
-            .combine(ch_target_beds.map { beds -> [beds] })
+            .combine(ch_target_beds.map { _meta, bed -> bed }.toSortedList { a, b -> a.name <=> b.name }.map { beds -> [beds] })
             .combine(genome_bed)
             .map { common, beds, genome -> [[id: 'common_targets'], common, beds, genome] },
         'targets',
@@ -96,5 +105,5 @@ workflow PREPARE_REGIONS {
     emit:
     common_bed  = ch_common_bed          // value channel: path
     summary     = REGION_SUMMARY.out.summary // channel: [ meta, tsv ]
-    target_beds = ch_sorted.target       // channel: [ meta, bed ]
+    target_beds = ch_target_beds         // channel: [ meta(id: technology), sorted BED ]
 }
