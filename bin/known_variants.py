@@ -47,10 +47,6 @@ from check_reference import Report, is_mito, map_contig, read_fai  # noqa: E402
 TSV_REQUIRED = ["chrom", "pos", "ref", "alt"]
 
 
-# a 'required' list is a short clinical checklist (user requirement: fewer than 10)
-MAX_REQUIRED = 10
-
-
 def open_text(path):
     """Text handle of a plain or gzipped file."""
     return gzip.open(path, "rt") if str(path).endswith(".gz") else open(path)
@@ -132,83 +128,52 @@ def read_known(path, vaf_tag=None):
             )
 
 
-def prepare(args):
-    # reference contigs and their order (for sorting the output)
-    reference = read_fai(args.fai)
-    order = {c: i for i, c in enumerate(reference)}
-    # FASTA for the REF allele check (pysam), optional
-    fasta = pysam.FastaFile(args.fasta) if args.fasta else None
-    # the check report; --warn-only (check switched off) turns errors into warnings
-    report = Report(args.name or ", ".join(args.input), warn_only=args.warn_only)
-    records, errors = [], []
-    n_mito = n_ref_mismatch = 0
-    # all variants of all input files of the list
-    known = [v for path in args.input for v in read_known(path, args.vaf_tag)]
-    if not known:
-        sys.exit(f"ERROR: {', '.join(args.input)}: the known-variant list is empty")
-    for chrom, pos, ref, alt, gene, label, vaf in known:
-        # contig name on the reference (chr prefix, MT/chrM); unknown contigs are an error
-        ref_chrom = map_contig(chrom, reference)
-        if ref_chrom is None:
-            errors.append(
-                f"{chrom}:{pos} {ref}>{alt} ({label}): contig '{chrom}' is not in the reference"
+def check_variant(variant, reference, fasta, keep_mito):
+    """(kind, value) of one known variant: ('ok', reference contig), ('mito', None) for a
+    dropped mitochondrial one, ('error', problem) or ('ref_mismatch', problem)."""
+    chrom, pos, ref, alt, _gene, label, _vaf = variant
+    where = f"{chrom}:{pos} {ref}>{alt} ({label})"
+    # contig name on the reference (chr prefix, MT/chrM); unknown contigs are an error
+    ref_chrom = map_contig(chrom, reference)
+    if ref_chrom is None:
+        return "error", f"{where}: contig '{chrom}' is not in the reference"
+    # the mitochondrial contig is not compared (unless --keep-mito)
+    if is_mito(ref_chrom) and not keep_mito:
+        return "mito", None
+    # the REF allele must lie on the contig
+    if pos < 1 or pos - 1 + len(ref) > reference[ref_chrom]:
+        return "error", (
+            f"{where}: position beyond the end of {ref_chrom} (length "
+            f"{reference[ref_chrom]}): another genome build?"
+        )
+    # alleles must be plain bases (symbolic alleles can't be checked against a call)
+    if not set(ref + alt) <= set("ACGTN") or ref == alt:
+        return "error", f"{where}: REF/ALT must be different A/C/G/T/N alleles"
+    # the REF allele must match the reference sequence at this position
+    if fasta is not None:
+        expected = fasta.fetch(ref_chrom, pos - 1, pos - 1 + len(ref)).upper()
+        if ref != expected:
+            return "ref_mismatch", (
+                f"{where}: REF {ref} differs from the reference ({expected}): another "
+                "genome build?"
             )
-            continue
-        # the mitochondrial contig is not compared (unless --keep-mito)
-        if is_mito(ref_chrom) and not args.keep_mito:
-            n_mito += 1
-            continue
-        # position must lie on the contig
-        if pos < 1 or pos - 1 + len(ref) > reference[ref_chrom]:
-            errors.append(
-                f"{chrom}:{pos} {ref}>{alt} ({label}): position beyond the end of {ref_chrom} "
-                f"(length {reference[ref_chrom]}): another genome build?"
-            )
-            continue
-        # alleles must be plain bases (symbolic alleles can't be checked against a call)
-        if not set(ref + alt) <= set("ACGTN") or ref == alt:
-            errors.append(
-                f"{chrom}:{pos} {ref}>{alt} ({label}): REF/ALT must be different A/C/G/T/N alleles"
-            )
-            continue
-        # the REF allele must match the reference sequence at this position
-        if fasta is not None:
-            expected = fasta.fetch(ref_chrom, pos - 1, pos - 1 + len(ref)).upper()
-            if ref != expected:
-                n_ref_mismatch += 1
-                errors.append(
-                    f"{chrom}:{pos} {ref}>{alt} ({label}): REF {ref} differs from the "
-                    f"reference ({expected}): another genome build?"
-                )
-                continue
-        records.append((ref_chrom, pos, ref, alt, gene, label, vaf))
-    # report: counts and all problems (errors stop the run unless --warn-only)
-    report.set("input", ", ".join(args.input))
-    report.set("variants_read", len(known))
-    report.set("variants_kept", len(records))
-    report.set("dropped_mito", n_mito)
-    report.set("ref_mismatches", n_ref_mismatch)
-    if n_mito:
-        report.warnings.append(f"{n_mito} variants on the mitochondrial contig are not compared")
-    for message in errors:
-        report.error(message)
-    if args.report:
-        report.write(args.report)
-    report.print_and_exit()
-    if not records:
-        sys.exit(f"ERROR: {', '.join(args.input)}: no usable known variant is left")
-    # reference order, then position and alleles (needed for tabix and bcftools)
-    records.sort(key=lambda r: (order[r[0]], r[1], r[2], r[3]))
+    return "ok", ref_chrom
 
-    # sites-only VCF header: reference contigs and the KV_* / VC_T_VAF INFO tags
+
+def write_sites_vcf(path, records, reference):
+    """Sorted sites-only VCF (KV_GENE, KV_LABEL, VC_T_VAF) with tabix index; returns the
+    number of distinct variants written."""
+    order = {c: i for i, c in enumerate(reference)}
+    # reference order, then position and alleles (needed for tabix and bcftools)
+    records = sorted(records, key=lambda r: (order[r[0]], r[1], r[2], r[3]))
     header = pysam.VariantHeader()
     for name, length in reference.items():
         header.contigs.add(name, length=length)
     header.info.add("KV_GENE", 1, "String", "Gene of the known variant")
     header.info.add("KV_LABEL", 1, "String", "Label of the known variant")
     header.info.add("VC_T_VAF", 1, "Float", "Tumor VAF of the known variant (if given)")
-    with pysam.VariantFile(args.output, "wz", header=header) as out:
-        seen = set()
+    seen = set()
+    with pysam.VariantFile(path, "wz", header=header) as out:
         for chrom, pos, ref, alt, gene, label, vaf in records:
             # the same variant listed twice (e.g. in two input files) is written once
             if (chrom, pos, ref, alt) in seen:
@@ -217,15 +182,58 @@ def prepare(args):
             info = {"KV_GENE": gene.replace(" ", "_"), "KV_LABEL": label.replace(" ", "_")}
             if vaf is not None:
                 info["VC_T_VAF"] = float(vaf)
-            rec = out.new_record(
-                contig=chrom, start=pos - 1, alleles=(ref, alt), id=label, info=info
+            out.write(
+                out.new_record(contig=chrom, start=pos - 1, alleles=(ref, alt), id=label, info=info)
             )
-            out.write(rec)
-    pysam.tabix_index(args.output, preset="vcf", force=True)
+    pysam.tabix_index(path, preset="vcf", force=True)
+    return len(seen)
+
+
+def prepare(args):
+    """Known-variant list(s) -> checked, sorted sites-only VCF on the reference."""
+    reference = read_fai(args.fai)
+    # FASTA for the REF allele check (pysam), optional
+    fasta = pysam.FastaFile(args.fasta) if args.fasta else None
+    # the check report; --warn-only (check switched off) turns errors into warnings
+    report = Report(args.name or ", ".join(args.input), warn_only=args.warn_only)
+
+    # all variants of all input files of the list
+    known = [v for path in args.input for v in read_known(path, args.vaf_tag)]
+    if not known:
+        sys.exit(f"ERROR: {', '.join(args.input)}: the known-variant list is empty")
+
+    # every variant is checked; usable ones get the reference contig name
+    records, counts = [], {"mito": 0, "ref_mismatch": 0, "error": 0}
+    for variant in known:
+        kind, value = check_variant(variant, reference, fasta, args.keep_mito)
+        if kind == "ok":
+            records.append((value, *variant[1:]))
+            continue
+        counts[kind] += 1
+        # problems are errors (warnings with --warn-only); the variant is not written
+        if kind != "mito":
+            report.error(value)
+    n_mito = counts["mito"]
+
+    # report: counts and all problems (errors stop the run unless --warn-only)
+    report.set("input", ", ".join(args.input))
+    report.set("variants_read", len(known))
+    report.set("variants_kept", len(records))
+    report.set("dropped_mito", n_mito)
+    report.set("ref_mismatches", counts["ref_mismatch"])
+    if n_mito:
+        report.warnings.append(f"{n_mito} variants on the mitochondrial contig are not compared")
+    if args.report:
+        report.write(args.report)
+    report.print_and_exit()
+    if not records:
+        sys.exit(f"ERROR: {', '.join(args.input)}: no usable known variant is left")
+
+    written = write_sites_vcf(args.output, records, reference)
     n_vaf = sum(1 for r in records if r[6] is not None)
     print(
-        f"INFO: {', '.join(args.input)}: {len(seen)} known variants written "
-        f"({len(records) - len(seen)} duplicates removed, {n_vaf} with a VAF)",
+        f"INFO: {', '.join(args.input)}: {written} known variants written "
+        f"({len(records) - written} duplicates removed, {n_vaf} with a VAF)",
         file=sys.stderr,
     )
 
@@ -305,14 +313,14 @@ def fmt(value):
     return str(value)
 
 
-def check(args):
-    with pysam.VariantFile(args.known) as vcf:
-        # the known-variant VCF is the output of 'prepare' (+ bcftools norm)
+def read_prepared(path):
+    """[(chrom, pos, ref, alt, gene, label)] of a VCF written by 'prepare' (+ bcftools norm)."""
+    with pysam.VariantFile(path) as vcf:
         missing = [t for t in ("KV_GENE", "KV_LABEL") if t not in vcf.header.info]
         if missing:
             sys.exit(
-                f"ERROR: {args.known}: INFO/{', INFO/'.join(missing)} not defined; expected "
-                "the output of 'known_variants.py prepare'"
+                f"ERROR: {path}: INFO/{', INFO/'.join(missing)} not defined; expected the "
+                "output of 'known_variants.py prepare'"
             )
         known = [
             (
@@ -327,14 +335,13 @@ def check(args):
             for alt in rec.alts or ()
         ]
     if not known:
-        sys.exit(f"ERROR: {args.known}: no known variants")
-    # a required list is a short checklist; a long list is probably a benchmark set
-    if len(known) >= MAX_REQUIRED:
-        print(
-            f"WARNING: {args.known}: {len(known)} required variants; 'required' is meant for a "
-            f"checklist of fewer than {MAX_REQUIRED} variants (use mode 'benchmark' for truth sets)",
-            file=sys.stderr,
-        )
+        sys.exit(f"ERROR: {path}: no known variants")
+    return known
+
+
+def technology_inputs(args):
+    """[(technology, normalized VCF, compared VCF, regions BED, evidence VCF or None)],
+    sorted by technology; checks that the options belong together."""
     # one value of each option per technology, in the same order
     lengths = {len(args.technology), len(args.normalized), len(args.compare), len(args.regions)}
     if len(lengths) != 1:
@@ -345,7 +352,7 @@ def check(args):
     if len(set(args.technology)) != len(args.technology):
         sys.exit(f"ERROR: --technology {' '.join(args.technology)}: a technology is given twice")
     # optional tumor evidence: technology=VCF, technology must be one of --technology
-    evidence_paths = {}
+    evidence = {}
     for item in args.evidence:
         tech, sep, path = item.partition("=")
         if not sep or tech not in args.technology:
@@ -353,86 +360,106 @@ def check(args):
                 f"ERROR: --evidence '{item}' must be TECHNOLOGY=VCF with a technology of "
                 f"--technology ({', '.join(args.technology)})"
             )
-        evidence_paths[tech] = path
-
-    rows, summary = [], []
+        evidence[tech] = path
     # technologies in name order: the inputs arrive in any order, the tables must not depend on it
-    inputs = sorted(zip(args.technology, args.normalized, args.compare, args.regions, strict=True))
-    for tech, norm_path, compare_path, region_path in inputs:
-        normalized = load_calls(norm_path)
-        compared = load_calls(compare_path)
-        regions = load_regions(region_path)
-        evidence = load_evidence(evidence_paths.get(tech))
-        # all normalized alleles per position, to report calls with another allele
-        by_position = {}
-        for key in normalized:
-            by_position.setdefault(key[:2], []).append(f"{key[2]}>{key[3]}")
-        passed = 0
-        for chrom, pos, ref, alt, gene, label in known:
-            key = (chrom, pos, ref, alt)
-            region = in_regions(regions, chrom, pos, ref)
-            call = normalized.get(key)
-            # status: compared call > outside the region > filtered call > not called
-            if key in compared:
-                status = "PASS"
-                passed += 1
-            elif not region:
-                status = "FAIL_outside_region"
-            elif call:
-                status = "FAIL_filtered"
-            else:
-                status = "FAIL_not_called"
-            # read evidence in the tumor alignment (NA without alignment)
-            ev_dp = ev_alt = None
-            if evidence is not None:
-                ev_dp = evidence[1].get((chrom, pos), 0)
-                ev_alt = evidence[0].get(key, 0)
-            others = [a for a in by_position.get((chrom, pos), []) if a != f"{ref}>{alt}"]
-            rows.append(
-                {
-                    "sample": args.sample,
-                    "technology": tech,
-                    "label": label,
-                    "gene": gene,
-                    "chrom": chrom,
-                    "pos": pos,
-                    "ref": ref,
-                    "alt": alt,
-                    "status": status,
-                    "in_region": "yes" if region else "no",
-                    "called": "yes" if call else "no",
-                    "filter": call["filter"] if call else "NA",
-                    "vaf": fmt(call["vaf"]) if call else "NA",
-                    "depth": fmt(call["dp"]) if call else "NA",
-                    "alt_reads": fmt(call["alt"]) if call else "NA",
-                    "evidence_depth": fmt(ev_dp),
-                    "evidence_alt_reads": fmt(ev_alt),
-                    "same_position_call": ",".join(others) or ".",
-                }
-            )
-        print(
-            f"INFO: {args.sample} {tech}: {passed} of {len(known)} required variants PASS",
-            file=sys.stderr,
-        )
-        summary.append(
+    rows = zip(args.technology, args.normalized, args.compare, args.regions, strict=True)
+    return [(t, n, c, r, evidence.get(t)) for t, n, c, r in sorted(rows)]
+
+
+def status_of(key, compared, normalized, in_region):
+    """PASS / FAIL_* of one known variant in one technology (see the module docstring)."""
+    # the variant (same CHROM/POS/REF/ALT after normalization) was compared: found
+    if key in compared:
+        return "PASS"
+    # not in the comparison region of the sample: the technology could not be compared there
+    if not in_region:
+        return "FAIL_outside_region"
+    # called, but removed by FILTER or the uniform filters
+    if key in normalized:
+        return "FAIL_filtered"
+    # in the region, but not called at all
+    return "FAIL_not_called"
+
+
+def check_technology(sample, tech, paths, known):
+    """Rows of the variant table and the summary row of one technology."""
+    norm_path, compare_path, region_path, evidence_path = paths
+    normalized = load_calls(norm_path)
+    compared = load_calls(compare_path)
+    regions = load_regions(region_path)
+    evidence = load_evidence(evidence_path)
+    # all normalized alleles per position, to report calls with another allele
+    by_position = {}
+    for key in normalized:
+        by_position.setdefault(key[:2], []).append(f"{key[2]}>{key[3]}")
+    rows = []
+    for chrom, pos, ref, alt, gene, label in known:
+        key = (chrom, pos, ref, alt)
+        in_region = in_regions(regions, chrom, pos, ref)
+        call = normalized.get(key)
+        status = status_of(key, compared, normalized, in_region)
+        # read evidence in the tumor alignment (NA without alignment)
+        ev_dp = ev_alt = None
+        if evidence is not None:
+            ev_dp = evidence[1].get((chrom, pos), 0)
+            ev_alt = evidence[0].get(key, 0)
+        others = [a for a in by_position.get((chrom, pos), []) if a != f"{ref}>{alt}"]
+        rows.append(
             {
-                "sample": args.sample,
+                "sample": sample,
                 "technology": tech,
-                "required": len(known),
-                "passed": passed,
-                "failed": len(known) - passed,
-                "all_passed": "yes" if passed == len(known) else "no",
+                "label": label,
+                "gene": gene,
+                "chrom": chrom,
+                "pos": pos,
+                "ref": ref,
+                "alt": alt,
+                "status": status,
+                "in_region": "yes" if in_region else "no",
+                "called": "yes" if call else "no",
+                "filter": call["filter"] if call else "NA",
+                "vaf": fmt(call["vaf"]) if call else "NA",
+                "depth": fmt(call["dp"]) if call else "NA",
+                "alt_reads": fmt(call["alt"]) if call else "NA",
+                "evidence_depth": fmt(ev_dp),
+                "evidence_alt_reads": fmt(ev_alt),
+                "same_position_call": ",".join(others) or ".",
             }
         )
+    passed = sum(r["status"] == "PASS" for r in rows)
+    summary = {
+        "sample": sample,
+        "technology": tech,
+        "required": len(known),
+        "passed": passed,
+        "failed": len(known) - passed,
+        "recall": f"{passed / len(known):.4f}",
+        "all_passed": "yes" if passed == len(known) else "no",
+    }
+    print(
+        f"INFO: {sample} {tech}: {passed} of {len(known)} required variants PASS", file=sys.stderr
+    )
+    return rows, summary
 
-    # both tables have at least one row (known variants and technologies are not empty)
-    for name, data in (("known_variants", rows), ("known_summary", summary)):
-        with open(f"{args.prefix}.{name}.tsv", "w", newline="") as fh:
-            writer = csv.DictWriter(
-                fh, fieldnames=list(data[0]), delimiter="\t", lineterminator="\n"
-            )
-            writer.writeheader()
-            writer.writerows(data)
+
+def write_table(path, rows):
+    """TSV with the keys of the first row as header (rows are never empty here)."""
+    with open(path, "w", newline="") as fh:
+        writer = csv.DictWriter(fh, fieldnames=list(rows[0]), delimiter="\t", lineterminator="\n")
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def check(args):
+    """'required' mode: PASS/FAIL of every known variant in every technology of a sample."""
+    known = read_prepared(args.known)
+    rows, summary = [], []
+    for tech, *paths in technology_inputs(args):
+        tech_rows, tech_summary = check_technology(args.sample, tech, paths, known)
+        rows += tech_rows
+        summary.append(tech_summary)
+    write_table(f"{args.prefix}.known_variants.tsv", rows)
+    write_table(f"{args.prefix}.known_summary.tsv", summary)
 
 
 def main():
