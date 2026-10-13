@@ -148,3 +148,43 @@ def test_known(tmp_path):
     assert result.returncode == 1
     for message in ("sample 'S9' is not in the samplesheet", "mode 'check'", "must end with"):
         assert message in result.stderr
+
+
+def test_required_alignments_are_listed(tmp_path):
+    sheet = tmp_path / "s.csv"
+    for name in ("a.vcf.gz", "b.vcf.gz", "t.bam"):
+        (tmp_path / name).write_text("")
+    sheet.write_text(
+        "sample,technology,library_type,tumor_id,normal_id,caller,vcf,tumor_bam,normal_bam,target_bed\n"
+        "S1,wgs,wgs,T,N,x,a.vcf.gz,t.bam,n/a,n/a\n"
+        "S1,wes,wgs,T,N,x,b.vcf.gz,n/a,n/a,n/a\n"
+    )
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "samplesheet",
+            "--sheet",
+            str(sheet),
+            "--base-dir",
+            str(tmp_path),
+            "--output",
+            str(tmp_path / "o.csv"),
+            "--truth-technology",
+            "wgs",
+            "--require-tumor-bam",
+            "callable_regions",
+            "--require-normal-bam",
+            "require_normal_coverage",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 1
+    assert (
+        "line 3: no tumor_bam for S1 wes, but --callable_regions needs alignments" in result.stderr
+    )
+    assert (
+        "line 2: no normal_bam for S1 wgs (normal_id N), but --require_normal_coverage"
+        in result.stderr
+    )

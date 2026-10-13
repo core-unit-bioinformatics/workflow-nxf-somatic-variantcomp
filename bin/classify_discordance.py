@@ -34,6 +34,11 @@ the query: P(X >= --power-min-alt) with X ~ Binomial(query tumor depth, truth VA
 Variants with power >= --detection-power are "detectable"; the power-adjusted
 recall only counts these. Without a query tumor alignment, power is NA.
 
+With --no-read-evidence (pipeline --read_evidence false) no alignments are used:
+the classes are concordant, present_but_filtered or absent, and the read-evidence
+columns (other_tumor_dp, other_tumor_alt, normal_*, query_power, detectable) are not
+written.
+
 Outputs (--prefix):
   <prefix>.discordance.tsv  input table + class and evidence columns
   <prefix>.power.tsv        power-adjusted recall (one metrics row)
@@ -51,6 +56,16 @@ from collections import Counter
 import pysam
 
 REQUIRED_COLUMNS = ["sample", "truth", "query", "status", "chrom", "pos", "ref", "alt", "truth_vaf"]
+# columns that need read evidence (left out with --no-read-evidence)
+EVIDENCE_COLUMNS = [
+    "other_tumor_dp",
+    "other_tumor_alt",
+    "normal_dp",
+    "normal_alt",
+    "normal_vaf",
+    "query_power",
+    "detectable",
+]
 EXTRA_COLUMNS = [
     "class",
     "other_in_normalized",
@@ -245,6 +260,11 @@ def main():
         help="power needed to count a truth variant as detectable",
     )
     parser.add_argument("--prefix", required=True)
+    parser.add_argument(
+        "--no-read-evidence",
+        action="store_true",
+        help="no alignments: classes without read evidence, no evidence columns",
+    )
     args = parser.parse_args()
     # parameter ranges
     if args.min_coverage < 0 or args.min_alt_reads < 1 or args.power_min_alt < 1:
@@ -255,6 +275,10 @@ def main():
     rows = read_variants(args.variants, args.sample, args.truth, args.query)
     truth_calls = load_calls(args.truth_normalized)
     query_calls = load_calls(args.query_normalized)
+    # evidence files and --no-read-evidence exclude each other
+    given = [args.truth_tumor_evidence, args.query_tumor_evidence, *args.normal_evidence]
+    if args.no_read_evidence and any(given):
+        sys.exit("ERROR: --no-read-evidence was given together with read-evidence VCFs")
     truth_tumor = load_evidence(args.truth_tumor_evidence) if args.truth_tumor_evidence else None
     query_tumor = load_evidence(args.query_tumor_evidence) if args.query_tumor_evidence else None
     normals = merge_evidence(args.normal_evidence)
@@ -308,8 +332,14 @@ def main():
     with open(args.variants, newline="") as fh:
         columns = list(csv.DictReader(fh, delimiter="\t").fieldnames)
     columns += [c for c in EXTRA_COLUMNS if c not in columns]
+    # without read evidence, its columns are not written at all
+    if args.no_read_evidence:
+        columns = [c for c in columns if c not in EVIDENCE_COLUMNS]
     with open(f"{args.prefix}.discordance.tsv", "w", newline="") as fh:
-        writer = csv.DictWriter(fh, fieldnames=columns, delimiter="\t", lineterminator="\n")
+        # extrasaction='ignore': the evidence values are dropped with --no-read-evidence
+        writer = csv.DictWriter(
+            fh, fieldnames=columns, delimiter="\t", lineterminator="\n", extrasaction="ignore"
+        )
         writer.writeheader()
         writer.writerows(rows)
 

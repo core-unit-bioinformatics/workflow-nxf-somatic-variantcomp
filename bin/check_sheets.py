@@ -265,7 +265,24 @@ def check_samplesheet(args):
             errors.error(
                 f"technology '{tech}' must have one library_type, found: {', '.join(libs)}"
             )
-    # alignments: coverage needs them for every technology of a sample
+    # alignments: required by --callable_regions / --read_evidence (and normals by
+    # --require_normal_coverage); every missing one is listed
+    if args.require_tumor_bam:
+        for row in out:
+            if not row["tumor_bam"]:
+                errors.error(
+                    f"line {row['_line']}: no tumor_bam for {row['sample']} {row['technology']}, "
+                    f"but --{args.require_tumor_bam} needs alignments; give the BAM/CRAM or "
+                    "switch the option off"
+                )
+    if args.require_normal_bam:
+        for row in out:
+            if row["normal_id"] and not row["normal_bam"]:
+                errors.error(
+                    f"line {row['_line']}: no normal_bam for {row['sample']} {row['technology']} "
+                    f"(normal_id {row['normal_id']}), but --{args.require_normal_bam} needs it; "
+                    "give the BAM/CRAM or switch the option off"
+                )
     with_bam = sum(1 for r in out if r["tumor_bam"])
     if 0 < with_bam < len(out):
         errors.warn(
@@ -395,6 +412,16 @@ def main():
         p.add_argument("--output", required=True, help="validated CSV")
         if name == "samplesheet":
             p.add_argument("--truth-technology", required=True)
+            p.add_argument(
+                "--require-tumor-bam",
+                metavar="REASON",
+                help="every row needs a tumor_bam (REASON: name of the pipeline param that needs it, e.g. callable_regions)",
+            )
+            p.add_argument(
+                "--require-normal-bam",
+                metavar="REASON",
+                help="every row with a normal_id needs a normal_bam (REASON: the option)",
+            )
         if name == "known":
             p.add_argument("--samplesheet", required=True, help="validated samplesheet")
     args = parser.parse_args()

@@ -210,3 +210,12 @@ def test_empty_table_keeps_comparison_identity(tmp_path):
     assert result.returncode == 0, result.stderr
     power = (tmp_path / "x.power.tsv").read_text().splitlines()[1]
     assert power.startswith("S1\twgs\twes\tpower_adjusted\tdetectable\tNA")
+
+
+def test_no_read_evidence_leaves_out_evidence_columns(tmp_path):
+    table = "\t".join(VARIANT_COLUMNS) + "\nS1\twgs\twes\tFN\tchr1\t200\tA\tC\t0.3\tNA\n"
+    result = classify(tmp_path, table, CALL_HEADER, "--no-read-evidence")
+    assert result.returncode == 0, result.stderr
+    header, row = (tmp_path / "x.discordance.tsv").read_text().splitlines()
+    assert "other_tumor_dp" not in header and "detectable" not in header
+    assert row.split("\t")[header.split("\t").index("class")] == "absent"
