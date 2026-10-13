@@ -4,6 +4,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Dates follow ISO 8601 (`YYYY-MM-DD`).
 
+## v0.14.0-dev - [unreleased]
+
+### `Changed`
+
+- The samplesheet is read as in the nf-core template: `samplesheetToList` (nf-schema) in `PIPELINE_INITIALISATION`; the checks across rows (`check_sheets.py samplesheet`) run as `CHECK_SAMPLESHEET`, the first step of `VARIANTCOMP`, and everything else waits for them
+- `--stratification` and `--known_variants` are plain file parameters: `PIPELINE_INITIALISATION` no longer reads them; each sheet is checked by `check_sheets.py` in the subworkflow that uses it (`DISCORDANCE`, `PREPARE_KNOWN_VARIANTS`)
+- Metro map and README step table: the sheet checks are shown where they run (1.1, 1.2, 7.4, 8.1)
+
+### `Fixed`
+
+- Required known-variant tables list the technologies in name order (the order depended on the order the inputs arrived)
+- `discordance/variants.annotated.tsv` and `coverage/callable_summary.tsv` are concatenated in file-name order (the row order depended on the work directory paths)
+
 ## v0.13.1-dev - [2026-10-08]
 
 ### `Changed`
