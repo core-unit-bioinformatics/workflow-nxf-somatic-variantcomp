@@ -75,8 +75,8 @@ def test_tags_gt_and_symbolic(tmp_path):
     assert third.info["VC_T_ALT"] == 10
     assert "3 written, 1 dropped (symbolic ALT)" in result.stderr
     # per-record source of the tumor values
-    assert [r.info.get("VC_T_SRC") for r in recs] == ["AD", "AD", "AF_DP"]
-    assert "1 records without FORMAT/AD" in result.stderr
+    # auto: FORMAT/AF where present (third record), else the allelic depths
+    assert [r.info.get("VC_T_SRC") for r in recs] == ["AD", "AD", "AF"]
 
 
 def test_summary_counts_sources(tmp_path):
@@ -104,7 +104,6 @@ def test_summary_counts_sources(tmp_path):
         ("chr1\t10\t.\tA\tC,G\t.\tPASS\t.\tGT:AD\t0/1:5,3,2\t0/0:9,0,0\n", "2 ALT alleles; split"),
         ("chr1\t10\t.\tA\tC\t.\tPASS\t.\tGT:AD\t0/1:5,-3\t0/0:9,0\n", "negative value"),
         ("chr1\t10\t.\tA\tC\t.\tPASS\t.\tGT:AF:DP\t0/1:1.5:20\t0/0:0:20\n", "outside [0, 1]"),
-        ("chr1\t10\t.\tA\tC\t.\tPASS\t.\tGT\t0/1\t0/0\n", "1 of 1 tumor records have no VAF"),
     ],
 )
 def test_invalid_input_fails_with_message(tmp_path, record, message):
@@ -113,13 +112,35 @@ def test_invalid_input_fails_with_message(tmp_path, record, message):
     assert message in result.stderr
 
 
-def test_missing_vaf_allowed_up_to_threshold(tmp_path):
+def test_missing_vaf_above_threshold_marks_vaf_unavailable(tmp_path):
     body = (
         "chr1\t10\t.\tA\tC\t.\tPASS\t.\tGT:AD\t0/1:5,5\t0/0:9,0\n"
         "chr1\t20\t.\tA\tC\t.\tPASS\t.\tGT\t0/1\t0/0\n"
     )
-    result, _ = run(tmp_path, body, "--tumor", "T", "--normal", "N", "--max-missing-vaf", "0.5")
+    # 1 of 2 without VAF: allowed with 0.5, VAF available
+    result, out = run(tmp_path, body, "--tumor", "T", "--normal", "N", "--max-missing-vaf", "0.5")
     assert result.returncode == 0, result.stderr
+    assert "variantcomp_vaf" not in str(pysam.VariantFile(str(out)).header)
+    # above the default 0.05: a warning and the header flag, no error
+    result, out = run(tmp_path, body, "--tumor", "T", "--normal", "N")
+    assert result.returncode == 0, result.stderr
+    assert "1 of 2 tumor records have no VAF" in result.stderr
+    assert "##variantcomp_vaf=unavailable" in str(pysam.VariantFile(str(out)).header)
+
+
+@pytest.mark.parametrize(
+    ("mode", "expected"),
+    [("auto", (0.25, "AF")), ("af", (0.25, "AF")), ("ad", (0.3, "AD"))],
+)
+def test_vaf_source_modes(tmp_path, mode, expected):
+    # AF 0.25 and AD 70,30 disagree: the mode decides
+    body = "chr1\t10\t.\tA\tC\t.\tPASS\t.\tGT:AD:AF:DP\t0/1:70,30:0.25:100\t0/0:50,0:0:50\n"
+    result, out = run(tmp_path, body, "--tumor", "T", "--normal", "N", "--vaf-source", mode)
+    assert result.returncode == 0, result.stderr
+    rec = next(iter(pysam.VariantFile(str(out))))
+    assert (rec.info["VC_T_VAF"], rec.info["VC_T_SRC"]) == (pytest.approx(expected[0]), expected[1])
+    # alt reads always from AD, depth from DP
+    assert (rec.info["VC_T_ALT"], rec.info["VC_T_DP"]) == (30, 100)
 
 
 def test_wrong_sample_order_fails(tmp_path):

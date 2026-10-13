@@ -36,6 +36,8 @@ VAF, depth, alt reads and the variant type are taken from the harmonized INFO ta
 of harmonize_vcf.py (VC_T_VAF, VC_T_DP, VC_T_ALT, VC_TYPE, VC_LEN). A truth set
 without these tags (known-variant benchmark) is accepted: type and length are
 derived from REF/ALT, VAF-based strata are 'unknown' (counted and reported).
+A VCF with the header line `##variantcomp_vaf=unavailable` (too many records without
+VAF, see harmonize_vcf.py) is treated the same way: all its VAFs count as unknown.
 
 recall = TP_baseline / (TP_baseline + FN); precision = TP_call / (TP_call + FP);
 F1 = harmonic mean. Undefined values are written as NA.
@@ -128,6 +130,16 @@ def read_records(path, what):
         # only tags declared in the header can be read (pysam raises otherwise)
         tags = set(vcf.header.info)
         missing_tags = [t for t in HARMONIZED_TAGS if t not in tags]
+        # harmonize_vcf.py marks VCFs with too many records without VAF: no VAF strata
+        vaf_unavailable = any(
+            r.key == "variantcomp_vaf" and r.value == "unavailable" for r in vcf.header.records
+        )
+        if vaf_unavailable:
+            print(
+                f"WARNING: {what}: {path}: VAF unavailable (harmonize_vcf.py); its variants are "
+                "counted in the VAF stratum 'unknown'",
+                file=sys.stderr,
+            )
         for rec in vcf:
             info = {t: rec.info.get(t) for t in HARMONIZED_TAGS if t in tags}
             for alt in rec.alts or ():
@@ -144,7 +156,7 @@ def read_records(path, what):
                             if info.get("VC_LEN") is not None
                             else len(alt) - len(rec.ref)
                         ),
-                        "vaf": info.get("VC_T_VAF"),
+                        "vaf": None if vaf_unavailable else info.get("VC_T_VAF"),
                         "dp": info.get("VC_T_DP"),
                         "alt_count": info.get("VC_T_ALT"),
                         "filter": ";".join(rec.filter.keys()) or ".",

@@ -264,3 +264,13 @@ def test_aggregate_invalid_values_fail(tmp_path):
     )
     assert result.returncode == 1
     assert "recall '1.9' is not a number within [0, 1]" in result.stderr
+
+
+def test_read_records_vaf_unavailable(tmp_path):
+    sys.path.insert(0, str(BIN))
+    import benchmark_metrics
+
+    path = vcf(tmp_path / "x.vcf", [(100, "A", "C", 0.3)])
+    path.write_text(path.read_text().replace("#CHROM", "##variantcomp_vaf=unavailable\n#CHROM", 1))
+    records = benchmark_metrics.read_records(str(path), "test")
+    assert records[0]["vaf"] is None and records[0]["dp"] == 100

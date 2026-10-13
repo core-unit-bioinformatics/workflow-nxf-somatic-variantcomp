@@ -195,8 +195,27 @@
                 "filter_pass_only": {
                     "type": "boolean",
                     "default": true,
-                    "description": "Only compare calls with FILTER PASS (or '.').",
+                    "description": "Compare only records with FILTER PASS (or '.'). The split is the first step after the sample selection; the other records are normalized the same way and reported by the discordance step as 'filtered_non_pass' (with their FILTER value) if the other technology misses them.",
                     "fa_icon": "fas fa-check"
+                },
+                "vaf_source": {
+                    "type": "string",
+                    "enum": [
+                        "auto",
+                        "af",
+                        "ad"
+                    ],
+                    "default": "auto",
+                    "description": "Source of the VAF of every record: 'auto' = FORMAT/AF if present, else AD[1]/sum(AD); 'af' = FORMAT/AF only; 'ad' = allelic depths only. Depth is FORMAT/DP (else sum(AD)), alt reads AD[1] (else round(AF*DP)). See docs/usage.md.",
+                    "fa_icon": "fas fa-percentage"
+                },
+                "max_missing_vaf": {
+                    "type": "number",
+                    "default": 0.05,
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "If more than this fraction of the tumor records of a VCF have no VAF, a warning is printed and the VAF-based results of that VCF (VAF strata, detection power) are NA.",
+                    "fa_icon": "fas fa-percentage"
                 },
                 "min_vaf": {
                     "type": "number",
