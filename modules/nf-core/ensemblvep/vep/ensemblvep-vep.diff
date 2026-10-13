@@ -12,7 +12,20 @@ Changes in 'ensemblvep/vep/main.nf':
      def create_index = file_extension == "vcf" ? "touch ${prefix}.${file_extension}.gz.tbi" : ""
 
 'modules/nf-core/ensemblvep/vep/meta.yml' is unchanged
-'modules/nf-core/ensemblvep/vep/environment.yml' is unchanged
+Changes in 'ensemblvep/vep/environment.yml':
+--- modules/nf-core/ensemblvep/vep/environment.yml
++++ modules/nf-core/ensemblvep/vep/environment.yml
+@@ -9,6 +9,8 @@
+   # renovate: datasource=conda depName=bioconda/perl-math-cdf
+   - bioconda::perl-math-cdf=0.1
+   # renovate: datasource=conda depName=bioconda/htslib
+-  - bioconda::htslib=1.23.1
++  # htslib 1.22.1: perl-bio-db-hts (needed by ensembl-vep) is not built for 1.23 on all
++  # platforms (e.g. linux-aarch64); the container is unchanged
++  - bioconda::htslib=1.22.1
+   - conda-forge::gzip=1.14
+   - conda-forge::tar=1.35
+
 'modules/nf-core/ensemblvep/vep/tests/nextflow.config' is unchanged
 'modules/nf-core/ensemblvep/vep/tests/tab.gz.config' is unchanged
 'modules/nf-core/ensemblvep/vep/tests/main.nf.test.snap' is unchanged
