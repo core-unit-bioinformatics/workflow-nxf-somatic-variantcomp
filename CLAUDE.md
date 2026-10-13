@@ -177,9 +177,14 @@ nf-core-style pipelines.
   one filter rule set for all VCFs.
 - **Normalization chain:** this order is mandatory; don't reorder or skip a
   step without discussing it. Implemented in `subworkflows/local/preprocess_vcf`.
-  1. reference check (contigs, lengths, REF alleles, sample names)
+  1. reference check (contigs, lengths, REF alleles, sample names), done for
+     all inputs at the start of the run (`subworkflows/local/check_inputs`)
   2. select tumor (+ normal) in this order, recompress to BGZF (inputs may be
      plain gzip)
+  2b. `--filter_pass_only` (default): split into PASS (FILTER `PASS`/`.`) and
+     non-PASS records; only PASS records are compared, the non-PASS records
+     run through the same steps 3-7 (`subworkflows/local/normalize_vcf`) so
+     that DISCORDANCE can report them as `filtered_non_pass`
   3. contig renaming
   4. keep reference contigs only; drop records whose only ALT is symbolic
      (gVCF blocks)
@@ -205,7 +210,8 @@ nf-core-style pipelines.
   (mean ± sd) over samples.
 - **Discordance classes.**
   - `absent`
-  - `present_but_filtered`
+  - `filtered_non_pass` (called, but FILTER not PASS)
+  - `present_but_filtered` (PASS, but removed by the uniform filters/region)
   - `outside_callable`
   - `no_evidence`
   - `subthreshold_evidence`

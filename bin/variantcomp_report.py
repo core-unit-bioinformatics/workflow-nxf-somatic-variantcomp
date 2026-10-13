@@ -74,6 +74,7 @@ BASE_COLUMNS = {
     "gene",
 }
 CLASS_ORDER = [
+    "filtered_non_pass",
     "present_but_filtered",
     "germline_in_normal",
     "low_coverage",

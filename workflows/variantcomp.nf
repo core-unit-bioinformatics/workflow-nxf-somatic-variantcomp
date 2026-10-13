@@ -141,7 +141,8 @@ workflow VARIANTCOMP {
         CHECK_INPUTS.out.vcf_rename,
         PREPARE_REFERENCE.out.reference,
         PREPARE_REFERENCE.out.genome_bed,
-        ch_comparison_regions
+        ch_comparison_regions,
+        params.filter_pass_only
     )
 
     //

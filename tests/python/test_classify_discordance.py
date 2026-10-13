@@ -126,7 +126,7 @@ def test_classes(run):
     rows, _ = run
     assert {pos: r["class"] for pos, r in rows.items()} == {
         100: "concordant",
-        200: "present_but_filtered",
+        200: "filtered_non_pass",
         300: "germline_in_normal",
         400: "low_coverage",
         500: "subthreshold_evidence",
@@ -219,3 +219,13 @@ def test_no_read_evidence_leaves_out_evidence_columns(tmp_path):
     header, row = (tmp_path / "x.discordance.tsv").read_text().splitlines()
     assert "other_tumor_dp" not in header and "detectable" not in header
     assert row.split("\t")[header.split("\t").index("class")] == "absent"
+
+
+def test_pass_call_removed_by_uniform_filters_is_present_but_filtered(tmp_path):
+    table = "\t".join(VARIANT_COLUMNS) + "\nS1\twgs\twes\tFN\tchr1\t200\tA\tC\t0.3\tNA\n"
+    calls = CALL_HEADER + "chr1\t200\t.\tA\tC\t.\tPASS\tVC_T_VAF=0.01\n"
+    result = classify(tmp_path, table, calls, "--no-read-evidence")
+    assert result.returncode == 0, result.stderr
+    header, row = (tmp_path / "x.discordance.tsv").read_text().splitlines()
+    values = dict(zip(header.split("\t"), row.split("\t"), strict=True))
+    assert values["class"] == "present_but_filtered" and values["other_filter"] == "PASS"

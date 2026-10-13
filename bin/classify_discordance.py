@@ -5,10 +5,13 @@ Input is the per-variant table of benchmark_metrics.py (status TP, FN or FP).
 For a variant missing in one technology ("other" = query for FN, truth for FP),
 the script looks for the reason in this order (the first that applies is used):
 
-  present_but_filtered   the other technology has the call (same CHROM, POS, REF,
-                         ALT) in its normalized VCF (all records), but it failed
-                         FILTER or the uniform thresholds and therefore was not
-                         compared. Calls outside the comparison region end up here,
+  filtered_non_pass      the other technology has the call (same CHROM, POS, REF,
+                         ALT) in its normalized VCF (all records), but its FILTER is
+                         not PASS (the FILTER value is in other_filter); with
+                         --filter_pass_only such calls are not compared
+  present_but_filtered   the other technology has the call with FILTER PASS, but it
+                         failed the uniform thresholds (--min_vaf, --min_depth,
+                         --min_alt_reads) or lies outside the comparison region. Calls outside the comparison region end up here,
                          too; the comparison region is the same for both
                          technologies of a sample, so a separate
                          `outside_callable` class can't occur.
@@ -210,12 +213,13 @@ def read_variants(path, sample, truth, query):
     return rows
 
 
-def classify(status, in_other, tumor_dp, tumor_alt, normal_alt, normal_vaf, args):
+def classify(status, in_other, other_filter, tumor_dp, tumor_alt, normal_alt, normal_vaf, args):
     """Discordance class of one variant (see the module docstring for the order)."""
     if status == "TP":
         return "concordant"
+    # the other technology called it: non-PASS FILTER, or removed by the uniform filters
     if in_other:
-        return "present_but_filtered"
+        return "filtered_non_pass" if other_filter not in ("PASS", ".") else "present_but_filtered"
     if (normal_alt or 0) >= args.min_alt_reads and (normal_vaf or 0) >= args.germline_vaf:
         return "germline_in_normal"
     if tumor_dp is None:
@@ -297,7 +301,9 @@ def main():
         tumor_dp, tumor_alt = evidence_at(other_tumor, key)
         normal_dp, normal_alt = evidence_at(normals, key)
         normal_vaf = normal_alt / normal_dp if normal_dp else None
-        row_class = classify(status, in_other, tumor_dp, tumor_alt, normal_alt, normal_vaf, args)
+        row_class = classify(
+            status, in_other, other_filter, tumor_dp, tumor_alt, normal_alt, normal_vaf, args
+        )
         classes[(status, row_class)] += 1
 
         # detection power of the query for truth variants (needs the query tumor depth)

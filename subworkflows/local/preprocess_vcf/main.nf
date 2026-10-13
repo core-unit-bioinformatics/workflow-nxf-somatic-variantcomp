@@ -5,32 +5,34 @@
 //  1. reference check of contigs, contig lengths, sample names and REF alleles: done
 //     before for all inputs (subworkflow CHECK_INPUTS); its rename maps come in here
 //  2. select tumor (+ normal) in this order, recompress to BGZF (bcftools view)
-//  3. rename contigs to the reference (bcftools annotate --rename-chrs)
-//  4. keep reference contigs; drop records whose only ALT is symbolic (bcftools view)
-//  5. rewrite contig header lines from the .fai (bcftools reheader --fai)
-//  6. split multiallelics, left-align, atomize MNVs, remove REF mismatches, deduplicate
-//     (bcftools norm; its log with the counts goes to the report)
-//  7. harmonize VAF/DP/alt counts, variant type and GT; drop remaining symbolic alleles
-//     (harmonize_vcf.py)
+//  2b. --filter_pass_only (default): split into PASS records (FILTER PASS or '.') and
+//     non-PASS records (bcftools view -f / -e). Only the PASS records are compared; the
+//     non-PASS records are normalized the same way, so that DISCORDANCE can tell that a
+//     missed variant was called but not PASS (class filtered_non_pass)
+//  3.-7. contig renaming, cleaning, contig header, bcftools norm, harmonization
+//     (subworkflow NORMALIZE_VCF, once per branch)
+//  ->  all normalized records: PASS and non-PASS branch concatenated (bcftools concat)
 //  8. uniform filters + restriction to the comparison region (bcftools view)
 //
 
-include { BCFTOOLS_VIEW as BCFTOOLS_VIEW_SELECT  } from '../../../modules/nf-core/bcftools/view/main'
-include { BCFTOOLS_ANNOTATE                      } from '../../../modules/nf-core/bcftools/annotate/main'
-include { BCFTOOLS_REHEADER                      } from '../../../modules/nf-core/bcftools/reheader/main'
-include { BCFTOOLS_VIEW as BCFTOOLS_VIEW_CLEAN   } from '../../../modules/nf-core/bcftools/view/main'
-include { BCFTOOLS_NORM                          } from '../../../modules/nf-core/bcftools/norm/main'
-include { HARMONIZE_VCF                          } from '../../../modules/local/harmonize_vcf/main'
-include { BCFTOOLS_VIEW as BCFTOOLS_VIEW_COMPARE } from '../../../modules/nf-core/bcftools/view/main'
+include { BCFTOOLS_VIEW as BCFTOOLS_VIEW_SELECT   } from '../../../modules/nf-core/bcftools/view/main'
+include { BCFTOOLS_VIEW as BCFTOOLS_VIEW_PASS     } from '../../../modules/nf-core/bcftools/view/main'
+include { BCFTOOLS_VIEW as BCFTOOLS_VIEW_NON_PASS } from '../../../modules/nf-core/bcftools/view/main'
+include { NORMALIZE_VCF as NORMALIZE_PASS         } from '../normalize_vcf/main'
+include { NORMALIZE_VCF as NORMALIZE_NON_PASS     } from '../normalize_vcf/main'
+include { NORMALIZE_VCF as NORMALIZE_ALL          } from '../normalize_vcf/main'
+include { BCFTOOLS_CONCAT as BCFTOOLS_CONCAT_ALL  } from '../../../modules/nf-core/bcftools/concat/main'
+include { BCFTOOLS_VIEW as BCFTOOLS_VIEW_COMPARE  } from '../../../modules/nf-core/bcftools/view/main'
 
 workflow PREPROCESS_VCF {
 
     take:
-    ch_samplesheet // channel: samplesheet entries [ meta, vcf, vcf_index, tumor_bam, tumor_index, normal_bam, normal_index, target_bed ]
-    ch_vcf_rename  // channel: [ meta, rename map ] of the reference check (CHECK_INPUTS)
-    ch_reference   // value channel: [ meta, fasta, fai, gzi ]
-    genome_bed     // value channel: BED of all reference contigs
-    ch_regions     // channel: [ meta, bed ] comparison region per entry (meta.id must match)
+    ch_samplesheet   // channel: samplesheet entries [ meta, vcf, vcf_index, tumor_bam, tumor_index, normal_bam, normal_index, target_bed ]
+    ch_vcf_rename    // channel: [ meta, rename map ] of the reference check (CHECK_INPUTS)
+    ch_reference     // value channel: [ meta, fasta, fai, gzi ]
+    genome_bed       // value channel: BED of all compared reference contigs
+    ch_regions       // channel: [ meta, bed ] comparison region per entry (meta.id must match)
+    filter_pass_only // boolean: compare only PASS records (--filter_pass_only)
 
     main:
     // [ meta, vcf, index or [] ]
@@ -38,40 +40,53 @@ workflow PREPROCESS_VCF {
 
     // 2. tumor (+ normal) in a fixed order, BGZF output (input may be plain gzip)
     BCFTOOLS_VIEW_SELECT(ch_vcf, [], [], [])
+    def ch_selected = BCFTOOLS_VIEW_SELECT.out.vcf.join(BCFTOOLS_VIEW_SELECT.out.index)
 
-    // 3. contig renaming to the reference names
-    BCFTOOLS_ANNOTATE(
-        BCFTOOLS_VIEW_SELECT.out.vcf
-            .join(BCFTOOLS_VIEW_SELECT.out.index)
-            .join(ch_vcf_rename)
-            .map { meta, vcf, tbi, rename -> [meta, vcf, tbi, [], [], [], [], rename] }
-    )
+    // [ meta, vcf, tbi ] all normalized records, and the records that are compared
+    def ch_normalized = channel.empty()
+    def ch_to_compare = channel.empty()
+    def ch_norm_logs = channel.empty()
+    def ch_summaries = channel.empty()
+    if (filter_pass_only) {
+        // 2b. PASS records (compared) and non-PASS records (only looked up by DISCORDANCE)
+        BCFTOOLS_VIEW_PASS(ch_selected, [], [], [])
+        BCFTOOLS_VIEW_NON_PASS(ch_selected, [], [], [])
 
-    // 4. reference contigs only; drop pure gVCF reference blocks
-    BCFTOOLS_VIEW_CLEAN(
-        BCFTOOLS_ANNOTATE.out.vcf.join(BCFTOOLS_ANNOTATE.out.index),
-        [],
-        genome_bed,
-        []
-    )
+        // 3.-7. the same normalization for both branches
+        NORMALIZE_PASS(
+            BCFTOOLS_VIEW_PASS.out.vcf.join(BCFTOOLS_VIEW_PASS.out.index),
+            ch_vcf_rename,
+            ch_reference,
+            genome_bed
+        )
+        NORMALIZE_NON_PASS(
+            BCFTOOLS_VIEW_NON_PASS.out.vcf.join(BCFTOOLS_VIEW_NON_PASS.out.index),
+            ch_vcf_rename,
+            ch_reference,
+            genome_bed
+        )
 
-    // 5. contig header lines from the reference .fai
-    BCFTOOLS_REHEADER(
-        BCFTOOLS_VIEW_CLEAN.out.vcf.map { meta, vcf -> [meta, vcf, [], []] },
-        ch_reference.map { meta, _fasta, fai, _gzi -> [meta, fai] }
-    )
-
-    // 6. split, left-align, atomize, remove REF mismatches, deduplicate
-    BCFTOOLS_NORM(
-        BCFTOOLS_REHEADER.out.vcf.join(BCFTOOLS_REHEADER.out.index),
-        ch_reference.map { meta, fasta, _fai, _gzi -> [meta, fasta] }
-    )
-
-    // 7. caller-independent tags (VC_T_VAF, VC_T_DP, ...)
-    HARMONIZE_VCF(BCFTOOLS_NORM.out.vcf.join(BCFTOOLS_NORM.out.index))
+        // all normalized records: both branches concatenated (sorted, --allow-overlaps)
+        BCFTOOLS_CONCAT_ALL(
+            NORMALIZE_PASS.out.vcf
+                .join(NORMALIZE_NON_PASS.out.vcf)
+                .map { meta, pass_vcf, pass_tbi, non_pass_vcf, non_pass_tbi -> [meta, [pass_vcf, non_pass_vcf], [pass_tbi, non_pass_tbi]] }
+        )
+        ch_normalized = BCFTOOLS_CONCAT_ALL.out.vcf.join(BCFTOOLS_CONCAT_ALL.out.index)
+        ch_to_compare = NORMALIZE_PASS.out.vcf
+        ch_norm_logs = NORMALIZE_PASS.out.norm_logs.mix(NORMALIZE_NON_PASS.out.norm_logs)
+        ch_summaries = NORMALIZE_PASS.out.summaries.mix(NORMALIZE_NON_PASS.out.summaries)
+    } else {
+        // 3.-7. all records together
+        NORMALIZE_ALL(ch_selected, ch_vcf_rename, ch_reference, genome_bed)
+        ch_normalized = NORMALIZE_ALL.out.vcf
+        ch_to_compare = NORMALIZE_ALL.out.vcf
+        ch_norm_logs = NORMALIZE_ALL.out.norm_logs
+        ch_summaries = NORMALIZE_ALL.out.summaries
+    }
 
     // 8. uniform filters and restriction to the comparison region of the entry
-    def ch_compare_input = HARMONIZE_VCF.out.vcf
+    def ch_compare_input = ch_to_compare
         .map { meta, vcf, tbi -> [meta.id, meta, vcf, tbi] }
         .join(ch_regions.map { meta, bed -> [meta.id, bed] })
         .multiMap { _id, meta, vcf, tbi, bed ->
@@ -81,8 +96,8 @@ workflow PREPROCESS_VCF {
     BCFTOOLS_VIEW_COMPARE(ch_compare_input.vcf, [], ch_compare_input.bed, [])
 
     emit:
-    normalized = HARMONIZE_VCF.out.vcf                                               // channel: [ meta, vcf, tbi ] all records
+    normalized = ch_normalized                                                       // channel: [ meta, vcf, tbi ] all normalized records (PASS and non-PASS)
     compare    = BCFTOOLS_VIEW_COMPARE.out.vcf.join(BCFTOOLS_VIEW_COMPARE.out.index) // channel: [ meta, vcf, tbi ] filtered, in region
-    norm_logs  = BCFTOOLS_NORM.out.log                                               // channel: [ meta, log ] counts of bcftools norm
-    summaries  = HARMONIZE_VCF.out.summary                                           // channel: [ meta, tsv ] harmonization counts
+    norm_logs  = ch_norm_logs                                                        // channel: [ meta, log ] counts of bcftools norm (per branch)
+    summaries  = ch_summaries                                                        // channel: [ meta, tsv ] harmonization counts (per branch)
 }
