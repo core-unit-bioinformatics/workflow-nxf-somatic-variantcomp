@@ -4,6 +4,7 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 include { MULTIQC                } from '../modules/nf-core/multiqc/main'
+include { CHECK_SHEETS as CHECK_SAMPLESHEET } from '../modules/local/check_sheets/main'
 include { PREPARE_REFERENCE      } from '../subworkflows/local/prepare_reference'
 include { PREPARE_REGIONS        } from '../subworkflows/local/prepare_regions'
 include { PREPARE_ALIGNMENTS     } from '../subworkflows/local/prepare_alignments'
@@ -29,8 +30,9 @@ workflow VARIANTCOMP {
 
     take:
     ch_samplesheet_input // channel: samplesheet entries [ meta, vcf, vcf_index, tumor_bam, tumor_index, normal_bam, normal_index, target_bed ]
-    ch_strata      // channel: stratification BEDs [ meta(id: name), bed ]
-    ch_known       // channel: known variant lists [ meta(id: name, sample, mode), [ files ], regions ]
+    input          // string: samplesheet (--input), for the checks across rows
+    stratification // string: optional stratification sheet (--stratification: name, bed)
+    known_variants // string: optional known-variant sheet (--known_variants: name, sample, mode, variants, regions)
     fasta          // string: reference FASTA
     fasta_fai      // string: optional reference .fai
     regions_bed    // string: optional BED restricting the comparison
@@ -47,9 +49,22 @@ workflow VARIANTCOMP {
     def ch_multiqc_files = channel.empty()
 
     //
-    // SUBWORKFLOW: alignment indices (created where missing)
+    // MODULE: checks of the samplesheet across rows (bin/check_sheets.py: truth technology
+    // per sample, unique rows, one target BED per technology, ...); all problems are
+    // reported at once. The columns were already checked by nf-schema.
     //
-    PREPARE_ALIGNMENTS(ch_samplesheet_input)
+    def input_file = file(input, checkIfExists: true)
+    CHECK_SAMPLESHEET('samplesheet', input_file, input_file.parent.toUriString(), [])
+    def ch_samplesheet_validated = CHECK_SAMPLESHEET.out.csv.first()
+
+    //
+    // SUBWORKFLOW: alignment indices (created where missing); starts after the checks passed
+    //
+    PREPARE_ALIGNMENTS(
+        ch_samplesheet_input
+            .combine(ch_samplesheet_validated)
+            .map { entry -> entry[0..-2] }
+    )
     def ch_samplesheet = PREPARE_ALIGNMENTS.out.samplesheet
 
     //
@@ -83,7 +98,7 @@ workflow VARIANTCOMP {
     ch_multiqc_files = ch_multiqc_files.mix(COVERAGE.out.multiqc_files)
     COVERAGE.out.callable_summary
         .map { _meta, tsv -> tsv }
-        .collectFile(name: 'callable_summary.tsv', keepHeader: true, skip: 1, sort: true, storeDir: "${outdir}/coverage")
+        .collectFile(name: 'callable_summary.tsv', keepHeader: true, skip: 1, sort: { tsv -> tsv.name }, storeDir: "${outdir}/coverage")
 
     //
     // SUBWORKFLOW: reference check, normalization, harmonization and uniform filtering
@@ -108,7 +123,7 @@ workflow VARIANTCOMP {
     //
     // SUBWORKFLOW: known variant lists on the reference, per sample
     //
-    PREPARE_KNOWN_VARIANTS(ch_known, ch_samplesheet, PREPARE_REFERENCE.out.reference)
+    PREPARE_KNOWN_VARIANTS(known_variants, ch_samplesheet_validated, ch_samplesheet, PREPARE_REFERENCE.out.reference)
 
     //
     // SUBWORKFLOW: read evidence, classification and annotation of discordant variants
@@ -120,7 +135,7 @@ workflow VARIANTCOMP {
         BENCHMARK.out.variants,
         PREPARE_REFERENCE.out.reference,
         gene_bed ? file(gene_bed, checkIfExists: true) : null,
-        ch_strata,
+        stratification,
         PREPARE_KNOWN_VARIANTS.out.sites
     )
 

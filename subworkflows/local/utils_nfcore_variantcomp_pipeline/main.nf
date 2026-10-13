@@ -11,12 +11,10 @@
 include { UTILS_NFSCHEMA_PLUGIN     } from '../../nf-core/utils_nfschema_plugin'
 include { paramsSummaryMap          } from 'plugin/nf-schema'
 include { paramsHelp                } from 'plugin/nf-schema'
+include { samplesheetToList         } from 'plugin/nf-schema'
 include { completionSummary         } from '../../nf-core/utils_nfcore_pipeline'
 include { UTILS_NFCORE_PIPELINE     } from '../../nf-core/utils_nfcore_pipeline'
 include { UTILS_NEXTFLOW_PIPELINE   } from '../../nf-core/utils_nextflow_pipeline'
-include { CHECK_SHEETS as CHECK_SAMPLESHEET    } from '../../../modules/local/check_sheets/main'
-include { CHECK_SHEETS as CHECK_STRATIFICATION } from '../../../modules/local/check_sheets/main'
-include { CHECK_SHEETS as CHECK_KNOWN          } from '../../../modules/local/check_sheets/main'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -34,8 +32,6 @@ workflow PIPELINE_INITIALISATION {
     outdir            //  string: The output directory where the results will be saved
     input             //  string: Path to input samplesheet
     truth_technology  //  string: Technology used as ground truth
-    stratification    //  string: Optional stratification sheet (name, bed)
-    known_variants    //  string: Optional known-variant sheet (name, sample, mode, variants, regions)
     help              // boolean: Display help message and exit
     help_full         // boolean: Show the full help message
     show_hidden       // boolean: Show hidden parameters in the help message
@@ -87,46 +83,18 @@ workflow PIPELINE_INITIALISATION {
     )
 
     //
-    // Sheets: content checks in bin/check_sheets.py (all problems reported at once);
-    // here only the validated CSVs are read into channels.
+    // Create channel from input file provided through params.input (as in the nf-core
+    // template): nf-schema checks every column against assets/schema_input.json. Rules
+    // across rows are checked by CHECK_SAMPLESHEET at the start of the workflow.
     //
     def input_file = file(input, checkIfExists: true)
-    CHECK_SAMPLESHEET('samplesheet', input_file, input_file.parent.toUriString(), [])
     // samplesheet entry: [ meta, vcf, vcf_index, tumor_bam, tumor_index, normal_bam, normal_index, target_bed ]
-    ch_samplesheet = CHECK_SAMPLESHEET.out.csv
-        .splitCsv(header: true)
-        .map { row -> samplesheetEntry(row) }
-
-    def ch_strata = channel.empty()
-    if (stratification) {
-        def strat_file = file(stratification, checkIfExists: true)
-        CHECK_STRATIFICATION('stratification', strat_file, strat_file.parent.toUriString(), [])
-        // stratum: [ meta(id: name), bed ]
-        ch_strata = CHECK_STRATIFICATION.out.csv
-            .splitCsv(header: true)
-            .map { row -> [[id: row.name], file(row.bed, checkIfExists: true)] }
-    }
-
-    def ch_known = channel.empty()
-    if (known_variants) {
-        def known_file = file(known_variants, checkIfExists: true)
-        CHECK_KNOWN('known', known_file, known_file.parent.toUriString(), CHECK_SAMPLESHEET.out.csv)
-        // known-variant list: [ meta(id: name, sample, mode), [ variant files ], regions or [] ]
-        ch_known = CHECK_KNOWN.out.csv
-            .splitCsv(header: true)
-            .map { row ->
-                [
-                    [id: row.name, sample: row.sample, mode: row.mode],
-                    row.variants.tokenize(';').collect { path -> file(path, checkIfExists: true) },
-                    row.regions ? file(row.regions, checkIfExists: true) : [],
-                ]
-            }
-    }
+    ch_samplesheet = channel
+        .fromList(samplesheetToList(input, "${projectDir}/assets/schema_input.json"))
+        .map { row -> samplesheetEntry(row, input_file.parent, truth_technology) }
 
     emit:
     samplesheet = ch_samplesheet
-    strata      = ch_strata
-    known       = ch_known
     versions    = ch_versions
 }
 
@@ -164,25 +132,26 @@ workflow PIPELINE_COMPLETION {
 */
 
 //
-// Samplesheet entry from a row of the validated samplesheet (bin/check_sheets.py)
+// Samplesheet entry from a row of samplesheetToList: [ meta fields, vcf, tumor_bam,
+// normal_bam, target_bed ]. Empty fields and 'n/a' become [] (null for normal_id);
+// relative paths are resolved against the samplesheet's directory; index files next
+// to the data files are looked up (missing indices are created later).
 //
-// Content was checked by the script; here the files are only staged (checkIfExists
-// fails with the missing path) and index files next to them are looked up.
-//
-def samplesheetEntry(row) {
+def samplesheetEntry(row, base_dir, truth_technology) {
+    def fields = row[0]
     def meta = [
-        id          : "${row.sample}_${row.technology}".toString(),
-        sample      : row.sample,
-        technology  : row.technology,
-        library_type: row.library_type,
-        tumor_id    : row.tumor_id,
-        normal_id   : row.normal_id ?: null,
-        caller      : row.caller,
-        is_truth    : row.is_truth == 'true',
+        id          : "${fields.sample}_${fields.technology}".toString(),
+        sample      : fields.sample,
+        technology  : fields.technology,
+        library_type: fields.library_type,
+        tumor_id    : fields.tumor_id,
+        normal_id   : sheetValue(fields.normal_id) ?: null,
+        caller      : sheetValue(fields.caller) ?: 'unknown',
+        is_truth    : fields.technology == truth_technology,
     ]
-    def vcf = file(row.vcf, checkIfExists: true)
-    def tumor_bam = row.tumor_bam ? file(row.tumor_bam, checkIfExists: true) : []
-    def normal_bam = row.normal_bam ? file(row.normal_bam, checkIfExists: true) : []
+    def vcf = sheetFile(row[1], base_dir)
+    def tumor_bam = sheetFile(row[2], base_dir)
+    def normal_bam = sheetFile(row[3], base_dir)
     return [
         meta,
         vcf,
@@ -191,8 +160,29 @@ def samplesheetEntry(row) {
         tumor_bam ? findIndex(tumor_bam, ['.bai', '.csi', '.crai'], [/\.bam$/: '.bai', /\.cram$/: '.crai']) : [],
         normal_bam,
         normal_bam ? findIndex(normal_bam, ['.bai', '.csi', '.crai'], [/\.bam$/: '.bai', /\.cram$/: '.crai']) : [],
-        row.target_bed ? file(row.target_bed, checkIfExists: true) : [],
+        sheetFile(row[4], base_dir),
     ]
+}
+
+//
+// Value of a samplesheet field; '' for empty fields and 'n/a'
+//
+def sheetValue(value) {
+    def text = value instanceof List ? '' : (value ?: '').toString().trim()
+    return text == 'n/a' ? '' : text
+}
+
+//
+// File of a samplesheet field, [] if empty; relative paths are resolved against the
+// samplesheet's directory, absolute paths and URLs are used as given
+//
+def sheetFile(value, base_dir) {
+    def text = sheetValue(value)
+    if (!text) {
+        return []
+    }
+    def absolute = text.startsWith('/') || text ==~ /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\/.*/
+    return file(absolute ? text : base_dir.resolve(text).toString(), checkIfExists: true)
 }
 
 //

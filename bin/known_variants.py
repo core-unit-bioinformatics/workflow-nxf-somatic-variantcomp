@@ -284,9 +284,9 @@ def check(args):
         evidence_paths[tech] = path
 
     rows, summary = [], []
-    for tech, norm_path, compare_path, region_path in zip(
-        args.technology, args.normalized, args.compare, args.regions, strict=True
-    ):
+    # technologies in name order: the inputs arrive in any order, the tables must not depend on it
+    inputs = sorted(zip(args.technology, args.normalized, args.compare, args.regions, strict=True))
+    for tech, norm_path, compare_path, region_path in inputs:
         normalized = load_calls(norm_path)
         compared = load_calls(compare_path)
         regions = load_regions(region_path)

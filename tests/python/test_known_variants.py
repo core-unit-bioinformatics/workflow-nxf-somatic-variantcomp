@@ -151,3 +151,21 @@ def test_check_evidence_of_unknown_technology_fails(tmp_path, ref):
                  "--evidence", f"wgs={calls}", "--prefix", str(tmp_path / "x"))  # fmt: skip
     assert result.returncode == 1
     assert "--evidence 'wgs=" in result.stderr and "technology of --technology (wes)" in result.stderr
+
+
+def test_check_output_order_does_not_depend_on_input_order(tmp_path, ref):
+    known = tmp_path / "known.vcf"
+    known.write_text(CALL_HEADER.replace("#CHROM", '##INFO=<ID=KV_GENE,Number=1,Type=String,Description="g">\n'
+                                         '##INFO=<ID=KV_LABEL,Number=1,Type=String,Description="l">\n#CHROM')
+                     + "chr1\t10\tv1\tA\tC\t.\t.\tKV_GENE=G;KV_LABEL=v1\n")  # fmt: skip
+    calls = tmp_path / "calls.vcf"
+    calls.write_text(CALL_HEADER)
+    bed = tmp_path / "r.bed"
+    bed.write_text("chr1\t0\t100\n")
+    # technologies given as wgs, wes: the tables list wes first
+    result = run("check", "--known", str(known), "--sample", "S1", "--technology", "wgs", "wes",
+                 "--normalized", str(calls), str(calls), "--compare", str(calls), str(calls),
+                 "--regions", str(bed), str(bed), "--prefix", str(tmp_path / "x"))  # fmt: skip
+    assert result.returncode == 0, result.stderr
+    summary = (tmp_path / "x.known_summary.tsv").read_text().splitlines()
+    assert [line.split("\t")[1] for line in summary[1:]] == ["wes", "wgs"]

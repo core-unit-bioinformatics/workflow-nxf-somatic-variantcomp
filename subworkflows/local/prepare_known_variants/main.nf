@@ -1,6 +1,7 @@
 //
 // Known variant lists: conversion to VCF on the reference, normalization, regions
 //
+//  0. check of the known-variant sheet (check_sheets.py known)
 //  1. VCF/CSV/TSV list -> sites-only VCF, contigs renamed (known_variants.py prepare)
 //  2. left-align and split (bcftools norm), REF alleles checked against the FASTA:
 //     any mismatch stops the run (check_reference.py ref-alleles with threshold 0)
@@ -8,6 +9,7 @@
 //  4. one item per list and sample ('all' = every sample)
 //
 
+include { CHECK_SHEETS as CHECK_KNOWN              } from '../../../modules/local/check_sheets/main'
 include { KNOWN_PREPARE                            } from '../../../modules/local/known_prepare/main'
 include { BCFTOOLS_NORM as KNOWN_NORM              } from '../../../modules/nf-core/bcftools/norm/main'
 include { CHECK_REF_ALLELES as CHECK_REF_ALLELES_KNOWN } from '../../../modules/local/check_ref_alleles/main'
@@ -16,12 +18,31 @@ include { CHECK_REFERENCE as CHECK_REFERENCE_KNOWN } from '../../../modules/loca
 workflow PREPARE_KNOWN_VARIANTS {
 
     take:
-    ch_known       // channel: [ meta(id: name, sample, mode), [ variant files ], regions or [] ]
+    known_variants // string: optional known-variant sheet (name, sample, mode, variants, regions)
+    samplesheet    // value channel: checked samplesheet (sample names for the sheet check)
     ch_samplesheet // channel: samplesheet entries
     ch_reference   // value channel: [ meta, fasta, fai, gzi ]
 
     main:
     def ch_fai = ch_reference.map { meta, _fasta, fai, _gzi -> [meta, fai] }
+
+    // known-variant sheet: columns, modes, samples and files checked by check_sheets.py;
+    // the checked sheet (absolute paths) gives one item per list:
+    // [ meta(id: name, sample, mode), [ variant files ], regions or [] ]
+    def ch_known = channel.empty()
+    if (known_variants) {
+        def sheet = file(known_variants, checkIfExists: true)
+        CHECK_KNOWN('known', sheet, sheet.parent.toUriString(), samplesheet)
+        ch_known = CHECK_KNOWN.out.csv
+            .splitCsv(header: true)
+            .map { row ->
+                [
+                    [id: row.name, sample: row.sample, mode: row.mode],
+                    row.variants.tokenize(';').collect { path -> file(path, checkIfExists: true) },
+                    row.regions ? file(row.regions, checkIfExists: true) : [],
+                ]
+            }
+    }
 
     // 1. lists -> sites-only VCFs on the reference contigs
     KNOWN_PREPARE(ch_known.map { meta, variants, _regions -> [meta, variants] }, ch_fai)

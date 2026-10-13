@@ -11,6 +11,7 @@
 //     merged back into the table (annotate_variants.py)
 //
 
+include { CHECK_SHEETS as CHECK_STRATIFICATION          } from '../../../modules/local/check_sheets/main'
 include { CHECK_REFERENCE as CHECK_REFERENCE_ANNOTATION } from '../../../modules/local/check_reference/main'
 include { BCFTOOLS_QUERY as BCFTOOLS_QUERY_SITES        } from '../../../modules/nf-core/bcftools/query/main'
 include { BCFTOOLS_MPILEUP                              } from '../../../modules/nf-core/bcftools/mpileup/main'
@@ -32,11 +33,22 @@ workflow DISCORDANCE {
     ch_variants     // channel: [ meta(pair), tsv ] per-variant table of each comparison
     ch_reference    // value channel: [ meta, fasta, fai, gzi ]
     gene_bed        // path: optional gene BED (BED4, name = gene)
-    ch_strata       // channel: [ meta(id: name), bed ] stratification BEDs
+    stratification  // string: optional stratification sheet (name, bed)
     ch_extra_sites  // channel: [ meta(id, sample), vcf ] further positions for the read evidence (known variants)
 
     main:
     def ch_fai = ch_reference.map { meta, _fasta, fai, _gzi -> [meta, fai] }
+
+    // stratification sheet: columns, names and files checked by check_sheets.py; the
+    // checked sheet (absolute paths) gives one item per stratification: [ meta(id: name), bed ]
+    def ch_strata = channel.empty()
+    if (stratification) {
+        def sheet = file(stratification, checkIfExists: true)
+        CHECK_STRATIFICATION('stratification', sheet, sheet.parent.toUriString(), [])
+        ch_strata = CHECK_STRATIFICATION.out.csv
+            .splitCsv(header: true)
+            .map { row -> [[id: row.name], file(row.bed, checkIfExists: true)] }
+    }
 
     //
     // 1. read evidence
@@ -125,7 +137,8 @@ workflow DISCORDANCE {
     // one table with every variant of every comparison
     def ch_all_variants = CLASSIFY_DISCORDANCE.out.discordance
         .map { _meta, tsv -> tsv }
-        .collectFile(name: 'variants.tsv', keepHeader: true, skip: 1, sort: true)
+        // sorted by file name (<sample>_<truth>_vs_<query>): the row order must not depend on the work directories
+        .collectFile(name: 'variants.tsv', keepHeader: true, skip: 1, sort: { tsv -> tsv.name })
         .map { tsv -> [[id: 'variants'], tsv] }
 
     // gene and stratification BEDs: reference check (contig renaming; extra columns kept)

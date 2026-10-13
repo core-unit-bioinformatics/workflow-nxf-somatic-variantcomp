@@ -195,7 +195,7 @@
                     "python": "3.12.15"
                 },
                 "Workflow": {
-                    "core-unit-bioinformatics/workflow-nxf-somatic-variantcomp": "v0.12.0-dev"
+                    "core-unit-bioinformatics/workflow-nxf-somatic-variantcomp": "v0.13.1-dev"
                 }
             },
             [
@@ -606,7 +606,7 @@
                 "low_mappability.reference_check.tsv:md5,87c2a488151053502ae929d19ff426d1",
                 "segmental_duplication.reference_check.tsv:md5,21c093b587f645359742c3ccf3f656df",
                 "tandem_repeat.reference_check.tsv:md5,d909749145a96c03d88e7d44926d5694",
-                "variants.annotated.tsv:md5,c1729600e589a9da822895207e02279d",
+                "variants.annotated.tsv:md5,8998847a23a5a1d199714113cb088cb7",
                 "SEQC2_FD_1_seqc2_truth_vs_wes.metrics.tsv:md5,782b9b5112cecdfb67d250ca2268f112",
                 "SEQC2_FD_1_seqc2_truth_vs_wes.variants.tsv:md5,56297bc87099e992fe56ac80cb2c9a3f",
                 "SEQC2_FD_1_seqc2_truth_vs_wgs.metrics.tsv:md5,4f29e2259f3fb6870eb87816d9b56fb7",
@@ -673,7 +673,7 @@
                 "SEQC2_NV_1_wgs.vcf.reference_check.tsv:md5,f5b086885ea90f1764957a1958eaf6ad"
             ]
         ],
-        "timestamp": "2026-10-08T16:25:39.00017302",
+        "timestamp": "2026-10-13T15:47:24.394905161",
         "meta": {
             "nf-test": "0.9.5",
             "nextflow": "26.04.4"

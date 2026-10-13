@@ -29,8 +29,6 @@ workflow COREUNITBIOINFORMATICS_VARIANTCOMP {
 
     take:
     samplesheet // channel: samplesheet read in from --input
-    ch_strata   // channel: stratification BEDs [ meta, bed ]
-    ch_known    // channel: known variant lists [ meta, files, regions ]
 
     main:
 
@@ -39,8 +37,9 @@ workflow COREUNITBIOINFORMATICS_VARIANTCOMP {
     //
     VARIANTCOMP (
         samplesheet,
-        ch_strata,
-        ch_known,
+        params.input,
+        params.stratification,
+        params.known_variants,
         params.fasta,
         params.fasta_fai,
         params.regions_bed,
@@ -74,8 +73,6 @@ workflow {
         params.outdir,
         params.input,
         params.truth_technology,
-        params.stratification,
-        params.known_variants,
         params.help,
         params.help_full,
         params.show_hidden
@@ -85,9 +82,7 @@ workflow {
     // WORKFLOW: Run main workflow
     //
     COREUNITBIOINFORMATICS_VARIANTCOMP (
-        PIPELINE_INITIALISATION.out.samplesheet,
-        PIPELINE_INITIALISATION.out.strata,
-        PIPELINE_INITIALISATION.out.known
+        PIPELINE_INITIALISATION.out.samplesheet
     )
     //
     // SUBWORKFLOW: Run completion tasks

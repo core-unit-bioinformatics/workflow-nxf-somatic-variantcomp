@@ -164,7 +164,7 @@
                     "python": "3.12.15"
                 },
                 "Workflow": {
-                    "core-unit-bioinformatics/workflow-nxf-somatic-variantcomp": "v0.12.0-dev"
+                    "core-unit-bioinformatics/workflow-nxf-somatic-variantcomp": "v0.13.1-dev"
                 }
             },
             [
@@ -451,7 +451,7 @@
                 "genes.reference_check.tsv:md5,8baf00d39b0613c96f0ce14984b1dd7c",
                 "homopolymer.reference_check.tsv:md5,731456605716a3fd135c83b274d7ea7d",
                 "tandem_repeat.reference_check.tsv:md5,bb7cdba5d6a4d8c4490d26fbebeb0b43",
-                "variants.annotated.tsv:md5,e7e72e985da9c1ef03a45e1b595667f7",
+                "variants.annotated.tsv:md5,aa6a96e2ae426b72ac96d10938f88bda",
                 "S1_designed_truth_vs_panel.metrics.tsv:md5,5e7de9b1a05c872f512664aeef7f2920",
                 "S1_designed_truth_vs_panel.variants.tsv:md5,b8814816530aa80443fbcd6396d8fe70",
                 "S1_designed_truth_vs_wes.metrics.tsv:md5,00e43d67ad8682673b4727dd22f433e0",
@@ -463,8 +463,8 @@
                 "designed_truth.ref_alleles.tsv:md5,8db16b70a72ac4f349c301ea9a393edb",
                 "designed_truth.regions.reference_check.tsv:md5,acf67f9b3c07e6c76607023be6f69511",
                 "required_demo.ref_alleles.tsv:md5,43d8e8a70670ce6872cc15c94fce79ed",
-                "required_demo_S1.known_summary.tsv:md5,168fd5352d8bf76f32bdd902fd3c84d9",
-                "required_demo_S1.known_variants.tsv:md5,fde9facc09bdb190e8b3712af2591980",
+                "required_demo_S1.known_summary.tsv:md5,161216e868d8386af2f05d2046caa958",
+                "required_demo_S1.known_variants.tsv:md5,103ef35009c3006cf1d705bc84a23abd",
                 "required_summary.tsv:md5,8b14e271e67e1e0c74d9b12c468f63be",
                 "required_variants.tsv:md5,37faff7aee5b5e93923d783967d58387",
                 "multiqc_citations.txt:md5,4c806e63a283ec1b7e78cdae3a923d4f",
@@ -508,7 +508,7 @@
                 "S2_wgs.vcf.reference_check.tsv:md5,9d59d057624c00b71d780af3ce5c1877"
             ]
         ],
-        "timestamp": "2026-10-08T16:48:40.44547941",
+        "timestamp": "2026-10-13T15:19:35.251834125",
         "meta": {
             "nf-test": "0.9.5",
             "nextflow": "26.04.4"
