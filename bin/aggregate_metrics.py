@@ -96,6 +96,7 @@ def micro(group):
 
 
 def main():
+    """Parse the command line and run the (sub)command."""
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("metrics", nargs="+", help="per-pair metrics TSV files")
     parser.add_argument("--prefix", required=True, help="output prefix")

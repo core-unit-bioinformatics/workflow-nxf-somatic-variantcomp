@@ -296,6 +296,7 @@ def merge(args):
 
 
 def main():
+    """Parse the command line and run the (sub)command."""
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     sub = parser.add_subparsers(dest="command", required=True)
     v = sub.add_parser("to-vcf", help="variant table -> sites-only VCF (VEP input)")

@@ -378,6 +378,7 @@ def class_summary(df):
 
 
 def mqc_header(section_id, name, description, plot_type, extra=""):
+    """Comment lines that define a MultiQC custom-content section."""
     return (
         f"# id: 'variantcomp_{section_id}'\n# section_name: '{name}'\n"
         f"# description: '{description}'\n# plot_type: '{plot_type}'\n{extra}"
@@ -483,6 +484,7 @@ def write_mqc(prefix, metrics, per_pair, power, classes):
 
 
 def plot_metrics(per_pair, metrics, outdir):
+    """Bar plot of micro recall/precision/F1 per comparison, dots per sample."""
     overall = metrics[metrics["stratum_type"] == "overall"]
     if overall.empty:
         return
@@ -520,6 +522,7 @@ def plot_metrics(per_pair, metrics, outdir):
 
 
 def plot_vaf(metrics, outdir):
+    """Line plot of the micro recall per truth-VAF bin."""
     vaf = metrics[(metrics["stratum_type"] == "truth_vaf") & (metrics["stratum"] != "unknown")]
     if vaf.empty:
         return
@@ -541,6 +544,7 @@ def plot_vaf(metrics, outdir):
 
 
 def plot_classes(classes, outdir):
+    """Stacked bars of the discordance classes per comparison and status."""
     if classes.empty:
         return
     labels = (classes["truth"] + " vs " + classes["query"] + " " + classes["status"]).tolist()
@@ -559,6 +563,7 @@ def plot_classes(classes, outdir):
 
 
 def plot_enrichment(enrich, outdir, fdr=0.05):
+    """log2 odds ratios of the enrichment tests (significant ones in red)."""
     data = enrich[(enrich["discordant"] == "FN+FP") & enrich["odds_ratio"].notna()].copy()
     data = data[np.isfinite(data["odds_ratio"]) & (data["odds_ratio"] > 0)]
     if data.empty:
@@ -575,6 +580,7 @@ def plot_enrichment(enrich, outdir, fdr=0.05):
 
 
 def main():
+    """Parse the command line and run the (sub)command."""
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--metrics", required=True)
     parser.add_argument("--per-pair", required=True)
@@ -588,6 +594,7 @@ def main():
     args = parser.parse_args()
 
     def read(path):
+        """TSV as a data frame (NA kept as missing)."""
         return pd.read_csv(path, sep="\t", na_values=["NA"], keep_default_na=False)
 
     # inputs with their required columns

@@ -245,6 +245,7 @@ def parse_bins(text):
 
 
 def bin_label(lo, hi):
+    """Label of a VAF bin, e.g. [0.05,0.1)."""
     return f"[{lo:g},{hi:g})"
 
 
@@ -279,6 +280,7 @@ def metric_row(keys, stratum_type, stratum, tpb, fn, tpc, fp):
 
 
 def main():
+    """Parse the command line and run the (sub)command."""
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--tp-baseline", required=True, help="vcfeval tp-baseline.vcf.gz")
     parser.add_argument("--fn", required=True, help="vcfeval fn.vcf.gz")
@@ -319,6 +321,7 @@ def main():
     for group in ("SNV", "INDEL"):
 
         def count(records, group=group):
+            """Number of records of the variant-type group."""
             return sum(TYPE_GROUP[r["type"]] == group for r in records)
 
         rows.append(
@@ -329,6 +332,7 @@ def main():
     for label in labels:
 
         def in_bin(records, label=label):
+            """Number of records whose VAF falls into the bin."""
             return sum(find_bin(r["vaf"], bins) == label for r in records)
 
         if label != "unknown" or in_bin(tpb) + in_bin(fn):

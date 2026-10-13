@@ -4,7 +4,17 @@
 targets   size of every technology's target BED and how much of it lies in the
           common comparison region (the intersection of all target BEDs);
           technologies without BED (WGS) are reported as genome-wide.
+          INPUT   --common BED, --genome BED (all compared contigs), --target
+                  TECHNOLOGY=BED ..., --genome-wide TECHNOLOGY ...
+          OUTPUT  TSV with columns region (technology or 'common'), type (target,
+                  genome, common), intervals (count), bp, bp_in_common,
+                  fraction_in_common (bp_in_common / bp, 4 digits)
 callable  size of a sample's callable region relative to the common region.
+          INPUT   --common BED, --callable-bed BED (already intersected with it)
+          OUTPUT  TSV with columns sample, alignments (number), mode (base/region),
+                  min_coverage (tumor/normal), common_bp, callable_bp,
+                  fraction_callable
+--min-bp: the common resp. callable region must have at least this many bp (error).
 
 All BEDs are expected to be sorted and merged (bedtools sort | bedtools merge),
 so that bp counts are not inflated by overlapping intervals. The script checks
@@ -47,6 +57,7 @@ def read_bed(path):
 
 
 def total_bp(intervals):
+    """Total size (bp) of sorted, merged intervals."""
     return sum(end - start for ivs in intervals.values() for start, end in ivs)
 
 
@@ -71,10 +82,12 @@ def overlap_bp(a, b):
 
 
 def fraction(part, whole):
+    """part / whole with 4 digits, NA if whole is 0."""
     return f"{part / whole:.4f}" if whole else "NA"
 
 
 def targets(args):
+    """Summary of the target BEDs and the common region (subcommand targets)."""
     common = read_bed(args.common)
     common_bp = total_bp(common)
     rows = []
@@ -130,6 +143,7 @@ def targets(args):
 
 
 def callable_(args):
+    """Summary of the callable region of one sample (subcommand callable)."""
     common = read_bed(args.common)
     callable_bed = read_bed(args.callable_bed)
     common_bp = total_bp(common)
@@ -170,6 +184,7 @@ def callable_(args):
 
 
 def main():
+    """Parse the command line and run the (sub)command."""
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     sub = parser.add_subparsers(dest="command", required=True)
     t = sub.add_parser("targets")

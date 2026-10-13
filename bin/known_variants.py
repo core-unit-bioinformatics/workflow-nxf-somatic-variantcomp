@@ -28,9 +28,27 @@ check    For the 'required' mode: every known variant must be found in every
          Matching is by CHROM/POS/REF/ALT after normalization; a call at the same
          position with another allele is reported in `same_position_call`.
 
-Outputs of check (prefix):
-  <prefix>.known_variants.tsv   one row per technology and known variant
-  <prefix>.known_summary.tsv    per technology: required, passed, all_passed
+INPUT of prepare
+  --input   CSV/TSV (header with chrom, pos [1-based], ref, alt; optional gene, label,
+            vaf in [0, 1]) or VCF/BCF (ID = label, INFO/GENE or KV_GENE, VAF tag)
+  --fai, --fasta  reference index and FASTA
+OUTPUT of prepare
+  --output  bgzipped sites-only VCF (+ .tbi): ID = label, INFO/KV_GENE, INFO/KV_LABEL,
+            INFO/VC_T_VAF; --report  check report (key, value)
+
+INPUT of check
+  --known       VCF of prepare (normalized); --technology, --normalized (harmonized VCF
+                of every record), --compare (compared VCF), --regions (comparison region
+                BED) once per technology; --evidence TECHNOLOGY=pileup VCF (optional)
+OUTPUT of check (--prefix)
+  <prefix>.known_variants.tsv   one row per technology and known variant: sample,
+                                technology, label, gene, chrom, pos, ref, alt, status,
+                                in_region (yes/no), called (yes/no), filter, vaf, depth,
+                                alt_reads (of the call, NA if none), evidence_depth,
+                                evidence_alt_reads (tumor alignment, NA without),
+                                same_position_call (other alleles called there, '.')
+  <prefix>.known_summary.tsv    per technology: sample, technology, required, passed,
+                                failed, recall (passed / required), all_passed (yes/no)
 """
 
 import argparse
@@ -463,6 +481,7 @@ def check(args):
 
 
 def main():
+    """Parse the command line and run the (sub)command."""
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     sub = parser.add_subparsers(dest="command", required=True)
     p = sub.add_parser("prepare", help="known variants -> sites-only VCF on the reference")

@@ -103,6 +103,7 @@ def write_callable(args, rename_map, reference_contigs):
 
 
 def main():
+    """Parse the command line and run the (sub)command."""
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--quantized", required=True, help="mosdepth <prefix>.quantized.bed.gz")
     parser.add_argument("--regions", required=True, help="mosdepth <prefix>.regions.bed.gz")

@@ -68,6 +68,7 @@ def parse_pairs(items, option):
 
 
 def main():
+    """Parse the command line and run the (sub)command."""
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--variants", nargs="+", required=True, help="LIST=<x>.known_variants.tsv")
     parser.add_argument("--summary", nargs="+", required=True, help="LIST=<x>.known_summary.tsv")

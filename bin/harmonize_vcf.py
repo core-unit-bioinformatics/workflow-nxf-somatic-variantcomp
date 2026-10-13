@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Harmonize a normalized somatic tumor/normal VCF across callers.
 
-Supported input
+INPUT (supported)
   VCF 4.1-4.3 (VCF/BCF, read with pysam/HTSlib) after `bcftools norm -m-any`: one ALT
   per record, left-aligned, the tumor sample first and the optional normal sample
   second (order fixed by `bcftools view -s` in the pipeline). The sample columns need
@@ -45,7 +45,7 @@ counted. The tumor GT is set to 0/1 and the normal GT to 0/0 (every record is a 
 call of the tumor; callers fill GT differently). FILTER, ID, QUAL, INFO and all other
 FORMAT fields are copied unchanged.
 
-Outputs
+OUTPUT
   --output    the harmonized VCF (bgzipped; --index writes a .tbi)
   --summary   two columns with header `key value`: records_read, records_written,
               records_dropped_symbolic, vaf_available (yes/no), and per sample
@@ -344,6 +344,7 @@ def log_summary(args, counts, roles, skipped_format):
 
 
 def parse_args():
+    """Command-line options; checks their ranges."""
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--input", required=True, help="normalized VCF (tumor first)")
     parser.add_argument("--output", required=True, help="output VCF (.vcf.gz)")
@@ -370,6 +371,7 @@ def parse_args():
 
 
 def main():
+    """Parse the command line and run the (sub)command."""
     args = parse_args()
     roles = [("T", args.tumor)] + ([("N", args.normal)] if args.normal else [])
 

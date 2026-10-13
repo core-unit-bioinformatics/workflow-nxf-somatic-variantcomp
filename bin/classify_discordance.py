@@ -232,6 +232,7 @@ def classify(status, in_other, other_filter, tumor_dp, tumor_alt, normal_alt, no
 
 
 def main():
+    """Parse the command line and run the (sub)command."""
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--variants", required=True, help="benchmark_metrics.py variants table")
     parser.add_argument("--sample", required=True, help="sample of the comparison")

@@ -138,6 +138,7 @@ def table(args):
 
 
 def main():
+    """Parse the command line and run the (sub)command."""
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     sub = parser.add_subparsers(dest="command", required=True)
     for name in ("key-value", "norm-logs", "table"):

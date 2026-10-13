@@ -72,6 +72,7 @@ class Report:
     """Collects key/value results, warnings and errors of one check."""
 
     def __init__(self, name, warn_only=False):
+        """Empty collection of messages for one input."""
         self.name = name
         self.warn_only = warn_only
         self.values = {}
@@ -471,6 +472,7 @@ def rename_bed(args):
 
 
 def main():
+    """Parse the command line and run the (sub)command."""
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     sub = parser.add_subparsers(dest="command", required=True)
     for name, help_text in (

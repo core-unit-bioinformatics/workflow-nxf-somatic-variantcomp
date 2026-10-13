@@ -14,6 +14,21 @@ The script only checks the *content* of the sheets. Whether the files exist is
 checked by Nextflow when it stages them (file(..., checkIfExists: true)),
 because a containerized process cannot see files that are not staged into it.
 
+INPUT
+  samplesheet     CSV: sample, technology, library_type (wgs, capture, amplicon),
+                  tumor_id, normal_id, caller, vcf, tumor_bam, normal_bam, target_bed
+                  ('n/a' or empty for empty optional fields)
+  stratification  CSV: name, bed
+  known           CSV: name, sample (or 'all'), mode (required, benchmark), variants
+                  (files separated by ';'), regions; --samplesheet: the validated
+                  samplesheet (its sample names)
+OUTPUT (--output)
+  samplesheet     CSV: sample, technology, library_type, tumor_id, normal_id, caller,
+                  is_truth (true/false), vcf, tumor_bam, normal_bam, target_bed
+                  (absolute paths, empty for missing optional values)
+  stratification  CSV: name, bed (absolute path)
+  known           CSV: name, sample, mode, variants (absolute paths, ';'), regions
+
 Exit status: 0 if the sheet is valid, 1 otherwise. Messages go to stderr with
 ERROR/WARNING/INFO prefixes.
 
@@ -48,18 +63,22 @@ class Errors:
     """Collects errors and warnings, so that all problems are reported at once."""
 
     def __init__(self, sheet):
+        """Empty collection of messages for one input."""
         self.sheet = sheet
         self.errors = []
         self.warnings = []
 
     def error(self, msg):
+        """Record an error (reported with its line number; stops the run at the end)."""
         self.errors.append(msg)
 
     def warn(self, msg):
+        """Record a warning (reported, does not stop the run)."""
         self.warnings.append(msg)
 
     def report_and_exit_on_error(self):
         # print warnings first, then errors; exit 1 if there was any error
+        """Print all warnings and errors; exit 1 if there was an error."""
         for msg in self.warnings:
             print(f"WARNING: {self.sheet}: {msg}", file=sys.stderr)
         for msg in self.errors:
@@ -137,6 +156,7 @@ def check_extension(errors, line, column, value, extensions):
 
 
 def write_csv(path, columns, rows):
+    """Write the validated sheet (CSV with the given columns, missing values empty)."""
     with open(path, "w", newline="") as fh:
         writer = csv.DictWriter(fh, fieldnames=columns, lineterminator="\n")
         writer.writeheader()
@@ -148,6 +168,7 @@ def write_csv(path, columns, rows):
 
 
 def check_samplesheet(args):
+    """Check the samplesheet row by row and across rows; write the validated CSV."""
     errors = Errors(args.sheet)
     rows = read_csv(
         args.sheet, errors, SAMPLESHEET_REQUIRED, SAMPLESHEET_OPTIONAL, SAMPLESHEET_REMOVED
@@ -317,6 +338,7 @@ def check_samplesheet(args):
 
 
 def check_stratification(args):
+    """Check the stratification sheet (names, BED files); write the validated CSV."""
     errors = Errors(args.sheet)
     rows = read_csv(args.sheet, errors, ["name", "bed"], [])
     out, names = [], {}
@@ -342,6 +364,7 @@ def check_stratification(args):
 
 
 def check_known(args):
+    """Check the known-variant sheet (names, samples, modes, files); write the validated CSV."""
     errors = Errors(args.sheet)
     rows = read_csv(args.sheet, errors, ["name", "sample", "mode", "variants"], ["regions"])
     # samples of the (validated) samplesheet
@@ -401,6 +424,7 @@ def check_known(args):
 
 
 def main():
+    """Parse the command line and run the (sub)command."""
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     sub = parser.add_subparsers(dest="command", required=True)
     for name in ("samplesheet", "stratification", "known"):
