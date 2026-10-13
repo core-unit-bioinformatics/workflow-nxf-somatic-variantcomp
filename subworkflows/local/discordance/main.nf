@@ -32,6 +32,7 @@ workflow DISCORDANCE {
     ch_reference    // value channel: [ meta, fasta, fai, gzi ]
     ch_annotation_beds // channel: [ meta(id, role: genes | stratum), bed ] checked gene and stratification BEDs (CHECK_INPUTS)
     ch_extra_sites  // channel: [ meta(id, sample), vcf ] further positions for the read evidence (known variants)
+    read_evidence   // boolean: count the reads of the alignments at the compared positions (--read_evidence)
 
     main:
     def ch_fai = ch_reference.map { meta, _fasta, fai, _gzi -> [meta, fai] }
@@ -39,46 +40,51 @@ workflow DISCORDANCE {
     //
     // 1. read evidence
     //
-    // positions (CHROM, POS) of every compared variant and of the extra sites
-    BCFTOOLS_QUERY_SITES(
-        ch_compare.mix(ch_extra_sites.map { meta, vcf -> [meta, vcf, []] }),
-        [],
-        [],
-        []
-    )
-    // one sites file per sample (concatenation; mpileup accepts unsorted, duplicate sites)
-    def ch_sites = BCFTOOLS_QUERY_SITES.out.output
-        .collectFile { meta, sites -> ["${meta.sample}.sites.tsv", sites] }
-        .map { sites -> [sites.name.replaceAll(/\.sites\.tsv$/, ''), sites] }
+    // (--read_evidence; without, the classification uses the calls only)
+    // [ meta(alignment: id, entry_id, role, ...), vcf, tbi ]
+    def ch_evidence = channel.empty()
+    if (read_evidence) {
+        // positions (CHROM, POS) of every compared variant and of the extra sites
+        BCFTOOLS_QUERY_SITES(
+            ch_compare.mix(ch_extra_sites.map { meta, vcf -> [meta, vcf, []] }),
+            [],
+            [],
+            []
+        )
+        // one sites file per sample (concatenation; mpileup accepts unsorted, duplicate sites)
+        def ch_sites = BCFTOOLS_QUERY_SITES.out.output
+            .collectFile { meta, sites -> ["${meta.sample}.sites.tsv", sites] }
+            .map { sites -> [sites.name.replaceAll(/\.sites\.tsv$/, ''), sites] }
 
-    // every alignment of the samplesheet: [ meta(id, entry_id, role, sample, ...), alignment, index ]
-    def ch_alignments = ch_samplesheet.flatMap { entry ->
-        def meta = entry[0]
-        def alignments = []
-        if (entry[3]) {
-            alignments << [meta + [id: "${meta.id}_tumor".toString(), entry_id: meta.id, role: 'tumor'], entry[3], entry[4]]
+        // every alignment of the samplesheet: [ meta(id, entry_id, role, sample, ...), alignment, index ]
+        def ch_alignments = ch_samplesheet.flatMap { entry ->
+            def meta = entry[0]
+            def alignments = []
+            if (entry[3]) {
+                alignments << [meta + [id: "${meta.id}_tumor".toString(), entry_id: meta.id, role: 'tumor'], entry[3], entry[4]]
+            }
+            if (entry[5]) {
+                alignments << [meta + [id: "${meta.id}_normal".toString(), entry_id: meta.id, role: 'normal'], entry[5], entry[6]]
+            }
+            alignments
         }
-        if (entry[5]) {
-            alignments << [meta + [id: "${meta.id}_normal".toString(), entry_id: meta.id, role: 'normal'], entry[5], entry[6]]
-        }
-        alignments
+
+        // allele counts of each alignment at the positions of its sample
+        BCFTOOLS_MPILEUP(
+            ch_alignments
+                .map { meta, bam, _index -> [meta.sample, meta, bam] }
+                .combine(ch_sites, by: 0)
+                .map { _sample, meta, bam, sites -> [meta, bam, sites, []] },
+            ch_reference.map { meta, fasta, fai, _gzi -> [meta, fasta, fai] },
+            false
+        )
+        // split and left-align like the calls, so alleles match by CHROM/POS/REF/ALT
+        BCFTOOLS_NORM_EVIDENCE(
+            BCFTOOLS_MPILEUP.out.vcf.join(BCFTOOLS_MPILEUP.out.index),
+            ch_reference.map { meta, fasta, _fai, _gzi -> [meta, fasta] }
+        )
+        ch_evidence = BCFTOOLS_NORM_EVIDENCE.out.vcf.join(BCFTOOLS_NORM_EVIDENCE.out.index)
     }
-
-    // allele counts of each alignment at the positions of its sample
-    BCFTOOLS_MPILEUP(
-        ch_alignments
-            .map { meta, bam, _index -> [meta.sample, meta, bam] }
-            .combine(ch_sites, by: 0)
-            .map { _sample, meta, bam, sites -> [meta, bam, sites, []] },
-        ch_reference.map { meta, fasta, fai, _gzi -> [meta, fasta, fai] },
-        false
-    )
-    // split and left-align like the calls, so alleles match by CHROM/POS/REF/ALT
-    BCFTOOLS_NORM_EVIDENCE(
-        BCFTOOLS_MPILEUP.out.vcf.join(BCFTOOLS_MPILEUP.out.index),
-        ch_reference.map { meta, fasta, _fai, _gzi -> [meta, fasta] }
-    )
-    def ch_evidence = BCFTOOLS_NORM_EVIDENCE.out.vcf.join(BCFTOOLS_NORM_EVIDENCE.out.index)
 
     //
     // 2. classification per comparison

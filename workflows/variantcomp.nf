@@ -49,6 +49,13 @@ workflow VARIANTCOMP {
     def ch_versions = channel.empty()
     def ch_multiqc_files = channel.empty()
 
+    // alignments are only used for callable regions and read evidence; without both,
+    // they are ignored (not checked, not indexed, not read)
+    def use_alignments = params.callable_regions || params.read_evidence
+    def ch_entries = use_alignments
+        ? ch_samplesheet_input
+        : ch_samplesheet_input.map { entry -> [entry[0], entry[1], entry[2], [], [], [], [], entry[7]] }
+
     //
     // MODULE: checks of the samplesheet across rows (bin/check_sheets.py: truth technology
     // per sample, unique rows, one target BED per technology, ...); all problems are
@@ -71,7 +78,7 @@ workflow VARIANTCOMP {
     // against the reference, before any long-running step
     //
     CHECK_INPUTS(
-        ch_samplesheet_input,
+        ch_entries,
         ch_samplesheet_validated,
         PREPARE_REFERENCE.out.reference,
         regions_bed ? file(regions_bed, checkIfExists: true) : null,
@@ -86,7 +93,7 @@ workflow VARIANTCOMP {
     // step starts only after all checks passed
     //
     PREPARE_ALIGNMENTS(
-        ch_samplesheet_input
+        ch_entries
             .combine(ch_samplesheet_validated)
             .combine(CHECK_INPUTS.out.done)
             .map { entry -> entry[0..-3] }
@@ -106,19 +113,25 @@ workflow VARIANTCOMP {
     )
 
     //
-    // SUBWORKFLOW: coverage and per-sample callable regions (alignments are optional)
+    // SUBWORKFLOW: coverage and per-sample callable regions (--callable_regions); without,
+    // every entry is compared in the common region
     //
-    COVERAGE(
-        ch_samplesheet,
-        CHECK_INPUTS.out.bam_rename,
-        PREPARE_REFERENCE.out.reference,
-        PREPARE_REGIONS.out.common_bed,
-        params.require_normal_coverage
-    )
-    ch_multiqc_files = ch_multiqc_files.mix(COVERAGE.out.multiqc_files)
-    COVERAGE.out.callable_summary
-        .map { _meta, tsv -> tsv }
-        .collectFile(name: 'callable_summary.tsv', keepHeader: true, skip: 1, sort: { tsv -> tsv.name }, storeDir: "${outdir}/coverage")
+    // comparison region per samplesheet entry: [ meta, bed ]
+    def ch_comparison_regions = ch_samplesheet.map { entry -> entry[0] }.combine(PREPARE_REGIONS.out.common_bed)
+    if (params.callable_regions) {
+        COVERAGE(
+            ch_samplesheet,
+            CHECK_INPUTS.out.bam_rename,
+            PREPARE_REFERENCE.out.reference,
+            PREPARE_REGIONS.out.common_bed,
+            params.require_normal_coverage
+        )
+        ch_comparison_regions = COVERAGE.out.regions
+        ch_multiqc_files = ch_multiqc_files.mix(COVERAGE.out.multiqc_files)
+        COVERAGE.out.callable_summary
+            .map { _meta, tsv -> tsv }
+            .collectFile(name: 'callable_summary.tsv', keepHeader: true, skip: 1, sort: { tsv -> tsv.name }, storeDir: "${outdir}/coverage")
+    }
 
     //
     // SUBWORKFLOW: normalization, harmonization and uniform filtering
@@ -128,7 +141,7 @@ workflow VARIANTCOMP {
         CHECK_INPUTS.out.vcf_rename,
         PREPARE_REFERENCE.out.reference,
         PREPARE_REFERENCE.out.genome_bed,
-        COVERAGE.out.regions
+        ch_comparison_regions
     )
 
     //
@@ -136,7 +149,7 @@ workflow VARIANTCOMP {
     //
     BENCHMARK(
         PREPROCESS_VCF.out.compare,
-        COVERAGE.out.regions,
+        ch_comparison_regions,
         PREPARE_REFERENCE.out.reference,
         params.comparison_mode
     )
@@ -160,7 +173,8 @@ workflow VARIANTCOMP {
         BENCHMARK.out.variants,
         PREPARE_REFERENCE.out.reference,
         CHECK_INPUTS.out.beds.filter { meta, _bed -> meta.role in ['genes', 'stratum'] },
-        PREPARE_KNOWN_VARIANTS.out.sites
+        PREPARE_KNOWN_VARIANTS.out.sites,
+        params.read_evidence
     )
 
     //
@@ -170,7 +184,7 @@ workflow VARIANTCOMP {
         PREPARE_KNOWN_VARIANTS.out.per_sample,
         PREPROCESS_VCF.out.normalized,
         PREPROCESS_VCF.out.compare,
-        COVERAGE.out.regions,
+        ch_comparison_regions,
         DISCORDANCE.out.evidence,
         BENCHMARK.out.sdf
     )
