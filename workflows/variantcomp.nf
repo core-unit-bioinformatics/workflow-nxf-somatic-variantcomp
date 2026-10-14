@@ -22,6 +22,7 @@ include { paramsSummaryMap       } from 'plugin/nf-schema'
 include { paramsSummaryMultiqc   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { softwareVersionsToYAML } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { methodsDescriptionText } from '../subworkflows/local/utils_nfcore_variantcomp_pipeline'
+include { giabStratifications    } from '../subworkflows/local/utils_nfcore_variantcomp_pipeline'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -87,6 +88,8 @@ workflow VARIANTCOMP {
         exclude_bed ? file(exclude_bed, checkIfExists: true) : null,
         repeats_bed ? file(repeats_bed, checkIfExists: true) : null,
         stratification,
+        // GIAB genome stratifications (--giab_stratifications): [ [ name, path ], ... ]
+        params.giab_stratifications ? giabStratifications(params.giab_dir, params.giab_files) : [],
         known_variants
     )
 

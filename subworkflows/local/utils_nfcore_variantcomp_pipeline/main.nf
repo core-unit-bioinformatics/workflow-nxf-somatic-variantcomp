@@ -200,6 +200,21 @@ def validateInputParameters() {
     if (params.vep && params.vep_cache && params.vep_gtf) {
         error("--vep_cache and --vep_gtf are both given: VEP uses one annotation source, give only one of them")
     }
+    if (params.giab_stratifications && !params.giab_dir) {
+        error("--giab_stratifications is on, but --giab_dir is not given: download the GIAB genome stratifications with scripts/download_resources.py and give their folder, or switch them off with --giab_stratifications false")
+    }
+}
+
+//
+// GIAB stratification BEDs of --giab_files resolved against --giab_dir:
+// [ [ name, path ], ... ]. The format of --giab_files (name=path,name=path) is checked
+// by nf-schema; the files themselves are checked in CHECK_INPUTS.
+//
+def giabStratifications(giab_dir, giab_files) {
+    return giab_files.tokenize(',').collect { item ->
+        def parts = item.tokenize('=')
+        [parts[0], "${giab_dir}/${parts[1]}".toString()]
+    }
 }
 
 //
@@ -226,7 +241,7 @@ def toolCitationText() {
             "BEDTools (Quinlan and Hall 2010) for region operations,",
             "mosdepth (Pedersen and Quinlan 2018) for coverage (if alignments were given),",
             "RTG Tools vcfeval (Cleary et al. 2015) for haplotype-aware variant matching,",
-            "Ensembl VEP (McLaren et al. 2016) and MSIsensor-pro (Jia et al. 2020) for the annotation of consequences and repeat context,",
+            "Ensembl VEP (McLaren et al. 2016), MSIsensor-pro (Jia et al. 2020) and the GIAB genome stratifications (Dwarshuis et al. 2024) for the annotation of consequences, repeat context and difficult regions,",
             "GNU Awk, pysam, pandas (McKinney 2010), NumPy (Harris et al. 2020), SciPy (Virtanen et al. 2020) and Matplotlib (Hunter 2007) in the pipeline scripts,",
             "the Benjamini-Hochberg procedure (Benjamini and Hochberg 1995) for multiple-testing correction",
             "and MultiQC (Ewels et al. 2016) for the report."
@@ -244,6 +259,7 @@ def toolBibliographyText() {
             "<li>Cleary, J. G., Braithwaite, R., Gaastra, K., Hilbush, B. S., Inglis, S., Irvine, S. A., Jackson, A., Littin, R., Rathod, M., Ware, D., Zook, J. M., Trigg, L., & De La Vega, F. M. (2015). Comparing variant call files for performance benchmarking of next-generation sequencing variant calling pipelines. bioRxiv. doi: 10.1101/023754</li>",
             "<li>McLaren, W., Gil, L., Hunt, S. E., Riat, H. S., Ritchie, G. R. S., Thormann, A., Flicek, P., & Cunningham, F. (2016). The Ensembl Variant Effect Predictor. Genome Biology, 17, 122. doi: 10.1186/s13059-016-0974-4</li>",
             "<li>Jia, P., Yang, X., Guo, L., Liu, B., Lin, J., Liang, H., Sun, J., Zhang, C., & Ye, K. (2020). MSIsensor-pro: fast, accurate, and matched-normal-sample-free detection of microsatellite instability. Genomics, Proteomics & Bioinformatics, 18(1), 65–71. doi: 10.1016/j.gpb.2020.02.001</li>",
+            "<li>Dwarshuis, N., Kalra, D., McDaniel, J., et al. (2024). The GIAB genomic stratifications resource for human reference genomes. Nature Communications, 15, 9029. doi: 10.1038/s41467-024-53260-y</li>",
             "<li>McKinney, W. (2010). Data structures for statistical computing in Python. Proceedings of the 9th Python in Science Conference, 56–61. doi: 10.25080/Majora-92bf1922-00a</li>",
             "<li>Harris, C. R., Millman, K. J., van der Walt, S. J., et al. (2020). Array programming with NumPy. Nature, 585, 357–362. doi: 10.1038/s41586-020-2649-2</li>",
             "<li>Virtanen, P., Gommers, R., Oliphant, T. E., et al. (2020). SciPy 1.0: fundamental algorithms for scientific computing in Python. Nature Methods, 17, 261–272. doi: 10.1038/s41592-019-0686-2</li>",

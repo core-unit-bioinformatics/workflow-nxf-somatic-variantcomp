@@ -23,6 +23,8 @@ Implements the feedback of 2026-10-13 (`docs/plan-feedback-20261013.md`, decisio
 - MultiQC tables of every step summary (`bin/mqc_tables.py`, `MQC_TABLES`): input checks, `bcftools norm` logs, harmonization, regions, callable regions
 - `docs/output.md` lists every output file with its columns and types; `docs/roadmap.md` collects further work
 - Synthetic GTF (test data) and a GENCODE chr22 GTF for SEQC2 (`tests/seqc2/`)
+- GIAB genome stratifications v3.5 in the annotation: `--giab_stratifications` (default `true`), `--giab_dir`, `--giab_files`; the BEDs are checked in `CHECK_INPUTS` and give one `giab_<name>` column per file
+- `scripts/download_resources.py`: downloads the VEP cache (Ensembl CHECKSUMS), the GIAB stratifications (md5) and optionally a GENCODE GTF for offline runs; writes `resources.config` / `resources.params.yaml` with the parameters
 
 ### `Changed`
 
@@ -37,6 +39,11 @@ Implements the feedback of 2026-10-13 (`docs/plan-feedback-20261013.md`, decisio
 - `vcf_preprocessed/reference_check/` renamed to `vcf_preprocessed/norm_logs/`
 - Metro map redrawn: a central VCF line; input lines merge into the steps that use them
 - Docstrings with INPUT/OUTPUT columns in every script, a docstring for every function
+
+### `Fixed`
+
+- `tests/seqc2/seqc2_testdata.py`: downloads in Python (`urllib`, resumable) with an explicit CA bundle, also exported for samtools/bcftools (`CURL_CA_BUNDLE`); fixes `curl: (77) error adding trust anchors` with conda curl builds; `--ca-bundle`
+- SEQC2 small dataset: alignments for all pairs (callable regions and read evidence need them for every row); GIAB stratifications in the release layout for `--giab_dir` instead of `stratification.csv`
 
 ### `Removed`
 

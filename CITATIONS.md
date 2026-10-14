@@ -112,7 +112,7 @@ These callers produced the VCFs the pipeline was tested with or is designed for 
 
   > Xiao W, Ren L, Chen Z, et al. Toward best practice in cancer mutation detection with whole-genome and whole-exome sequencing. Nat Biotechnol. 2021 Sep;39(9):1141-1150. doi: 10.1038/s41587-021-00994-5.
 
-- GIAB genomic stratifications v3.5 (test stratification BEDs: homopolymers, tandem repeats)
+- GIAB genomic stratifications v3.5 (annotation of the compared variants with `--giab_stratifications`: homopolymers, tandem repeats, segmental duplications, low mappability, all difficult regions; also in the SEQC2 test data)
 
   > Dwarshuis N, Kalra D, McDaniel J, et al. The GIAB genomic stratifications resource for human reference genomes. Nat Commun. 2024 Oct 19;15(1):9029. doi: 10.1038/s41467-024-53260-y. PubMed PMID: 39424793.
 

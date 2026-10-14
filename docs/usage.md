@@ -270,7 +270,22 @@ as in [variantinterpretation](https://github.com/cio-abcd/variantinterpretation)
 - **Repeats** (`--annotate_repeats`, default `true`): microsatellite regions of the
   reference from `msisensor-pro scan`, or a precomputed BED (`--repeats_bed`: contig,
   start, end, repeat unit, repeat times; the file written by a previous run can be reused).
-- **Stratifications** (`--stratification`, optional): any BEDs of genomic context.
+- **GIAB genome stratifications** (`--giab_stratifications`, default `true`): whether a
+  variant lies in a homopolymer, tandem repeat, segmental duplication, low-mappability or
+  any difficult region of the GIAB stratifications v3.5. The files are read from a local
+  folder (`--giab_dir`); `--giab_files` selects them. They are checked against the
+  reference like every BED (contig names are renamed, e.g. for the GRCh37 files without
+  `chr`). If the option is on and `--giab_dir` is missing, the run stops at the start.
+- **Stratifications** (`--stratification`, optional): any further BEDs of genomic context.
+
+The pipeline never downloads resources. Get the VEP cache, the GIAB stratifications and
+(optionally) a GENCODE GTF beforehand with `scripts/download_resources.py` on a machine
+with internet access; it writes `resources.config` with all the parameters below:
+
+```bash
+scripts/download_resources.py --outdir /data/variantcomp_resources --genome GRCh38
+nextflow run ... -c /data/variantcomp_resources/resources.config -params-file params.yaml
+```
 
 The consequences are grouped into `synonymous`, `non_synonymous` and `other`; the report
 tests the enrichment of discordant variants per group, repeat context, variant class,
@@ -288,7 +303,10 @@ impact and stratum.
 | `--vep_cache_args` | `--check_existing --var_synonyms --clin_sig_allele 1` | Extra VEP options used only with a cache. |
 | `--annotate_repeats` | `true` | Annotate repeat context. |
 | `--repeats_bed` | – | Precomputed repeat BED (skips `msisensor-pro scan`). |
-| `--stratification` | – | Comma-separated sheet with columns `name` and `bed` (relative paths resolved against the sheet), e.g. GIAB stratifications for homopolymers, tandem repeats, segmental duplications, low mappability. |
+| `--giab_stratifications` | `true` | Annotate with the GIAB genome stratifications (needs `--giab_dir`). |
+| `--giab_dir` | – | Local folder of the GIAB stratifications v3.5 of the build (content of `GRCh38@all` / `GRCh37@all`; `giab/<build>/` of `download_resources.py`). |
+| `--giab_files` | GRCh38: `homopolymer`, `tandem_repeat`, `segmental_duplication`, `low_mappability`, `all_difficult` | Comma-separated `name=path` pairs, paths relative to `--giab_dir`; column `giab_<name>` per file. Default: `homopolymer=LowComplexity/GRCh38_AllHomopolymers_ge7bp_imperfectge11bp_slop5.bed.gz,tandem_repeat=LowComplexity/GRCh38_AllTandemRepeats.bed.gz,segmental_duplication=SegmentalDuplications/GRCh38_segdups.bed.gz,low_mappability=Mappability/GRCh38_lowmappabilityall.bed.gz,all_difficult=Union/GRCh38_alldifficultregions.bed.gz`. For GRCh37 use the `GRCh37_` file names (written by `download_resources.py --genome GRCh37`). |
+| `--stratification` | – | Comma-separated sheet with columns `name` and `bed` (relative paths resolved against the sheet) of further context BEDs. |
 
 `--gene_bed` of earlier versions was removed: genes come from VEP.
 

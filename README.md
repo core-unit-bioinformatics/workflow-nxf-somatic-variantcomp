@@ -43,7 +43,8 @@ steps that process it and merges into the step that consumes it:
   alignments, directly into the filter step 7.8);
 - **orange — alignments (`--callable_regions`, `--read_evidence`):** callable regions
   restrict the comparison (step 7.8), read counts explain missed or extra calls (step 9.2);
-- **pink — `--stratification` and repeats:** genomic context of every variant (step 10.4);
+- **pink — GIAB stratifications (`--giab_dir`), `--stratification` and repeats:** genomic
+  context of every variant (step 10.4);
 - **red — VEP cache or GTF (`--vep`):** consequence, gene, impact (step 10.2);
 - **yellow — `--known_variants`:** a required clinical checklist (PASS/FAIL per sample,
   technology and variant) or an external truth set; merges into the report.
@@ -65,7 +66,7 @@ every step are set in `conf/modules/<subworkflow>.config`.
 | 3.1 | **VCFs: contigs, lengths, samples, REF alleles.** Contig names (safe renames chr/no-chr, MT/chrM), contig lengths (any difference is an error: another build), the tumor/normal columns and the REF allele of every record against the FASTA (`--max_ref_mismatch`). Switch off with `--check_vcf_contigs` / `--check_ref_alleles`. | `check_reference.py (pysam)` | VCFs of all technologies |
 | 3.2 | **Alignment headers: contigs and lengths.** Contig names and lengths of every alignment header (`--check_bam_contigs`). | `check_reference.py (pysam)` | Alignments |
 | 3.3 | **Target, regions and exclude BEDs.** BED format, contig names and interval ends of the target BEDs, `--regions_bed` and `--exclude_bed` (`--check_bed_contigs`). | `check_reference.py` | Target BEDs (+ --regions_bed / --exclude_bed) |
-| 3.4 | **Stratification sheet and BEDs, --repeats_bed.** The `--stratification` sheet (columns, unique names, files) and every stratification BED; a precomputed `--repeats_bed`. | `check_sheets.py, check_reference.py` | Stratification BEDs (--stratification) and repeat regions |
+| 3.4 | **GIAB and stratification BEDs, --repeats_bed.** The GIAB genome stratifications (`--giab_files` in `--giab_dir`), the `--stratification` sheet (columns, unique names, files) and every stratification BED; a precomputed `--repeats_bed`. | `check_sheets.py, check_reference.py` | GIAB (--giab_dir) and other stratification BEDs, repeat regions |
 | 3.5 | **Known-variant sheet and lists: positions, REF alleles.** The `--known_variants` sheet (columns, modes, samples, files) and every list: contigs, positions and REF alleles against the FASTA (`--check_known_variants`). Every later step starts only after all checks of 1.2 and 3.x passed. | `check_sheets.py, known_variants.py` | Known variants (--known_variants) |
 | **PREPARE_ALIGNMENTS** | _index the alignments_ | | |
 | 4.1 | **Index alignments without an index.** Alignments without a `.bai`/`.csi`/`.crai` next to them are indexed once. | `samtools index` | Alignments |
@@ -98,8 +99,8 @@ every step are set in `conf/modules/<subworkflow>.config`.
 | **ANNOTATE_VARIANTS** | _annotate every compared variant_ | | |
 | 10.1 | **Compared variants as sites VCF.** All compared variants of all comparisons as one sorted sites-only VCF. | `annotate_variants.py to-vcf` | VCFs of all technologies |
 | 10.2 | **Consequence, gene, impact, variant class.** Ensembl VEP (offline; `--vep_cache` or `--vep_gtf`, options as in cio-abcd/variantinterpretation): the most severe consequence and its gene, impact, variant class and biotype per variant. | `Ensembl VEP, bcftools +split-vep` | VEP cache or GTF (--vep) |
-| 10.3 | **Repeat regions of the reference.** msisensor-pro scans the reference for repeat (microsatellite) regions, or `--repeats_bed` is used (`--annotate_repeats`). | `msisensor-pro scan` | Stratification BEDs (--stratification) and repeat regions |
-| 10.4 | **Repeat context and stratifications per variant.** Every variant gets its repeat unit and length and a yes/no per stratification BED. | `bedtools map, intersect -c` | Stratification BEDs (--stratification) and repeat regions |
+| 10.3 | **Repeat regions of the reference.** msisensor-pro scans the reference for repeat (microsatellite) regions, or `--repeats_bed` is used (`--annotate_repeats`). | `msisensor-pro scan` | GIAB (--giab_dir) and other stratification BEDs, repeat regions |
+| 10.4 | **Repeat context and stratifications per variant.** Every variant gets its repeat unit and length and a yes/no per GIAB and stratification BED. | `bedtools map, intersect -c` | GIAB (--giab_dir) and other stratification BEDs, repeat regions |
 | 10.5 | **Merge all annotations into the variant table.** Result: `discordance/variants.annotated.tsv` (consequence group synonymous / non-synonymous / other, gene, impact, variant class, repeat, strata). | `annotate_variants.py merge` | VCFs of all technologies |
 | **PREPARE_KNOWN_VARIANTS, KNOWN_VARIANTS** | _check known variants_ | | |
 | 11.1 | **Normalize the lists like the calls.** The checked known-variant lists are normalized like the calls (split, left-align, atomize). | `bcftools norm` | Known variants (--known_variants) |

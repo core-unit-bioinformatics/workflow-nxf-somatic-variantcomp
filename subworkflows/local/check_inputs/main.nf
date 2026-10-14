@@ -10,8 +10,9 @@
 //     (check_reference.py vcf)                                     --check_vcf_contigs, --check_ref_alleles
 //  3. alignments: contig names and lengths of the header (check_reference.py bam)
 //                                                                  --check_bam_contigs
-//  4. BEDs: target BEDs, --regions_bed, --exclude_bed, --repeats_bed, stratification BEDs
-//     and known-list regions: format, contig names, interval ends (check_reference.py bed)
+//  4. BEDs: target BEDs, --regions_bed, --exclude_bed, --repeats_bed, stratification BEDs,
+//     GIAB stratifications and known-list regions: format, contig names, interval ends
+//     (check_reference.py bed)
 //                                                                  --check_bed_contigs
 //  5. known-variant lists: contigs, positions, REF alleles (known_variants.py prepare)
 //                                                                  --check_known_variants
@@ -38,6 +39,7 @@ workflow CHECK_INPUTS {
     exclude_bed    // path or null: --exclude_bed
     repeats_bed    // path or null: --repeats_bed (precomputed repeat regions)
     stratification // string or null: --stratification sheet (name, bed)
+    giab_beds      // list: [ [ name, path ], ... ] GIAB stratifications (--giab_files), or []
     known_variants // string or null: --known_variants sheet (name, sample, mode, variants, regions)
 
     main:
@@ -57,6 +59,11 @@ workflow CHECK_INPUTS {
             .map { row -> [[id: row.name, role: 'stratum'], file(row.bed, checkIfExists: true)] }
         ch_sheet_checks = ch_sheet_checks.mix(CHECK_STRATIFICATION.out.csv)
     }
+    // GIAB stratifications: named giab_<name> (column of the annotated variant table)
+    ch_strata = ch_strata.mix(
+        channel.fromList(giab_beds)
+            .map { name, path -> [[id: "giab_${name}".toString(), role: 'stratum'], file(path, checkIfExists: true)] }
+    )
     // known-variant lists: [ meta(id: name, sample, mode), [ variant files ], regions or [] ]
     def ch_known = channel.empty()
     if (known_variants) {

@@ -264,8 +264,13 @@ nf-core-style pipelines.
   the first step with a hint which param to switch off. Without these
   features, BAMs are ignored.
 - **Annotation like variantinterpretation:** Ensembl VEP (`+split-vep`) for
-  consequence, gene, impact; msisensor-pro for repeats; `--stratification`
-  BEDs as extra context. No gene BED.
+  consequence, gene, impact; msisensor-pro for repeats; GIAB genome
+  stratifications (`--giab_dir`, `--giab_files`); `--stratification` BEDs as
+  extra context. No gene BED.
+- **Resources are prepared, never downloaded by the pipeline.**
+  `scripts/download_resources.py` gets the VEP cache, GIAB stratifications and
+  a GENCODE GTF beforehand and writes `resources.config`. Download code uses
+  Python (`urllib`, resumable) with an explicit CA bundle, not `curl`.
 - **Statistics from scipy** (`fisher_exact`, `false_discovery_control`),
   not own implementations.
 

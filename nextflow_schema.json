@@ -611,6 +611,27 @@
                     "pattern": "^\\S+\\.bed(\\.gz)?$",
                     "description": "Precomputed repeat regions (contig, start, end, repeat unit, repeat times), e.g. from an earlier run (annotation/repeats/): skips the msisensor-pro scan of the reference.",
                     "fa_icon": "fas fa-file"
+                },
+                "giab_stratifications": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Annotate every compared variant with the GIAB genome stratifications (--giab_files in --giab_dir): one yes/no column giab_<name> per file. Needs --giab_dir.",
+                    "help_text": "The GIAB genome stratifications v3.5 (Dwarshuis et al. 2024) mark difficult regions of GRCh37/GRCh38: homopolymers, tandem repeats, segmental duplications, low mappability and their union. They are not downloaded by the pipeline; get them with scripts/download_resources.py. Set to false to skip them.",
+                    "fa_icon": "fas fa-layer-group"
+                },
+                "giab_dir": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "exists": true,
+                    "description": "Local folder of the GIAB genome stratifications of the reference build (the content of v3.5/GRCh38@all or GRCh37@all, as written by scripts/download_resources.py).",
+                    "fa_icon": "fas fa-folder-open"
+                },
+                "giab_files": {
+                    "type": "string",
+                    "default": "homopolymer=LowComplexity/GRCh38_AllHomopolymers_ge7bp_imperfectge11bp_slop5.bed.gz,tandem_repeat=LowComplexity/GRCh38_AllTandemRepeats.bed.gz,segmental_duplication=SegmentalDuplications/GRCh38_segdups.bed.gz,low_mappability=Mappability/GRCh38_lowmappabilityall.bed.gz,all_difficult=Union/GRCh38_alldifficultregions.bed.gz",
+                    "pattern": "^[a-z0-9_]+=[^,=\\s]+(,[a-z0-9_]+=[^,=\\s]+)*$",
+                    "description": "GIAB stratifications used, as comma-separated name=path pairs (path relative to --giab_dir). The column of each is giab_<name>. For GRCh37 replace GRCh38 by GRCh37 in the file names.",
+                    "fa_icon": "fas fa-list"
                 }
             }
         }
