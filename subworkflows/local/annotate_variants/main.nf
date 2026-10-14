@@ -127,7 +127,9 @@ workflow ANNOTATE_VARIANTS {
     ANNOTATION_MERGE(
         ch_variants
             .combine(ch_vep.map { tsv -> [tsv] })
-            .combine(BEDTOOLS_MAP_REPEATS.out.mapped.map { _meta, bed -> bed }.ifEmpty([]))
+            // wrapped in a list: without repeats ([]) the slot must still be filled
+            // (combine adds the elements of a list, none for an empty one)
+            .combine(BEDTOOLS_MAP_REPEATS.out.mapped.map { _meta, bed -> [bed] }.ifEmpty([[]]))
             // stratification results sorted by name: stable column order in the table
             .combine(BEDTOOLS_INTERSECT_STRATA.out.intersect.map { _meta, bed -> bed }.toSortedList { a, b -> a.name <=> b.name }.map { beds -> [beds] })
             .map { meta, table, vep, repeats, strata -> [meta, table, vep, repeats, strata] }
