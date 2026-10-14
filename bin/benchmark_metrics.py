@@ -51,6 +51,10 @@ from pathlib import Path
 
 import pysam
 
+# BED reader shared with the reference check (format checks with line numbers)
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from check_reference import read_bed  # noqa: E402
+
 # variant types of harmonize_vcf.py grouped for the variant_type stratum
 TYPE_GROUP = {"SNV": "SNV", "MNV": "SNV", "INS": "INDEL", "DEL": "INDEL", "COMPLEX": "INDEL"}
 VARIANT_COLUMNS = [
@@ -172,16 +176,10 @@ def read_records(path, what):
 
 
 def load_regions(path):
-    """{chrom: [(start, end)]} of a BED."""
+    """{chrom: [(start, end)]} of a BED (format checked by check_reference.read_bed)."""
     regions = {}
-    with open(path) as fh:
-        for line_no, line in enumerate(fh, start=1):
-            if not line.strip() or line.startswith(("#", "track", "browser")):
-                continue
-            fields = line.rstrip("\n").split("\t")
-            if len(fields) < 3:
-                sys.exit(f"ERROR: {path}: line {line_no}: expected at least 3 columns")
-            regions.setdefault(fields[0], []).append((int(fields[1]), int(fields[2])))
+    for iv in read_bed(path):
+        regions.setdefault(iv.chrom, []).append((iv.start, iv.end))
     return regions
 
 

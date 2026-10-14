@@ -1,7 +1,6 @@
 ---
 # yaml-language-server: $schema=https://raw.githubusercontent.com/nf-core/modules/master/modules/environment-schema.json
-# check_reference.py only needs the Python standard library; the container is shared with
-# the other local Python modules
+# pysam + Python: the container shared by the local Python modules (bin/ scripts)
 channels:
   - conda-forge
   - bioconda

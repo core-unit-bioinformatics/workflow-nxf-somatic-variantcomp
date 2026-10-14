@@ -53,21 +53,22 @@ OUTPUT of check (--prefix)
 
 import argparse
 import csv
-import gzip
 import sys
 from pathlib import Path
 
 import pysam
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from check_reference import Report, is_mito, map_contig, read_fai  # noqa: E402
+from check_reference import (  # noqa: E402
+    Report,
+    is_mito,
+    map_contig,
+    open_text,
+    read_bed,
+    read_fai,
+)
 
 TSV_REQUIRED = ["chrom", "pos", "ref", "alt"]
-
-
-def open_text(path):
-    """Text handle of a plain or gzipped file."""
-    return gzip.open(path, "rt") if str(path).endswith(".gz") else open(path)
 
 
 def first_value(value):
@@ -278,16 +279,10 @@ def load_calls(path):
 
 
 def load_regions(path):
-    """{chrom: [(start, end), ...]} of a BED; header and empty lines are skipped."""
+    """{chrom: [(start, end), ...]} of a BED (format checked by check_reference.read_bed)."""
     regions = {}
-    with open_text(path) as fh:
-        for line_no, line in enumerate(fh, start=1):
-            if not line.strip() or line.startswith(("#", "track", "browser")):
-                continue
-            fields = line.rstrip("\n").split("\t")
-            if len(fields) < 3 or not fields[1].isdigit() or not fields[2].isdigit():
-                sys.exit(f"ERROR: {path}: line {line_no}: expected chrom, start, end (integers)")
-            regions.setdefault(fields[0], []).append((int(fields[1]), int(fields[2])))
+    for iv in read_bed(path):
+        regions.setdefault(iv.chrom, []).append((iv.start, iv.end))
     return regions
 
 

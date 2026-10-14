@@ -26,33 +26,31 @@ one row per technology) is bookkeeping that would otherwise be awk in a module.
 
 import argparse
 import sys
+from pathlib import Path
+
+# BED reader shared with the reference check (format checks with line numbers)
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from check_reference import read_bed  # noqa: E402
 
 
-def read_bed(path):
-    """Intervals {chrom: [(start, end), ...]} of a sorted, merged BED; checks the format."""
+def read_merged_bed(path):
+    """Intervals {chrom: [(start, end), ...]} of a sorted, merged BED.
+
+    The BED format is checked by check_reference.read_bed (columns, integer coordinates,
+    0 <= start <= end); this function adds the check that the intervals are sorted and
+    do not overlap (bp counts would be inflated otherwise).
+    """
     intervals = {}
     last = {}
-    with open(path) as fh:
-        for line_no, line in enumerate(fh, start=1):
-            if not line.strip() or line.startswith(("#", "track", "browser")):
-                continue
-            fields = line.rstrip("\n").split("\t")
-            if len(fields) < 3:
-                sys.exit(f"ERROR: {path}: line {line_no}: expected at least 3 columns")
-            try:
-                start, end = int(fields[1]), int(fields[2])
-            except ValueError:
-                sys.exit(f"ERROR: {path}: line {line_no}: start/end are not integers")
-            if end < start:
-                sys.exit(f"ERROR: {path}: line {line_no}: end {end} < start {start}")
-            # merged input: an interval must start at or after the end of the previous one
-            if fields[0] in last and start < last[fields[0]]:
-                sys.exit(
-                    f"ERROR: {path}: line {line_no}: intervals overlap or are unsorted; "
-                    "sort and merge the BED first"
-                )
-            last[fields[0]] = end
-            intervals.setdefault(fields[0], []).append((start, end))
+    for iv in read_bed(path):
+        # merged input: an interval must start at or after the end of the previous one
+        if iv.chrom in last and iv.start < last[iv.chrom]:
+            sys.exit(
+                f"ERROR: {path}: line {iv.line_no}: intervals overlap or are unsorted; "
+                "sort and merge the BED first"
+            )
+        last[iv.chrom] = iv.end
+        intervals.setdefault(iv.chrom, []).append((iv.start, iv.end))
     return intervals
 
 
@@ -88,20 +86,20 @@ def fraction(part, whole):
 
 def targets(args):
     """Summary of the target BEDs and the common region (subcommand targets)."""
-    common = read_bed(args.common)
+    common = read_merged_bed(args.common)
     common_bp = total_bp(common)
     rows = []
     # one row per targeted technology: its BED and how much of it is in the common region
     for item in args.target:
         name, path = item.split("=", 1)
-        bed = read_bed(path)
+        bed = read_merged_bed(path)
         bp = total_bp(bed)
         inside = overlap_bp(bed, common)
         rows.append(
             (name, "target", sum(len(v) for v in bed.values()), bp, inside, fraction(inside, bp))
         )
     # one row per genome-wide technology (WGS): the genome and the share in the common region
-    genome = read_bed(args.genome)
+    genome = read_merged_bed(args.genome)
     genome_bp = total_bp(genome)
     for name in args.genome_wide:
         rows.append(
@@ -144,8 +142,8 @@ def targets(args):
 
 def callable_(args):
     """Summary of the callable region of one sample (subcommand callable)."""
-    common = read_bed(args.common)
-    callable_bed = read_bed(args.callable_bed)
+    common = read_merged_bed(args.common)
+    callable_bed = read_merged_bed(args.callable_bed)
     common_bp = total_bp(common)
     # the callable region was intersected with the common region, so it must lie inside it
     callable_bp = overlap_bp(callable_bed, common)
