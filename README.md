@@ -118,7 +118,8 @@ All tools and datasets, with their authors and publications, are listed in
 
 Outputs are described in [`docs/output.md`](docs/output.md), parameters in
 [`docs/usage.md`](docs/usage.md), HPC/offline use in [`docs/hpc.md`](docs/hpc.md) and testing
-in [`docs/testing.md`](docs/testing.md).
+in [`docs/testing.md`](docs/testing.md). Planned further work is collected in
+[`docs/roadmap.md`](docs/roadmap.md).
 
 ## Usage
 
