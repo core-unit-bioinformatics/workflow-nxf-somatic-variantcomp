@@ -265,7 +265,8 @@ nf-core-style pipelines.
   features, BAMs are ignored.
 - **Annotation like variantinterpretation:** Ensembl VEP (`+split-vep`) for
   consequence, gene, impact; msisensor-pro for repeats; GIAB genome
-  stratifications (`--giab_dir`, `--giab_files`); `--stratification` BEDs as
+  stratifications (one file param per stratification, `--giab_<name>`: a
+  given file switches it on, none by default); `--stratification` BEDs as
   extra context. No gene BED.
 - **Resources are prepared, never downloaded by the pipeline.**
   `scripts/download_resources.py` gets the VEP cache, GIAB stratifications and

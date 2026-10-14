@@ -343,7 +343,7 @@ Annotation columns of `discordance/variants.annotated.tsv`:
 | `biotype` | text | biotype of the transcript (e.g. `protein_coding`) |
 | `in_repeat` | yes/no | the variant overlaps a repeat region |
 | `repeat_unit`, `repeat_times` | text, int | repeat unit and number of repeats (`.` if none) |
-| `giab_<name>` | yes/no | one column per GIAB stratification of `--giab_files` (overlap with the variant's REF span) |
+| `giab_<name>` | yes/no | one column per GIAB file given with `--giab_<name>` (overlap with the variant's REF span) |
 | `<stratum>` | yes/no | one column per `--stratification` BED |
 
 ### Known variants

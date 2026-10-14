@@ -31,7 +31,7 @@ nextflow_pipeline {
                 // input checks: every VCF and alignment checked at the start
                 { assert file("$outputDir/input_checks/vcf").list().size() == 6 },
                 { assert file("$outputDir/input_checks/alignments").list().size() == 12 },
-                // annotation: VEP (GENCODE chr22 GTF), repeats, GIAB stratifications (default --giab_files)
+                // annotation: VEP (GENCODE chr22 GTF), repeats, GIAB stratifications (--giab_<name>)
                 { assert ['gene', 'consequence_group', 'in_repeat', 'giab_homopolymer', 'giab_tandem_repeat',
                           'giab_segmental_duplication', 'giab_low_mappability', 'giab_all_difficult'].every { c -> c in annotatedHeader } },
                 { assert snapshot(

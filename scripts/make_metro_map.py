@@ -40,7 +40,11 @@ TRACKS = {
         "bam",
         "Alignments: callable regions (--callable_regions), read evidence (--read_evidence)",
     ),
-    "annot": ("#E879E3", "bed", "GIAB (--giab_dir) and other stratification BEDs, repeat regions"),
+    "annot": (
+        "#E879E3",
+        "bed",
+        "GIAB (--giab_<name>) and other stratification BEDs, repeat regions",
+    ),
     "vep": ("#FA6863", "gtf", "VEP cache or GTF (--vep): consequences, genes"),
     "known": (
         "#ECDC86",
@@ -329,7 +333,7 @@ DETAILS = {
     "3.1": "Contig names (safe renames chr/no-chr, MT/chrM), contig lengths (any difference is an error: another build), the tumor/normal columns and the REF allele of every record against the FASTA (`--max_ref_mismatch`). Switch off with `--check_vcf_contigs` / `--check_ref_alleles`.",
     "3.2": "Contig names and lengths of every alignment header (`--check_bam_contigs`).",
     "3.3": "BED format, contig names and interval ends of the target BEDs, `--regions_bed` and `--exclude_bed` (`--check_bed_contigs`).",
-    "3.4": "The GIAB genome stratifications (`--giab_files` in `--giab_dir`), the `--stratification` sheet (columns, unique names, files) and every stratification BED; a precomputed `--repeats_bed`.",
+    "3.4": "The GIAB genome stratifications given as `--giab_<name>` files, the `--stratification` sheet (columns, unique names, files) and every stratification BED; a precomputed `--repeats_bed`.",
     "3.5": "The `--known_variants` sheet (columns, modes, samples, files) and every list: contigs, positions and REF alleles against the FASTA (`--check_known_variants`). Every later step starts only after all checks of 1.2 and 3.x passed.",
     "4.1": "Alignments without a `.bai`/`.csi`/`.crai` next to them are indexed once.",
     "5.1": "Every target BED is sorted, and only the bases targeted by every technology are kept (bedtools multiinter; WGS counts as genome-wide).",

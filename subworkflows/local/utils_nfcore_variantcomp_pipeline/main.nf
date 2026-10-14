@@ -200,21 +200,18 @@ def validateInputParameters() {
     if (params.vep && params.vep_cache && params.vep_gtf) {
         error("--vep_cache and --vep_gtf are both given: VEP uses one annotation source, give only one of them")
     }
-    if (params.giab_stratifications && !params.giab_dir) {
-        error("--giab_stratifications is on, but --giab_dir is not given: download the GIAB genome stratifications with scripts/download_resources.py and give their folder, or switch them off with --giab_stratifications false")
-    }
 }
 
 //
-// GIAB stratification BEDs of --giab_files resolved against --giab_dir:
-// [ [ name, path ], ... ]. The format of --giab_files (name=path,name=path) is checked
-// by nf-schema; the files themselves are checked in CHECK_INPUTS.
+// GIAB stratification BEDs given as file params (--giab_<name>): [ [ name, path ], ... ];
+// a param that is not set is not used. The files are checked in CHECK_INPUTS.
 //
-def giabStratifications(giab_dir, giab_files) {
-    return giab_files.tokenize(',').collect { item ->
-        def parts = item.tokenize('=')
-        [parts[0], "${giab_dir}/${parts[1]}".toString()]
-    }
+def giabStratifications() {
+    def names = ['homopolymer', 'tandem_repeat', 'segmental_duplication', 'low_mappability', 'all_difficult']
+    return names
+        .findAll { name -> params["giab_${name}"] }
+        .collect { name -> [name, params["giab_${name}"].toString()] }
+}
 }
 
 //

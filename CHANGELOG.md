@@ -4,6 +4,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Dates follow ISO 8601 (`YYYY-MM-DD`).
 
+## Unreleased
+
+### `Changed`
+
+- GIAB genome stratifications: one file parameter per stratification (`--giab_homopolymer`, `--giab_tandem_repeat`, `--giab_segmental_duplication`, `--giab_low_mappability`, `--giab_all_difficult`); a given file switches its annotation on, no file (the default) means no GIAB annotation. Replaces `--giab_stratifications`, `--giab_dir` and `--giab_files` (decision D30). `download_resources.py` and the SEQC2 dataset script write one parameter per file.
+
 ## v0.15.0-dev - [2026-10-14]
 
 Implements the feedback of 2026-10-13 (`docs/plan-feedback-20261013.md`, decisions D23–D27).

@@ -117,7 +117,7 @@ Notes:
   `curl: (77) error adding trust anchors from file: /home/conda/feedstock_root/...`,
   which occurs when a conda build of curl/htslib keeps its unrelocated build-time CA path.
 - The GIAB v3.5 stratifications are subset to the dataset's contigs and written in the
-  release layout to `annotation/giab/GRCh38/` (`--giab_dir`, default `--giab_files`).
+  release layout to `annotation/giab/GRCh38/`; `params.yaml` sets one `--giab_<name>` per file.
 
 ## nf-test
 

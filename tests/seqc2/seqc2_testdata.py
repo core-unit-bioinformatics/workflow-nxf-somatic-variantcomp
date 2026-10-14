@@ -386,7 +386,7 @@ class Dataset:
 
     def prepare_annotation(self):
         """Gene annotation for VEP (GENCODE GTF, bgzipped + tabix) and the GIAB genome
-        stratifications (folder with the layout of the GIAB release, for --giab_dir),
+        stratifications (layout of the GIAB release; one --giab_<name> param per file),
         restricted to the contigs."""
         acfg = self.cfg["annotation"]
         ann_dir = self.out / "annotation"
@@ -412,14 +412,15 @@ class Dataset:
         genes = ann_dir / "genes.gtf.gz"
         run(["tabix", "-f", "-p", "gff", str(genes)])
 
-        # GIAB stratifications: same relative paths as in the release (the pipeline's
-        # default --giab_files), restricted to the contigs, gzip-compressed
+        # GIAB stratifications: same relative paths as in the release, restricted to the
+        # contigs, gzip-compressed; the config keys are the pipeline's --giab_<name> params
         scfg = acfg["stratifications"]
         base = scfg["base_url"].rstrip("/")
         # local folder named after the build ('GRCh38@all' -> 'GRCh38': no '@' in file names)
         giab_dir = ann_dir / "giab" / Path(base).name.split("@")[0]
         md5 = fetch_md5_table(f"{base}/{scfg['md5']}", self.cache / "annotation" / scfg["md5"])
-        for _name, rel in scfg["files"].items():
+        giab = {}
+        for name, rel in scfg["files"].items():
             src = download(
                 f"{base}/{rel}", self.cache / "annotation" / Path(rel).name, md5.get(Path(rel).name)
             )
@@ -436,7 +437,8 @@ class Dataset:
                             continue
                         if self.keep_contig(line.split("\t", 1)[0]):
                             fout.write(line.encode())
-        return genes, giab_dir
+            giab[name] = dest
+        return genes, giab
 
     # BAMs ----------------------------------------------------------------------
 
@@ -585,15 +587,16 @@ class Dataset:
         path.write_text("\n".join(rows) + "\n")
         return path
 
-    def write_params(self, fasta, truth, genes, giab_dir, known):
+    def write_params(self, fasta, truth, genes, giab, known):
         params = {
             "input": "samplesheet.csv",
             "truth_technology": "wgs",
             "fasta": str(fasta.relative_to(self.out)),
             "vep_gtf": str(genes.relative_to(self.out)),
-            "giab_dir": str(giab_dir.relative_to(self.out)),
             "known_variants": str(known.relative_to(self.out)),
         }
+        # one parameter per GIAB stratification file (--giab_<name>)
+        params.update({f"giab_{name}": str(p.relative_to(self.out)) for name, p in giab.items()})
         # callable regions and read evidence need alignments for every row: switch them
         # off when only some or none of the pairs have BAMs (e.g. full mode without
         # --with-bams)
@@ -646,7 +649,7 @@ class Dataset:
             "| `bam/` | BAM slices (WES targets +/- padding in the BAM windows, subsampled) |",
             "| `truth/` | SEQC2 somatic reference call set v1.2.1 + high-confidence regions |",
             "| `annotation/genes.gtf.gz` | Genes (GENCODE v46 basic) for `--vep_gtf` |",
-            "| `annotation/giab/` | GIAB v3.5 stratifications (release layout) for `--giab_dir` |",
+            "| `annotation/giab/` | GIAB v3.5 stratifications (release layout), `--giab_<name>` |",
             "| `known_variants.csv`, `known/` | Known-variant sheet for `--known_variants` |",
             "| `checksums.md5` | md5 of every file in this folder |",
             "",
@@ -671,10 +674,10 @@ class Dataset:
         vcfs = self.prepare_vcfs()
         truth = self.prepare_truth()
         bams = self.prepare_bams(wes_bed)
-        genes, giab_dir = self.prepare_annotation()
+        genes, giab = self.prepare_annotation()
         self.write_samplesheet(vcfs, bams, wes_bed)
         known = self.write_known_variants(truth)
-        self.write_params(fasta, truth, genes, giab_dir, known)
+        self.write_params(fasta, truth, genes, giab, known)
         self.write_provenance(args)
         log.info("Done: %s", self.out)
 

@@ -80,8 +80,8 @@ nextflow run /path/to/pipelines/workflow-nxf-somatic-variantcomp \
     -resume
 ```
 
-`resources.config` sets `vep_cache`, `vep_cache_version`, `vep_genome`, `giab_dir` and
-`giab_files` (section 1); the pipeline never downloads them. Without a cache, `vep_gtf`
+`resources.config` sets `vep_cache`, `vep_cache_version`, `vep_genome` and one
+`giab_<name>` per GIAB file (section 1); the pipeline never downloads them. Without a cache, `vep_gtf`
 (bgzipped, tabix-indexed GTF, `download_resources.py --no-vep --gtf`) gives consequences
 and genes without the cache-only annotations. The repeat BED of
 msisensor-pro (`annotation/repeats/`) can be reused in later runs with `repeats_bed`.

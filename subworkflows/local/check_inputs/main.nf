@@ -39,7 +39,7 @@ workflow CHECK_INPUTS {
     exclude_bed    // path or null: --exclude_bed
     repeats_bed    // path or null: --repeats_bed (precomputed repeat regions)
     stratification // string or null: --stratification sheet (name, bed)
-    giab_beds      // list: [ [ name, path ], ... ] GIAB stratifications (--giab_files), or []
+    giab_beds      // list: [ [ name, path ], ... ] GIAB stratifications (--giab_<name>), or []
     known_variants // string or null: --known_variants sheet (name, sample, mode, variants, regions)
 
     main:

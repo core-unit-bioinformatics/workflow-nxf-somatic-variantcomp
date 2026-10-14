@@ -13,7 +13,9 @@ Resources (each can be switched off)
                Checked with the Ensembl CHECKSUMS file (BSD `sum`), if `sum` is on PATH.
                GRCh38 cache v116: about 27 GB download, about 30 GB unpacked.
   giab/<build>/ GIAB genome stratifications v3.5 of the build, in the release layout
-               (LowComplexity/, Mappability/, ...) -> --giab_dir, --giab_files
+               (LowComplexity/, Mappability/, ...) -> one --giab_<name> param per file
+               (--giab_homopolymer, --giab_tandem_repeat, --giab_segmental_duplication,
+               --giab_low_mappability, --giab_all_difficult)
                Source: https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/
                genome-stratifications/v3.5/<build>@all/; md5-checked.
   gencode/     (--gtf) GENCODE basic gene annotation, sorted, bgzipped + tabix index,
@@ -22,7 +24,7 @@ Resources (each can be switched off)
 OUTPUT (in --outdir)
   resources.config        Nextflow config with a params block: the absolute paths of the
                           downloaded resources (vep_cache or vep_gtf, vep_cache_version,
-                          vep_genome, vep_species, giab_dir, giab_files); use it with
+                          vep_genome, vep_species, giab_<name>); use it with
                           `-c resources.config` next to your own `-params-file`
   resources.params.yaml   the same parameters as YAML (for -params-file, or to copy into
                           your own params file)
@@ -63,7 +65,7 @@ GIAB_FTP = (
     "genome-stratifications/v3.5/{build}@all"
 )
 GENCODE_FTP = "https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_{release}"
-# GIAB stratifications used by default (pipeline --giab_files): name -> path in the release
+# GIAB stratifications (pipeline param giab_<name>): name -> path in the release
 GIAB_FILES = {
     "homopolymer": "LowComplexity/{build}_AllHomopolymers_ge7bp_imperfectge11bp_slop5.bed.gz",
     "tandem_repeat": "LowComplexity/{build}_AllTandemRepeats.bed.gz",
@@ -311,10 +313,8 @@ def giab(args, out, sources):
 
         download(url, giab_dir / rel, check)
         sources.append((f"giab/{args.genome}/{rel}", url, md5[rel]))
-    return {
-        "giab_dir": str(giab_dir),
-        "giab_files": ",".join(f"{name}={rel}" for name, rel in files.items()),
-    }
+    # one pipeline parameter per downloaded file: a given file switches its annotation on
+    return {f"giab_{name}": str(giab_dir / rel) for name, rel in files.items()}
 
 
 def gencode_gtf(args, out, sources):
@@ -450,8 +450,6 @@ def main():
             params["vep_genome"] = args.genome
     if not args.no_giab:
         params.update(giab(args, out, sources))
-    else:
-        params["giab_stratifications"] = False
     if args.dry_run:
         log.info("dry run: nothing written")
         return
