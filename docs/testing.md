@@ -128,5 +128,14 @@ nf-test test tests/seqc2_small.nf.test --profile +conda
 nf-test test --tag subworkflows_local --profile +conda
 ```
 
-On the Raspberry Pi, each function test takes about 35 s (JVM start-up), and the
-pipeline tests take about 4 minutes.
+On the Raspberry Pi, each nf-test takes at least about 35 s (JVM start-up of nf-test and
+Nextflow). Two settings keep the rest short:
+
+- `tests/nextflow.config` activates the conda environments with micromamba (in the dev
+  env) instead of `conda info` + `source activate`, which cost about 7 s per task on the
+  Pi (`NFT_MICROMAMBA=false` switches it off).
+- The test profiles request small resources per label (1 CPU / 768 MB, 2 CPUs / 1 GB):
+  the default labels ask for 6 GB, which the 3 GB limit caps to the whole machine, so
+  only one task would run at a time.
+
+Measured on the Pi (2026-10-14): the `PREPROCESS_VCF` test went from 847 s to 87 s.

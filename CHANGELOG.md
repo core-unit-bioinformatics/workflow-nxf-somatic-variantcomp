@@ -45,6 +45,9 @@ Implements the feedback of 2026-10-13 (`docs/plan-feedback-20261013.md`, decisio
 - `tests/seqc2/seqc2_testdata.py`: downloads in Python (`urllib`, resumable) with an explicit CA bundle, also exported for samtools/bcftools (`CURL_CA_BUNDLE`); fixes `curl: (77) error adding trust anchors` with conda curl builds; `--ca-bundle`
 - SEQC2 small dataset: alignments for all pairs (callable regions and read evidence need them for every row); GIAB stratifications in the release layout for `--giab_dir` instead of `stratification.csv`
 
+- Tests on small machines: tasks ran one at a time (the 3 GB test limit capped every 6 GB label request to the whole machine) and every task spent about 7 s in `conda info` + `source activate`; the test profiles now request small resources per label and nf-test activates the environments with micromamba (10x faster `PREPROCESS_VCF` test on the Pi)
+- `mqc_tables.py`: row order of the MultiQC tables no longer depends on the order in which the inputs arrive
+
 ### `Removed`
 
 - `--gene_bed` and `BEDTOOLS_MAP_GENES` (genes come from VEP)

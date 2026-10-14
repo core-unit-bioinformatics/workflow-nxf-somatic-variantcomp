@@ -7,6 +7,8 @@ dependencies:
   - nextflow=26.04.4
   - nf-core=4.1.0
   - nf-test
+  # fast conda-env activation in nf-tests (tests/nextflow.config: conda.useMicromamba)
+  - micromamba
   # python for bin/ scripts and test-data preparation
   - python=3.12
   - pysam
