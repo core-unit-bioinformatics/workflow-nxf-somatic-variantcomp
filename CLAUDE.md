@@ -61,10 +61,13 @@ VAF/detection-power awareness are essential.
 11. If something can't run on this machine, prepare everything (bundle,
     scripts, docs) so the user can transfer it and run it on the HPC.
 12. **Reference consistency check + safe auto-fixes.** Check that every input
-    (VCF, BED, BAM) is on the configured reference: contig names and
-    lengths, build fingerprint, REF alleles.
-    - Fix automatically: contig header lengths (e.g. chrM 16570 vs 16571),
-      `chr`/no-`chr` and `MT`/`chrM` naming, missing contig lines.
+    (VCF, BED, BAM, known-variant list) is on the configured reference: contig
+    names and lengths, build fingerprint, REF alleles.
+    - Fix automatically: `chr`/no-`chr` and `MT`/`chrM` naming, missing contig
+      lines.
+    - Never fix contig lengths: a length mismatch of a nuclear contig is an
+      error. chrM is dropped from all inputs and reported (`--keep_mito`
+      keeps it, with normal length checks) (user decision, 2026-10-13).
     - Fail hard: build mismatch, or a REF mismatch rate above the threshold.
       No liftover.
 13. **Last feature (`feat-known-variants`).** An extra list of known
@@ -191,7 +194,8 @@ nf-core-style pipelines.
   5. rewrite contig header lines from the `.fai`
   6. `-m-any` split + left-align + atomize MNPs + drop REF mismatches +
      deduplicate (`bcftools norm`)
-  7. harmonize VAF/DP/alt counts from AD (`VC_*` INFO tags), variant type,
+  7. harmonize VAF/DP/alt counts (`VC_*` INFO tags; `--vaf_source`, auto
+     prefers FORMAT/AF, else AD), variant type,
      GT (tumor `0/1`, normal `0/0`); drop remaining symbolic alleles
   8. uniform filtering + restriction to the common/callable regions (the
      unfiltered normalized VCF is kept as well)
@@ -212,11 +216,12 @@ nf-core-style pipelines.
   - `absent`
   - `filtered_non_pass` (called, but FILTER not PASS)
   - `present_but_filtered` (PASS, but removed by the uniform filters/region)
-  - `outside_callable`
   - `no_evidence`
   - `subthreshold_evidence`
   - `germline_in_normal`
   - `low_coverage`
+  - There is no `outside_callable` class: both technologies of a sample are
+    compared in the same region (open question in `docs/roadmap.md`).
 - **No hardcoded paths, env vars or downloads** in the pipeline. All
   resources come in via params. It must run offline on an HPC (PBS Pro +
   Singularity).
@@ -228,6 +233,41 @@ nf-core-style pipelines.
     `normal_id`, `caller`, `vcf`, `tumor_bam`, `normal_bam`, `target_bed`.
 - **Configs** are `.yaml` (params files) or `.config` (Nextflow).
   `.toml` is only used for `pyproject.toml`.
+
+### Design essence (feedback 2026-10-13)
+
+- **All input checks first.** `subworkflows/local/check_inputs` checks every
+  sheet, VCF, alignment, BED and known-variant list against the reference
+  before any other work starts; every other subworkflow waits for it. Each
+  check can be switched off (`--check_vcf_contigs`, `--check_ref_alleles`,
+  `--check_bam_contigs`, `--check_bed_contigs`, `--check_known_variants`);
+  contig renaming is still computed, only the errors become warnings
+  (`--check_ref_alleles false` skips the REF comparison).
+- **No silent fixes of contig lengths;** chrM is dropped and reported.
+- **pysam in Python scripts** for VCF/BAM/CRAM/FASTA; no processes that only
+  extract headers or contig lists for a script. Readers (`read_bed`,
+  `read_fai`, `open_vcf`, `open_alignment`) are functions in
+  `bin/check_reference.py`; other scripts import them from there (no shared
+  helper module).
+- **Every script** has an INPUT/OUTPUT docstring (columns, types, 0- or
+  1-based coordinates) and a docstring for every function; `main()` only
+  parses arguments and calls functions.
+- **Every threshold** of a script or tool is a documented pipeline param
+  (`nextflow.config`, `nextflow_schema.json`, `docs/usage.md`), passed via
+  `ext.args`.
+- **Every step summary reaches MultiQC** (`bin/mqc_tables.py`, `MQC_TABLES`).
+- **One config file per subworkflow** in `conf/modules/`, included from
+  `conf/modules.config`.
+- **Optional features are params, and require their inputs.**
+  `--callable_regions` and `--read_evidence` need BAMs, `--vep` a cache or a
+  GTF, `--require_normal_coverage` normal BAMs; missing inputs stop the run in
+  the first step with a hint which param to switch off. Without these
+  features, BAMs are ignored.
+- **Annotation like variantinterpretation:** Ensembl VEP (`+split-vep`) for
+  consequence, gene, impact; msisensor-pro for repeats; `--stratification`
+  BEDs as extra context. No gene BED.
+- **Statistics from scipy** (`fisher_exact`, `false_discovery_control`),
+  not own implementations.
 
 ## Git and versioning
 

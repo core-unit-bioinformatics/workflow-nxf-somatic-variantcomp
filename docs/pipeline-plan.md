@@ -105,15 +105,18 @@ pseudo-technology: a VCF with its confident-region BED and no BAM.
 | `comparison_mode` | `truth` | `truth` (truth vs. each) or `all_pairs` (additionally all-vs-all concordance + UpSet) |
 | `filter_pass_only` | `true` | Uniform FILTER handling |
 | `min_vaf`, `min_depth`, `min_alt_reads` | `0.0`, `0`, `0` | Uniform hard filters, applied identically to all technologies |
-| `min_coverage` | `10` | Callable threshold (from the old R script) |
+| `min_coverage_tumor`, `min_coverage_normal` | `10` | Callable thresholds (from the old R script); replace `min_coverage` (v0.15.0) |
+| `callable_regions`, `read_evidence` | `true` | Use the BAMs for callable regions / read evidence; need BAMs (v0.15.0) |
 | `callable_mode` | `base` | `base` (per-base, mosdepth `--quantize`) or `region` (mean per target region, as in the old script) |
 | `require_normal_coverage` | `true` | The normal must be callable too |
 | `regions_bed`, `exclude_bed` | – | Optional extra restriction / blacklist |
 | `vaf_bins` | `0,0.05,0.1,0.2,0.5,1` | VAF strata |
 | `detection_power` | `0.95` | Threshold for power-adjusted recall |
 | `stratification_beds` | – | TSV `name<TAB>path`, e.g. GIAB stratifications (homopolymers, STRs, segdups, low mappability, GC extremes) |
-| `annotation` | `gene_bed` | `vep` \| `gene_bed` \| `none` |
-| `gene_bed`, `vep_cache`, `vep_cache_version`, `vep_genome` | – | Annotation resources (offline) |
+| `vep` | `true` | Ensembl VEP annotation (D25); `gene_bed` was removed in v0.15.0 |
+| `vep_cache` or `vep_gtf`, `vep_cache_version`, `vep_genome`, `vep_species` | – | Annotation resources (offline) |
+| `annotate_repeats`, `repeats_bed` | `true`, – | msisensor-pro repeat regions (D25) |
+| `check_vcf_contigs`, `check_ref_alleles`, `check_bam_contigs`, `check_bed_contigs`, `check_known_variants`, `keep_mito` | `true` (`keep_mito` `false`) | Upfront input checks (D24, D26) |
 
 ## 5. Workflow
 
@@ -333,6 +336,11 @@ Everything needed to run offline elsewhere:
 | `0.11.0-dev` | `feat-hpc-bundle` | HPC profile template, download bundle, T2 instructions |
 | `1.0.0` | `dev` → `main` | After a successful T2 run on the HPC and review by the user |
 
+Versions `0.12.0-dev` to `0.14.0-dev` refactored the modules and sheet reading (see
+CHANGELOG); `0.15.0-dev` implements the feedback of 2026-10-13
+([`plan-feedback-20261013.md`](plan-feedback-20261013.md)). Further work is collected in
+[`roadmap.md`](roadmap.md).
+
 Status (2026-10-08): `0.1.0-dev` to `0.11.0-dev` implemented and tested on the Raspberry Pi
 (pytest, nf-test, synthetic and SEQC2 small data with `-profile conda`). Not yet done:
 the T2 run on the HPC with Singularity, and datavzrd reports (MultiQC custom content is used
@@ -352,12 +360,12 @@ vcf-comp-dev/                                  # workspace (no git)
 | ID | Question | Decision |
 |---|---|---|
 | D1 | Name / prefix | Repo and pipeline `workflow-nxf-somatic-variantcomp`, prefix `core-unit-bioinformatics` (manifest `core-unit-bioinformatics/workflow-nxf-somatic-variantcomp`). Internal nf-core template name `variantcomp` (Nextflow identifiers can't contain dashes) |
-| D2 | Genome build | GRCh38 for tests (SEQC2); GRCh37 via params. **New requirement:** check that all inputs (VCFs, BEDs, BAMs) are on the configured reference (contig names + lengths, REF alleles, build fingerprint via chr1 length) and auto-fix what can be fixed safely: contig header lengths (e.g. chrM 16570 vs 16571), `chr`/no-`chr` and `MT`/`chrM` naming, missing contig lines. Hard error on a build mismatch or a REF mismatch rate above a threshold (no liftover) |
+| D2 | Genome build (length fixes reversed by D24) | GRCh38 for tests (SEQC2); GRCh37 via params. **New requirement:** check that all inputs (VCFs, BEDs, BAMs) are on the configured reference (contig names + lengths, REF alleles, build fingerprint via chr1 length) and auto-fix what can be fixed safely: contig header lengths (e.g. chrM 16570 vs 16571), `chr`/no-`chr` and `MT`/`chrM` naming, missing contig lines. Hard error on a build mismatch or a REF mismatch rate above a threshold (no liftover) |
 | D3 | Callers | User data: **DRAGEN v4.4.4**, all samples **tumor/normal paired** (docs: help.dragen.illumina.com). Test data (SEQC2): MuTect2 VCFs. `caller_profiles.yaml` starts with `dragen` and `mutect2` |
 | D4 | Truth | One technology for all samples (`truth_technology`) |
 | D5 | Remotes | Commit locally only for now |
 | D6 | Test data | Data in a separate repo/folder (`workflow-nxf-somatic-variantcomp-testdata/`). The test code (download/prepare/run script) lives in the workflow repo |
-| D7 | Annotation | `gene_bed` default, VEP optional |
+| D7 | Annotation (reversed by D25) | `gene_bed` default, VEP optional |
 | D8 | Layout | Legacy scripts deleted. Workspace holds two subfolders: the pipeline repo and the test-data repo |
 | D9 | SEQC2 scope | WES + WGS only for now (no AmpliSeq) |
 | D10 | Call definition (implementation, 2026-10-07) | Every record of a somatic VCF is a call of the tumor sample: after splitting, GT is set to tumor `0/1` and normal `0/0` (callers fill GT differently, and split multiallelic records can otherwise be lost). VAF/depth/alt counts are computed from FORMAT/AD for every caller (`VC_*` INFO tags), so no caller profiles are needed. |
@@ -367,10 +375,15 @@ vcf-comp-dev/                                  # workspace (no git)
 | D16 | Checks (user, 2026-10-08) | Validation and pass/fail decisions in Python scripts with meaningful errors, not in Nextflow code; be strict, error rather than wrong results. |
 | D17 | Custom scripts (user, 2026-10-08) | Replace custom code where tools can do the job (e.g. contig/length extraction with `bcftools view -h` / `samtools view -H`, REF check with `bcftools +fixref`, exact matching with `bcftools isec`); Python only for the decisions. This reverses D12. |
 | D18 | Documentation (user, 2026-10-08) | Inline comments in all executed code; documented field-selection logic; list of tested callers/VCFs and input requirements; tools and citations for every step; nf-core-style overview figure. |
-| D19 | REF check tool (implementation of D17, 2026-10-08) | REF alleles are checked with `bcftools norm --check-ref x` (its log is emitted by the patched nf-core module and evaluated by `check_reference.py ref-alleles`), not with `bcftools +fixref`: `+fixref` only handles biallelic SNVs. |
+| D19 | REF check tool (implementation of D17, 2026-10-08; replaced by D26) | REF alleles are checked with `bcftools norm --check-ref x` (its log is emitted by the patched nf-core module and evaluated by `check_reference.py ref-alleles`), not with `bcftools +fixref`: `+fixref` only handles biallelic SNVs. |
 | D20 | Position-only match (implementation, 2026-10-08) | The `match`/`position` stratum counts positions: `bcftools isec -c all` still lists an extra allele at a shared position separately, its flags are combined per position. |
-| D21 | Missing VAF (implementation of D16, 2026-10-08) | Every tumor record needs a VAF (FORMAT/AD, else FORMAT/AF + FORMAT/DP); otherwise the run stops. The allowed fraction is configurable (`HARMONIZE_VCF` `--max-missing-vaf`, default 0). Records with AD 0,0 (no reads) have an undefined VAF (`zero_depth`, counted and warned, not an error); `FORMAT/AF = nan` counts as missing AF. Both occur in the SEQC2 MuTect2 3.8 VCFs. |
+| D21 | Missing VAF (implementation of D16, 2026-10-08; revised by D27) | Every tumor record needs a VAF (FORMAT/AD, else FORMAT/AF + FORMAT/DP); otherwise the run stops. The allowed fraction is configurable (`HARMONIZE_VCF` `--max-missing-vaf`, default 0). Records with AD 0,0 (no reads) have an undefined VAF (`zero_depth`, counted and warned, not an error); `FORMAT/AF = nan` counts as missing AF. Both occur in the SEQC2 MuTect2 3.8 VCFs. |
 | D22 | Sheet reading (user, 2026-10-13) | The samplesheet is read as in the nf-core template (`samplesheetToList` in `PIPELINE_INITIALISATION`, columns checked by nf-schema); the checks across rows run in `CHECK_SAMPLESHEET` (`check_sheets.py`) at the start of `VARIANTCOMP`. `--stratification` and `--known_variants` are plain file parameters, checked by `check_sheets.py` in the subworkflow that uses them (`DISCORDANCE`, `PREPARE_KNOWN_VARIANTS`). |
+| D23 | Early PASS filter (user, 2026-10-13) | With `--filter_pass_only` (default) the records are split into PASS (`PASS`/`.`) and non-PASS right after sample selection. Only PASS records are compared; the non-PASS records run through the same normalization (`NORMALIZE_VCF`) so that DISCORDANCE classifies a missed variant called with another FILTER as `filtered_non_pass` (with its FILTER value). `present_but_filtered` now means a PASS call removed by the uniform filters or the region. Changes the normalization chain (CLAUDE.md). |
+| D24 | Contig lengths and chrM (user, 2026-10-13) | Contig lengths are never fixed: a length mismatch of a nuclear contig is an error. chrM is dropped from all inputs and reported (records/intervals), its length is not checked; `--keep_mito` keeps it with normal checks. |
+| D25 | Annotation (user, 2026-10-13) | Like variantinterpretation: Ensembl VEP (nf-core module, offline cache or `--vep_gtf`) + `bcftools +split-vep` for consequence, gene, impact and variant class; msisensor-pro `scan` for repeat regions (`--repeats_bed` reuses them). `--gene_bed` is removed; `--stratification` BEDs stay. If VEP is on, a cache or a GTF is required. |
+| D26 | All input checks first (user, 2026-10-13) | `CHECK_INPUTS` runs right after `CHECK_SAMPLESHEET` and checks every VCF, alignment, BED, sheet and known-variant list with `check_reference.py` (pysam: headers, contigs, REF alleles against the FASTA); all other steps wait for it. Each check has a toggle (warnings instead of errors). Header-extraction processes (`bcftools view -h`, `bcftools query`, `samtools idxstats`) are removed; this revises D17/D19. Optional features need their inputs (`--callable_regions`, `--read_evidence` need BAMs; `--require_normal_coverage` normal BAMs), checked by `check_sheets.py`. Common and callable regions must be at least `--min_region_bp` long. Every step summary reaches MultiQC. |
+| D27 | VAF source (user, 2026-10-13) | `--vaf_source` (`auto`, `af`, `ad`); `auto` (default) prefers FORMAT/AF (+ DP), else AD. Above `--max_missing_vaf` (default 0.05) missing VAFs, the VCF gets a warning and the header line `##variantcomp_vaf=unavailable`; its VAF strata and detection power become NA instead of stopping the run. |
 | – | Open (2026-10-08) | The discordance class `outside_callable` can't occur, because both technologies of a sample share the comparison region; such calls are `present_but_filtered`. To discuss: drop the class or define it differently (e.g. call outside the *query* technology's own callable region). |
 | D13 | Callers (implementation, 2026-10-08) | No caller profiles are needed (D10): the `caller` samplesheet column is informational. |
 | D11 | Normalization order (implementation, 2026-10-07) | Records on non-reference contigs are dropped before the header is rewritten from the `.fai`. Records with a symbolic ALT only are dropped before `norm`, and remaining symbolic alleles of split records are dropped during harmonization. See CLAUDE.md for the full order. |
