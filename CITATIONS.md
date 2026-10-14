@@ -24,11 +24,11 @@ is in the [README](README.md#pipeline-summary).
 
 ## Pipeline tools
 
-- [BCFtools, SAMtools and HTSlib](https://pubmed.ncbi.nlm.nih.gov/33590861/) (VCF reference-check facts, sample selection, contig renaming, cleaning, reheader, normalization, filtering, exact/position matching, read evidence; alignment indexing and contig statistics; reference index)
+- [BCFtools, SAMtools and HTSlib](https://pubmed.ncbi.nlm.nih.gov/33590861/) (sample selection, PASS split, contig renaming, cleaning, reheader, normalization, concatenation, filtering, exact/position matching, read evidence, VEP field extraction with `+split-vep`; alignment indexing; reference index)
 
   > Danecek P, Bonfield JK, Liddle J, Marshall J, Ohan V, Pollard MO, Whitwham A, Keane T, McCarthy SA, Davies RM, Li H. Twelve years of SAMtools and BCFtools. GigaScience. 2021 Feb 16;10(2):giab008. doi: 10.1093/gigascience/giab008. PubMed PMID: 33590861.
 
-- [BEDTools](https://pubmed.ncbi.nlm.nih.gov/20110278/) (target BED sorting, N-way intersection, merging, region restriction and exclusion; callable regions; gene and stratification annotation)
+- [BEDTools](https://pubmed.ncbi.nlm.nih.gov/20110278/) (target BED sorting, N-way intersection, merging, region restriction and exclusion; callable regions; repeat and stratification annotation)
 
   > Quinlan AR, Hall IM. BEDTools: a flexible suite of utilities for comparing genomic features. Bioinformatics. 2010 Mar 15;26(6):841-842. doi: 10.1093/bioinformatics/btq033. PubMed PMID: 20110278.
 
@@ -40,6 +40,14 @@ is in the [README](README.md#pipeline-summary).
 
   > Cleary JG, Braithwaite R, Gaastra K, Hilbush BS, Inglis S, Irvine SA, Jackson A, Littin R, Rathod M, Ware D, Zook JM, Trigg L, De La Vega FM. Comparing variant call files for performance benchmarking of next-generation sequencing variant calling pipelines. bioRxiv. 2015. doi: 10.1101/023754.
 
+- [Ensembl VEP](https://pubmed.ncbi.nlm.nih.gov/27268795/) (consequence, gene, impact and variant class of every compared variant)
+
+  > McLaren W, Gil L, Hunt SE, Riat HS, Ritchie GRS, Thormann A, Flicek P, Cunningham F. The Ensembl Variant Effect Predictor. Genome Biol. 2016 Jun 6;17(1):122. doi: 10.1186/s13059-016-0974-4. PubMed PMID: 27268795.
+
+- [MSIsensor-pro](https://pubmed.ncbi.nlm.nih.gov/32171661/) (`scan`: microsatellite/repeat regions of the reference)
+
+  > Jia P, Yang X, Guo L, Liu B, Lin J, Liang H, Sun J, Zhang C, Ye K. MSIsensor-pro: Fast, Accurate, and Matched-normal-sample-free Detection of Microsatellite Instability. Genomics Proteomics Bioinformatics. 2020 Feb;18(1):65-71. doi: 10.1016/j.gpb.2020.02.001. PubMed PMID: 32171661.
+
 - [GNU Awk](https://www.gnu.org/software/gawk/) (genome BED from the reference index; selection of intervals covered by all BEDs)
 
   > Free Software Foundation. GNU Awk. https://www.gnu.org/software/gawk/
@@ -50,7 +58,7 @@ is in the [README](README.md#pipeline-summary).
 
 ## Python libraries used by the pipeline scripts (`bin/`)
 
-- [pysam](https://github.com/pysam-developers/pysam) (VCF reading and writing in all VCF scripts; wraps HTSlib, see above)
+- [pysam](https://github.com/pysam-developers/pysam) (VCF, alignment and FASTA reading in the reference checks; VCF reading and writing in all VCF scripts; wraps HTSlib, see above)
 
   > pysam developers. pysam: a Python module for reading and manipulating SAM/BAM/VCF/BCF files. https://github.com/pysam-developers/pysam
 
@@ -62,7 +70,7 @@ is in the [README](README.md#pipeline-summary).
 
   > Harris CR, Millman KJ, van der Walt SJ, et al. Array programming with NumPy. Nature. 2020 Sep;585(7825):357-362. doi: 10.1038/s41586-020-2649-2. PubMed PMID: 32939066.
 
-- [SciPy](https://pubmed.ncbi.nlm.nih.gov/32015543/) (Fisher's exact test in the enrichment statistics)
+- [SciPy](https://pubmed.ncbi.nlm.nih.gov/32015543/) (Fisher's exact test and Benjamini–Hochberg correction in the enrichment statistics)
 
   > Virtanen P, Gommers R, Oliphant TE, et al. SciPy 1.0: fundamental algorithms for scientific computing in Python. Nat Methods. 2020 Mar;17(3):261-272. doi: 10.1038/s41592-019-0686-2. PubMed PMID: 32015543.
 
@@ -108,7 +116,7 @@ These callers produced the VCFs the pipeline was tested with or is designed for 
 
   > Dwarshuis N, Kalra D, McDaniel J, et al. The GIAB genomic stratifications resource for human reference genomes. Nat Commun. 2024 Oct 19;15(1):9029. doi: 10.1038/s41467-024-53260-y. PubMed PMID: 39424793.
 
-- GENCODE release 46 (test gene BED)
+- GENCODE release 46 (test gene annotation for VEP, `--vep_gtf`)
 
   > Frankish A, Carbonell-Sala S, Diekhans M, et al. GENCODE: reference annotation for the human and mouse genomes in 2023. Nucleic Acids Res. 2023 Jan 6;51(D1):D942-D949. doi: 10.1093/nar/gkac1072. PubMed PMID: 36420896.
 

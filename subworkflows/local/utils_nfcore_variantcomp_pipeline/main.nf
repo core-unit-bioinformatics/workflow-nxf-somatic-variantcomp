@@ -226,6 +226,7 @@ def toolCitationText() {
             "BEDTools (Quinlan and Hall 2010) for region operations,",
             "mosdepth (Pedersen and Quinlan 2018) for coverage (if alignments were given),",
             "RTG Tools vcfeval (Cleary et al. 2015) for haplotype-aware variant matching,",
+            "Ensembl VEP (McLaren et al. 2016) and MSIsensor-pro (Jia et al. 2020) for the annotation of consequences and repeat context,",
             "GNU Awk, pysam, pandas (McKinney 2010), NumPy (Harris et al. 2020), SciPy (Virtanen et al. 2020) and Matplotlib (Hunter 2007) in the pipeline scripts,",
             "the Benjamini-Hochberg procedure (Benjamini and Hochberg 1995) for multiple-testing correction",
             "and MultiQC (Ewels et al. 2016) for the report."
@@ -241,6 +242,8 @@ def toolBibliographyText() {
             "<li>Quinlan, A. R., & Hall, I. M. (2010). BEDTools: a flexible suite of utilities for comparing genomic features. Bioinformatics, 26(6), 841–842. doi: 10.1093/bioinformatics/btq033</li>",
             "<li>Pedersen, B. S., & Quinlan, A. R. (2018). Mosdepth: quick coverage calculation for genomes and exomes. Bioinformatics, 34(5), 867–868. doi: 10.1093/bioinformatics/btx699</li>",
             "<li>Cleary, J. G., Braithwaite, R., Gaastra, K., Hilbush, B. S., Inglis, S., Irvine, S. A., Jackson, A., Littin, R., Rathod, M., Ware, D., Zook, J. M., Trigg, L., & De La Vega, F. M. (2015). Comparing variant call files for performance benchmarking of next-generation sequencing variant calling pipelines. bioRxiv. doi: 10.1101/023754</li>",
+            "<li>McLaren, W., Gil, L., Hunt, S. E., Riat, H. S., Ritchie, G. R. S., Thormann, A., Flicek, P., & Cunningham, F. (2016). The Ensembl Variant Effect Predictor. Genome Biology, 17, 122. doi: 10.1186/s13059-016-0974-4</li>",
+            "<li>Jia, P., Yang, X., Guo, L., Liu, B., Lin, J., Liang, H., Sun, J., Zhang, C., & Ye, K. (2020). MSIsensor-pro: fast, accurate, and matched-normal-sample-free detection of microsatellite instability. Genomics, Proteomics & Bioinformatics, 18(1), 65–71. doi: 10.1016/j.gpb.2020.02.001</li>",
             "<li>McKinney, W. (2010). Data structures for statistical computing in Python. Proceedings of the 9th Python in Science Conference, 56–61. doi: 10.25080/Majora-92bf1922-00a</li>",
             "<li>Harris, C. R., Millman, K. J., van der Walt, S. J., et al. (2020). Array programming with NumPy. Nature, 585, 357–362. doi: 10.1038/s41586-020-2649-2</li>",
             "<li>Virtanen, P., Gommers, R., Oliphant, T. E., et al. (2020). SciPy 1.0: fundamental algorithms for scientific computing in Python. Nature Methods, 17, 261–272. doi: 10.1038/s41592-019-0686-2</li>",

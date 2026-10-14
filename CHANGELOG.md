@@ -4,6 +4,46 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Dates follow ISO 8601 (`YYYY-MM-DD`).
 
+## v0.15.0-dev - [2026-10-14]
+
+Implements the feedback of 2026-10-13 (`docs/plan-feedback-20261013.md`, decisions D23–D27).
+
+### `Added`
+
+- `CHECK_INPUTS`: all inputs are checked against the reference before any other step runs: every VCF (contigs, samples, REF alleles against the FASTA), alignment header, BED (target, regions, exclude, repeats, strata, known-variant regions), the stratification and known-variant sheets and the known-variant lists; toggles `--check_vcf_contigs`, `--check_ref_alleles`, `--check_bam_contigs`, `--check_bed_contigs`, `--check_known_variants`
+- `--keep_mito` (default `false`): chrM/MT is dropped from all inputs and reported
+- `--min_region_bp` (default 10000): minimum size of the common and the callable regions
+- `--callable_regions` and `--read_evidence` (default `true`): use the alignments for callable regions / read evidence; both need BAMs (checked at the start); without them, BAMs are ignored
+- `--min_coverage_tumor` / `--min_coverage_normal` (tumor/normal thresholds); `--require_normal_coverage` requires normal BAMs for paired rows
+- Early PASS split (`--filter_pass_only`): non-PASS records are normalized in a side branch (`NORMALIZE_VCF`); new discordance class `filtered_non_pass` with the FILTER value
+- `--vaf_source auto|af|ad` (default `auto`: FORMAT/AF, else AD) and `--max_missing_vaf` (default 0.05: warning and NA VAF strata instead of an error)
+- Parameters for formerly fixed thresholds: `--evidence_min_mapq`, `--evidence_min_baseq`, `--evidence_max_depth`, `--amplicon_keep_duplicates`, `--enrichment_fdr`
+- `ANNOTATE_VARIANTS`: Ensembl VEP (nf-core `ensemblvep/vep`, offline cache or `--vep_gtf`) + `bcftools +split-vep` (consequence, gene, impact, variant class, biotype); msisensor-pro repeat regions (nf-core `msisensorpro/scan`, or `--repeats_bed`); new columns in `variants.annotated.tsv`; params `--vep`, `--vep_cache`, `--vep_gtf`, `--vep_cache_version`, `--vep_genome`, `--vep_species`, `--vep_args`, `--vep_cache_args`, `--annotate_repeats`, `--repeats_bed`
+- Report: discordance by consequence group, repeat context, variant class and impact (`variantcomp.strata.tsv`, `discordance_by_annotation.png`); recall of the required known variants per technology and over all samples
+- MultiQC tables of every step summary (`bin/mqc_tables.py`, `MQC_TABLES`): input checks, `bcftools norm` logs, harmonization, regions, callable regions
+- `docs/output.md` lists every output file with its columns and types; `docs/roadmap.md` collects further work
+- Synthetic GTF (test data) and a GENCODE chr22 GTF for SEQC2 (`tests/seqc2/`)
+
+### `Changed`
+
+- `check_reference.py` rewritten on pysam (subcommands `vcf`, `bam`, `bed`, `rename-bed`); contig lengths are never fixed: a nuclear length mismatch is an error
+- `CHECK_REFERENCE` takes the input file itself; new module `RENAME_BED`
+- `known_variants.py prepare` checks REF alleles against the FASTA; no maximum number of required variants
+- Python code formatted with black (line length 100), linted with ruff
+- `conf/modules.config` split into `conf/modules/<subworkflow>.config`
+- `BED_INTERSECT_ALL` sorts its input BEDs
+- Benjamini–Hochberg from `scipy.stats.false_discovery_control` (SciPy ≥ 1.11)
+- `present_but_filtered` now means a PASS call removed by the uniform filters or the region
+- `vcf_preprocessed/reference_check/` renamed to `vcf_preprocessed/norm_logs/`
+- Metro map redrawn: a central VCF line; input lines merge into the steps that use them
+- Docstrings with INPUT/OUTPUT columns in every script, a docstring for every function
+
+### `Removed`
+
+- `--gene_bed` and `BEDTOOLS_MAP_GENES` (genes come from VEP)
+- `--min_coverage` (replaced by `--min_coverage_tumor` / `--min_coverage_normal`)
+- Header-extraction steps `BCFTOOLS_VIEW_HEADER`, `BCFTOOLS_QUERY_CONTIGS`, `SAMTOOLS_IDXSTATS` and the `check_ref_alleles` module (replaced by `CHECK_INPUTS`)
+
 ## v0.14.0-dev - [2026-10-13]
 
 ### `Changed`
