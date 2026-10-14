@@ -13,7 +13,7 @@ Subcommands:
 
 Modes (see seqc2_testdata.yaml):
 
-  small    chr22 only, 3 pseudo-samples, BAM slices (two 1-Mb windows) for one.
+  small    chr22 only, 3 pseudo-samples, BAM slices (two 1-Mb windows) for all.
            A few tens of MB, runs on a laptop / Raspberry Pi with -profile conda.
            This is the dataset committed to the test-data repository.
   full     genome-wide, 12 pseudo-samples, VCFs only by default (the full BAMs
@@ -496,6 +496,12 @@ class Dataset:
             "stratification": str(strat.relative_to(self.out)),
             "known_variants": str(known.relative_to(self.out)),
         }
+        # callable regions and read evidence need alignments for every row: switch them
+        # off when only some or none of the pairs have BAMs (e.g. full mode without
+        # --with-bams)
+        if set(self.bam_pairs) != set(self.pairs):
+            params["callable_regions"] = False
+            params["read_evidence"] = False
         path = self.out / "params.yaml"
         with path.open("w") as fh:
             fh.write("# Pipeline parameters, paths relative to this folder.\n")

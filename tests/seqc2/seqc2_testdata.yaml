@@ -72,7 +72,7 @@ modes:
     contigs: [chr22]
     # every pair of the small set has alignments (--callable_regions and --read_evidence
     # need them for every samplesheet row)
-    bam_pairs: [IL_1, FD_1]
+    bam_pairs: [IL_1, FD_1, NV_1]
     # reads are extracted only for WES targets (+/- padding) inside these windows;
     # the two 1-Mb windows of chr22 with the most PASS exome calls in IL_1 + truth
     bam_windows: ["chr22:23000000-24000000", "chr22:50000000-50818468"]
