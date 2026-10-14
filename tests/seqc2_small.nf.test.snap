@@ -203,7 +203,7 @@
                     "python": "3.12.15"
                 },
                 "Workflow": {
-                    "core-unit-bioinformatics/workflow-nxf-somatic-variantcomp": "v0.14.0-dev"
+                    "core-unit-bioinformatics/workflow-nxf-somatic-variantcomp": "v0.15.0-dev"
                 }
             },
             [
