@@ -15,7 +15,8 @@ nextflow_pipeline {
         }
 
         then {
-            def stable_path = getAllFilesFromDir(params.outdir, relative: true, includeDir: true, ignore: ['pipeline_info/*.{html,json,txt}'])
+            // MultiQC decides per run which tables it also exports as plot images: not stable
+            def stable_path = getAllFilesFromDir(params.outdir, relative: true, includeDir: true, ignore: ['pipeline_info/*.{html,json,txt}', 'multiqc/multiqc_plots/**'])
             def stable_content = getAllFilesFromDir(params.outdir, ignoreFile: 'tests/.nftignore')
             def validated = path("$outputDir/pipeline_info/samplesheet.validated.csv").readLines()
             def annotatedHeader = path("$outputDir/discordance/variants.annotated.tsv").readLines()[0].tokenize('\t')
