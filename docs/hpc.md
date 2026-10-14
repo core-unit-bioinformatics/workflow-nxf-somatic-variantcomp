@@ -18,6 +18,17 @@ only `containers.txt` lists the images, for example to pull them on the HPC itse
 
 Once the repository is on GitHub, `nf-core pipelines download` works as well.
 
+Download the annotation resources on the same machine (VEP cache, GIAB genome
+stratifications; `--gtf` adds a GENCODE GTF for VEP without a cache):
+
+```bash
+scripts/download_resources.py --outdir /transfer/variantcomp_resources --genome GRCh37
+```
+
+It writes `resources.config` (a `params { }` block with the paths) and a `README.md` with
+the sources and checksums. The GRCh38 VEP cache v116 is about 27 GB. Copy the folder to
+the HPC to the same path, or edit the paths in `resources.config`.
+
 ## 2. Install on the HPC
 
 ```bash
@@ -56,10 +67,6 @@ singularity {
 input: /path/to/project/samplesheet.csv
 fasta: /path/to/reference/hg19.fa
 truth_technology: wgs
-vep_cache: /path/to/vep_cache          # offline Ensembl VEP cache (or vep_gtf: genes.gtf.gz)
-vep_cache_version: 116
-vep_genome: GRCh37
-stratification: /path/to/annotation/stratification.csv
 known_variants: /path/to/project/known_variants.csv
 outdir: /path/to/project/results/variantcomp
 ```
@@ -68,14 +75,15 @@ outdir: /path/to/project/results/variantcomp
 nextflow run /path/to/pipelines/workflow-nxf-somatic-variantcomp \
     -profile singularity \
     -c hpc.config \
+    -c /path/to/variantcomp_resources/resources.config \
     -params-file params.yaml \
     -resume
 ```
 
-The VEP cache must be downloaded beforehand (e.g. `vep_install -a cf -s homo_sapiens -y
-GRCh37 -c /path/to/vep_cache --CONVERT`, version matching `vep_cache_version`); the
-pipeline never downloads it. Without a cache, `vep_gtf` (bgzipped, tabix-indexed GTF)
-gives consequences and genes without the cache-only annotations. The repeat BED of
+`resources.config` sets `vep_cache`, `vep_cache_version`, `vep_genome`, `giab_dir` and
+`giab_files` (section 1); the pipeline never downloads them. Without a cache, `vep_gtf`
+(bgzipped, tabix-indexed GTF, `download_resources.py --no-vep --gtf`) gives consequences
+and genes without the cache-only annotations. The repeat BED of
 msisensor-pro (`annotation/repeats/`) can be reused in later runs with `repeats_bed`.
 
 Limit the memory of the Nextflow head job if the login/head node is shared, e.g.
