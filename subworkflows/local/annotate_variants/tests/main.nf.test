@@ -1,0 +1,98 @@
+nextflow_workflow {
+
+    name "Test Subworkflow ANNOTATE_VARIANTS"
+    script "../main.nf"
+    workflow "ANNOTATE_VARIANTS"
+    tag "subworkflows"
+    tag "subworkflows_local"
+    tag "annotate_variants"
+    tag "ensemblvep/vep"
+    tag "msisensorpro/scan"
+
+    test("synthetic - VEP (GTF), msisensor-pro repeats and strata per variant") {
+
+        when {
+            workflow {
+                """
+                def base = params.pipelines_testdata_base_path + 'synthetic/'
+                // compared variants: in GENE_A, in GENE_B inside the homopolymer stratum,
+                // intergenic on chr2; the same variant twice (two comparisons)
+                def table = file("${outputDir}/variants.tsv")
+                table.parent.mkdirs()
+                table.text = [
+                    'comparison\\tchrom\\tpos\\tref\\talt',
+                    'S1_wes\\tchr1\\t4100\\tA\\tC',
+                    'S1_panel\\tchr1\\t4100\\tA\\tC',
+                    'S1_wes\\tchr1\\t4999\\tGA\\tG',
+                    'S1_wes\\tchr2\\t15000\\tA\\tC',
+                ].join('\\n') + '\\n'
+                input[0] = channel.of([[id: 'variants'], table])
+                input[1] = channel.value([[id: 'synthetic'], file(base + 'reference/synthetic.fa'), file(base + 'reference/synthetic.fa.fai'), []])
+                input[2] = channel.of(
+                    [[id: 'homopolymer', role: 'stratum'], file(base + 'bed/stratification_homopolymer.bed')],
+                    [[id: 'tandem_repeat', role: 'stratum'], file(base + 'bed/stratification_tandem_repeat.bed')]
+                )
+                input[3] = channel.empty()
+                input[4] = true
+                input[5] = null
+                input[6] = file(base + 'annotation/genes.gtf.gz')
+                input[7] = true
+                input[8] = false
+                """
+            }
+        }
+
+        then {
+            def lines = path(workflow.out.annotated[0][1]).readLines()
+            def header = lines[0].tokenize('\t')
+            def rows = lines.drop(1).collect { line -> [header, line.split('\t', -1).toList()].transpose().collectEntries() }
+            assertAll(
+                { assert workflow.success },
+                { assert ['consequence', 'consequence_group', 'gene', 'impact', 'variant_class', 'biotype',
+                          'in_repeat', 'repeat_unit', 'repeat_times', 'homopolymer', 'tandem_repeat'].every { c -> c in header } },
+                // every input row is kept, in order
+                { assert rows.collect { row -> "${row.comparison}:${row.chrom}:${row.pos}" } == [
+                    'S1_wes:chr1:4100', 'S1_panel:chr1:4100', 'S1_wes:chr1:4999', 'S1_wes:chr2:15000'] },
+                { assert rows[0].gene == 'GENE_A' && rows[1].gene == 'GENE_A' },
+                { assert rows[0].consequence_group in ['synonymous', 'non_synonymous'] },
+                { assert rows[2].gene == 'GENE_B' && rows[2].variant_class == 'deletion' },
+                { assert rows[2].homopolymer == 'yes' && rows[0].homopolymer == 'no' },
+                { assert rows[3].gene == '.' && rows[3].consequence_group == 'other' },
+                { assert workflow.out.multiqc.size() == 1 }
+            )
+        }
+    }
+
+    test("synthetic - without VEP and repeats only the strata are added") {
+
+        when {
+            workflow {
+                """
+                def base = params.pipelines_testdata_base_path + 'synthetic/'
+                def table = file("${outputDir}/variants.tsv")
+                table.parent.mkdirs()
+                table.text = 'comparison\\tchrom\\tpos\\tref\\talt\\nS1_wes\\tchr1\\t4999\\tGA\\tG\\n'
+                input[0] = channel.of([[id: 'variants'], table])
+                input[1] = channel.value([[id: 'synthetic'], file(base + 'reference/synthetic.fa'), file(base + 'reference/synthetic.fa.fai'), []])
+                input[2] = channel.of([[id: 'homopolymer', role: 'stratum'], file(base + 'bed/stratification_homopolymer.bed')])
+                input[3] = channel.empty()
+                input[4] = false
+                input[5] = null
+                input[6] = null
+                input[7] = false
+                input[8] = false
+                """
+            }
+        }
+
+        then {
+            def lines = path(workflow.out.annotated[0][1]).readLines()
+            assertAll(
+                { assert workflow.success },
+                { assert lines[0] == 'comparison\tchrom\tpos\tref\talt\thomopolymer' },
+                { assert lines[1] == 'S1_wes\tchr1\t4999\tGA\tG\tyes' },
+                { assert workflow.out.multiqc.size() == 0 }
+            )
+        }
+    }
+}

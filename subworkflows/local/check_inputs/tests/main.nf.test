@@ -1,0 +1,132 @@
+nextflow_workflow {
+
+    name "Test Subworkflow CHECK_INPUTS"
+    script "../main.nf"
+    workflow "CHECK_INPUTS"
+    tag "subworkflows"
+    tag "subworkflows_local"
+    tag "check_inputs"
+
+    test("synthetic - every VCF, BED, sheet and known list is checked") {
+
+        when {
+            workflow {
+                """
+                def base = params.pipelines_testdata_base_path + 'synthetic/'
+                def entry = { sample, tech, bed -> [[id: sample + '_' + tech, sample: sample, technology: tech,
+                                                     tumor_id: sample + '_' + tech + '_T', normal_id: sample + '_' + tech + '_N'],
+                                                    file(base + 'vcf/' + sample + '_' + tech + '.vcf.gz'),
+                                                    file(base + 'vcf/' + sample + '_' + tech + '.vcf.gz.tbi'), [], [], [], [],
+                                                    bed ? file(base + bed) : []] }
+                input[0] = channel.of(
+                    entry.call('S1', 'wgs', null), entry.call('S1', 'wes', 'bed/wes.bed'), entry.call('S1', 'panel', 'bed/panel.bed'),
+                    entry.call('S2', 'wgs', null), entry.call('S2', 'wes', 'bed/wes.bed'), entry.call('S2', 'panel', 'bed/panel.bed')
+                )
+                input[1] = channel.value(file(base + 'samplesheet.csv'))
+                input[2] = channel.value([[id: 'synthetic'], file(base + 'reference/synthetic.fa'), file(base + 'reference/synthetic.fa.fai'), []])
+                input[3] = null
+                input[4] = null
+                input[5] = null
+                input[6] = base + 'stratification.csv'
+                // GIAB stratifications: the synthetic homopolymer BED stands in for a GIAB file
+                input[7] = [['homopolymer', base + 'bed/stratification_homopolymer.bed']]
+                input[8] = base + 'known_variants.csv'
+                """
+            }
+        }
+
+        then {
+            def report = { id ->
+                path(workflow.out.reports.find { item -> item[0].id == id && file(item[1]).name.contains('.vcf.') }[1]).readLines()
+            }
+            def rename = { id -> path(workflow.out.vcf_rename.find { item -> item[0].id == id }[1]).text }
+            assertAll(
+                { assert workflow.success },
+                { assert workflow.out.done == [true] },
+                // 6 VCFs, 6 BEDs (2 targets, 2 strata, 1 GIAB, 1 known-list region), 2 known lists;
+                // no alignments
+                { assert workflow.out.reports.size() == 14 },
+                { assert workflow.out.bam_rename.size() == 0 },
+                { assert workflow.out.beds.collect { item -> "${item[0].role}:${item[0].id}" }.sort() == [
+                    'known_regions:designed_truth', 'stratum:giab_homopolymer', 'stratum:homopolymer', 'stratum:tandem_repeat',
+                    'target:panel', 'target:wes'] },
+                // S2 panel uses 1/2/MT: renamed to the reference; MT (chrM) is dropped, not renamed
+                { assert rename('S2_panel') == '1\tchr1\n2\tchr2\n' },
+                { assert report('S2_panel').contains('records_on_mito\t1') },
+                // S2 wes: chrM header length 16570 (reference 16569) is not checked: chrM is dropped
+                { assert report('S2_wes').contains('length_mismatches\tnone') },
+                { assert workflow.out.known_lists.collect { item -> [item[0].id, item[3] ? 'regions' : 'none'] }.sort { a, b -> a[0] <=> b[0] } == [
+                    ['designed_truth', 'regions'], ['required_demo', 'none']] }
+            )
+        }
+    }
+
+    test("wrong-build regions BED fails in the input check") {
+
+        when {
+            workflow {
+                """
+                def base = params.pipelines_testdata_base_path + 'synthetic/'
+                def regions = file("${outputDir}/regions_other_build.bed")
+                regions.parent.mkdirs()
+                // chr1 is 30000 bp long in the reference
+                regions.text = 'chr1\\t100\\t200\\nchr1\\t29000\\t31000\\n'
+                def meta = [id: 'S1_wgs', sample: 'S1', technology: 'wgs', tumor_id: 'S1_wgs_T', normal_id: 'S1_wgs_N']
+                input[0] = channel.of([meta, file(base + 'vcf/S1_wgs.vcf.gz'), file(base + 'vcf/S1_wgs.vcf.gz.tbi'), [], [], [], [], []])
+                input[1] = channel.value(file(base + 'samplesheet.csv'))
+                input[2] = channel.value([[id: 'synthetic'], file(base + 'reference/synthetic.fa'), file(base + 'reference/synthetic.fa.fai'), []])
+                input[3] = regions
+                input[4] = null
+                input[5] = null
+                input[6] = null
+                input[7] = []
+                input[8] = null
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert workflow.failed },
+                { assert workflow.stdout.any { line -> line.contains('CHECK_REFERENCE_BED (regions_bed)') } },
+                { assert (workflow.stdout + workflow.stderr).any { line -> line.contains('on another genome build') } }
+            )
+        }
+    }
+
+    test("wrong-build regions BED with --check_bed_contigs false: warning only") {
+
+        when {
+            params {
+                check_bed_contigs = false
+            }
+            workflow {
+                """
+                def base = params.pipelines_testdata_base_path + 'synthetic/'
+                def regions = file("${outputDir}/regions_other_build.bed")
+                regions.parent.mkdirs()
+                regions.text = 'chr1\\t100\\t200\\nchr1\\t29000\\t31000\\n'
+                def meta = [id: 'S1_wgs', sample: 'S1', technology: 'wgs', tumor_id: 'S1_wgs_T', normal_id: 'S1_wgs_N']
+                input[0] = channel.of([meta, file(base + 'vcf/S1_wgs.vcf.gz'), file(base + 'vcf/S1_wgs.vcf.gz.tbi'), [], [], [], [], []])
+                input[1] = channel.value(file(base + 'samplesheet.csv'))
+                input[2] = channel.value([[id: 'synthetic'], file(base + 'reference/synthetic.fa'), file(base + 'reference/synthetic.fa.fai'), []])
+                input[3] = regions
+                input[4] = null
+                input[5] = null
+                input[6] = null
+                input[7] = []
+                input[8] = null
+                """
+            }
+        }
+
+        then {
+            def report = path(workflow.out.reports.find { item -> item[0].id == 'regions_bed' }[1]).readLines()
+            assertAll(
+                { assert workflow.success },
+                { assert workflow.out.done == [true] },
+                { assert report.any { line -> line.startsWith('warning\t(check switched off)') } }
+            )
+        }
+    }
+}
