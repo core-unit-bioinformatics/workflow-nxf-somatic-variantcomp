@@ -24,10 +24,17 @@ nextflow_workflow {
                 // alignments are indexed (missing indices are created by PREPARE_ALIGNMENTS)
                 input[0] = channel.of(entry.call('IL_1', 'wgs', 'wgs', true), entry.call('IL_1', 'wes', 'capture', true),
                                       entry.call('FD_1', 'wgs', 'wgs', false), entry.call('FD_1', 'wes', 'capture', false))
-                input[1] = channel.value([[id: 'chr22'], file(base + 'reference/GRCh38.d1.vd1_chr22.fa.gz'),
+                // rename maps of the alignment checks (CHECK_INPUTS): the alignments use the
+                // reference names, so the maps are empty
+                def rename = file("${outputDir}/empty.rename_chrs.tsv")
+                rename.parent.mkdirs()
+                rename.text = ''
+                input[1] = channel.of('IL_1_wgs_tumor', 'IL_1_wgs_normal', 'IL_1_wes_tumor', 'IL_1_wes_normal')
+                    .map { id -> [[id: 'SEQC2_' + id], rename] }
+                input[2] = channel.value([[id: 'chr22'], file(base + 'reference/GRCh38.d1.vd1_chr22.fa.gz'),
                                           file(base + 'reference/GRCh38.d1.vd1_chr22.fa.gz.fai'), file(base + 'reference/GRCh38.d1.vd1_chr22.fa.gz.gzi')])
-                input[2] = channel.value(file(base + 'bed/S07604624_Covered_human_all_v6_plus_UTR_hg38.bed'))
-                input[3] = true
+                input[3] = channel.value(file(base + 'bed/S07604624_Covered_human_all_v6_plus_UTR_hg38.bed'))
+                input[4] = true
                 """
             }
         }
@@ -40,8 +47,10 @@ nextflow_workflow {
                 { assert regions == [
                     SEQC2_IL_1_wgs: 'SEQC2_IL_1.callable.bed', SEQC2_IL_1_wes: 'SEQC2_IL_1.callable.bed',
                     SEQC2_FD_1_wgs: 'S07604624_Covered_human_all_v6_plus_UTR_hg38.bed', SEQC2_FD_1_wes: 'S07604624_Covered_human_all_v6_plus_UTR_hg38.bed'] },
-                { assert summary[1].startsWith('SEQC2_IL_1\t4\tbase\t10\t1987915\t') },
-                { assert workflow.out.reports.size() == 4 },
+                // min_coverage: tumor/normal threshold
+                { assert summary[1].startsWith('SEQC2_IL_1\t4\tbase\t10/10\t1987915\t') },
+                // mosdepth summaries for MultiQC: global, summary and regions per alignment
+                { assert workflow.out.multiqc_files.size() == 12 },
                 { assert snapshot(workflow.out.callable, workflow.out.callable_summary).match() }
             )
         }

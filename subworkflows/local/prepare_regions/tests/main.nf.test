@@ -16,13 +16,17 @@ nextflow_workflow {
                 def base = params.pipelines_testdata_base_path + 'synthetic/'
                 def genome = file("${outputDir}/genome.bed")
                 genome.parent.mkdirs()
-                genome.text = 'chr1\\t0\\t30000\\nchr2\\t0\\t20000\\nchrM\\t0\\t16569\\n'
+                genome.text = 'chr1\\t0\\t30000\\nchr2\\t0\\t20000\\n'
                 def entry = { tech, bed -> [[id: 'S1_' + tech, sample: 'S1', technology: tech], file(base + 'vcf/S1_' + tech + '.vcf.gz'), [], [], [], [], [], bed ? file(base + bed) : []] }
                 input[0] = channel.of(entry.call('wgs', null), entry.call('wes', 'bed/wes.bed'), entry.call('panel', 'bed/panel.bed'))
                 input[1] = channel.value([[id: 'synthetic'], file(base + 'reference/synthetic.fa'), file(base + 'reference/synthetic.fa.fai'), []])
                 input[2] = channel.value(genome)
-                input[3] = null
-                input[4] = null
+                // the target BEDs as CHECK_INPUTS emits them (checked, reference contig names,
+                // named <role>_<id>.harmonized.bed)
+                def checked = { tech -> def f = file("${outputDir}/target_" + tech + ".harmonized.bed"); f.text = file(base + 'bed/' + tech + '.bed').text; f }
+                input[3] = channel.of([[id: 'wes', role: 'target'], checked.call('wes')], [[id: 'panel', role: 'target'], checked.call('panel')])
+                input[4] = false
+                input[5] = false
                 """
             }
         }
@@ -44,18 +48,26 @@ nextflow_workflow {
                 def base = params.pipelines_testdata_base_path + 'synthetic/'
                 def genome = file("${outputDir}/genome.bed")
                 genome.parent.mkdirs()
-                genome.text = 'chr1\\t0\\t30000\\nchr2\\t0\\t20000\\nchrM\\t0\\t16569\\n'
+                genome.text = 'chr1\\t0\\t30000\\nchr2\\t0\\t20000\\n'
                 def entry = { tech, bed -> [[id: 'S1_' + tech, sample: 'S1', technology: tech], file(base + 'vcf/S1_' + tech + '.vcf.gz'), [], [], [], [], [], bed ? file(base + bed) : []] }
                 def regions = file("${outputDir}/regions.bed")
                 regions.parent.mkdirs()
-                regions.text = '1\\t4000\\t5000\\n2\\t1000\\t3000\\n'   // no-chr names: renamed by the reference check
+                // unsorted on purpose: PREPARE_REGIONS sorts --regions_bed / --exclude_bed
+                regions.text = 'chr2\\t1000\\t3000\\nchr1\\t4000\\t5000\\n'
                 def exclude = file("${outputDir}/exclude.bed")
                 exclude.text = 'chr1\\t4500\\t4600\\n'
+                def checked = file("${outputDir}/target_panel.harmonized.bed")
+                checked.text = file(base + 'bed/panel.bed').text
                 input[0] = channel.of(entry.call('wgs', null), entry.call('panel', 'bed/panel.bed'))
                 input[1] = channel.value([[id: 'synthetic'], file(base + 'reference/synthetic.fa'), file(base + 'reference/synthetic.fa.fai'), []])
                 input[2] = channel.value(genome)
-                input[3] = regions
-                input[4] = exclude
+                input[3] = channel.of(
+                    [[id: 'panel', role: 'target'], checked],
+                    [[id: 'regions_bed', role: 'regions'], regions],
+                    [[id: 'exclude_bed', role: 'exclude'], exclude]
+                )
+                input[4] = true
+                input[5] = true
                 """
             }
         }
@@ -76,15 +88,16 @@ nextflow_workflow {
                 def base = params.pipelines_testdata_base_path + 'synthetic/'
                 def genome = file("${outputDir}/genome.bed")
                 genome.parent.mkdirs()
-                genome.text = 'chr1\\t0\\t30000\\nchr2\\t0\\t20000\\nchrM\\t0\\t16569\\n'
+                genome.text = 'chr1\\t0\\t30000\\nchr2\\t0\\t20000\\n'
                 input[0] = channel.of(
                     [[id: 'S1_wgs', sample: 'S1', technology: 'wgs'], file(base + 'vcf/S1_wgs.vcf.gz'), [], [], [], [], [], []],
                     [[id: 'S1_wgs2', sample: 'S1', technology: 'wgs2'], file(base + 'vcf/S1_wgs.vcf.gz'), [], [], [], [], [], []]
                 )
                 input[1] = channel.value([[id: 'synthetic'], file(base + 'reference/synthetic.fa'), file(base + 'reference/synthetic.fa.fai'), []])
                 input[2] = channel.value(genome)
-                input[3] = null
-                input[4] = null
+                input[3] = channel.empty()
+                input[4] = false
+                input[5] = false
                 """
             }
         }
@@ -92,7 +105,8 @@ nextflow_workflow {
         then {
             assertAll(
                 { assert workflow.success },
-                { assert path(workflow.out.common_bed[0]).text == 'chr1\t0\t30000\nchr2\t0\t20000\nchrM\t0\t16569\n' }
+                { assert path(workflow.out.common_bed[0]).text == 'chr1\t0\t30000\nchr2\t0\t20000\n' },
+                { assert workflow.out.target_beds.size() == 0 }
             )
         }
     }

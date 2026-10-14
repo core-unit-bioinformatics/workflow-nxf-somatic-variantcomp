@@ -10,8 +10,9 @@ nextflow_workflow {
     tag "bcftools/annotate"
     tag "bcftools/reheader"
     tag "bcftools/norm"
+    tag "bcftools/concat"
 
-    test("synthetic - normalization, harmonization and filtering follow the design") {
+    test("synthetic - PASS branch, normalization, harmonization and filtering follow the design") {
 
         when {
             workflow {
@@ -21,14 +22,23 @@ nextflow_workflow {
                                                 tumor_id: sample + '_' + tech + '_T', normal_id: sample + '_' + tech + '_N'],
                                                file(base + 'vcf/' + sample + '_' + tech + '.vcf.gz'),
                                                file(base + 'vcf/' + sample + '_' + tech + '.vcf.gz.tbi'), [], [], [], [], []] }
+                // genome BED of PREPARE_REFERENCE: compared contigs, chrM excluded (--keep_mito false)
                 def genome = file("${outputDir}/genome.bed")
                 genome.parent.mkdirs()
-                genome.text = 'chr1\\t0\\t30000\\nchr2\\t0\\t20000\\nchrM\\t0\\t16569\\n'
+                genome.text = 'chr1\\t0\\t30000\\nchr2\\t0\\t20000\\n'
+                // rename maps as CHECK_INPUTS writes them: only S2_panel uses 1/2/MT names
+                // (MT is not mapped: the mitochondrial contig is dropped)
+                def no_rename = file("${outputDir}/none.rename_chrs.tsv")
+                no_rename.text = ''
+                def s2_panel_rename = file("${outputDir}/S2_panel.rename_chrs.tsv")
+                s2_panel_rename.text = '1\\tchr1\\n2\\tchr2\\n'
                 def entries = channel.of(entry.call('S1', 'wgs'), entry.call('S1', 'wes'), entry.call('S1', 'panel'), entry.call('S2', 'panel'), entry.call('S2', 'wgs'), entry.call('S2', 'wes'))
                 input[0] = entries
-                input[1] = channel.value([[id: 'synthetic'], file(base + 'reference/synthetic.fa'), file(base + 'reference/synthetic.fa.fai'), []])
-                input[2] = channel.value(genome)
-                input[3] = entries.map { e -> [e[0], file(base + 'bed/panel.bed')] }
+                input[1] = entries.map { e -> [e[0], e[0].id == 'S2_panel' ? s2_panel_rename : no_rename] }
+                input[2] = channel.value([[id: 'synthetic'], file(base + 'reference/synthetic.fa'), file(base + 'reference/synthetic.fa.fai'), []])
+                input[3] = channel.value(genome)
+                input[4] = entries.map { e -> [e[0], file(base + 'bed/panel.bed')] }
+                input[5] = true
                 """
             }
         }
@@ -38,13 +48,13 @@ nextflow_workflow {
                 def vcf = channel_out.find { item -> item[0].id == id }[1]
                 path(vcf).linesGzip.findAll { line -> !line.startsWith('#') }.collect { line -> line.tokenize('\t')[0..4].join(':') }
             }
+            def filters = { channel_out, id ->
+                def vcf = channel_out.find { item -> item[0].id == id }[1]
+                path(vcf).linesGzip.findAll { line -> !line.startsWith('#') }.collect { line -> line.tokenize('\t')[6] }
+            }
             def header = { channel_out, id ->
                 def vcf = channel_out.find { item -> item[0].id == id }[1]
                 path(vcf).linesGzip.findAll { line -> line.startsWith('##contig') || line.startsWith('#CHROM') }
-            }
-            def report = { channel_out, id, type ->
-                def tsv = channel_out.find { item -> item[0].id == id && file(item[1]).name.endsWith(".${type}.reference_check.tsv") }[1]
-                path(tsv).readLines()
             }
             assertAll(
                 { assert workflow.success },
@@ -56,21 +66,55 @@ nextflow_workflow {
                 { assert records(workflow.out.compare, 'S1_wes') == [
                     'chr1:4100:.:A:C', 'chr1:4200:.:A:C', 'chr1:4400:.:A:C', 'chr1:4401:.:C:T', 'chr1:4600:.:A:C',
                     'chr1:4600:.:A:G', 'chr1:4999:.:GA:G', 'chr1:8500:.:G:T', 'chr2:2500:.:CTAG:C', 'chr2:2999:.:G:GCA'] },
+                // only PASS records are compared; the normalized VCF holds both branches
+                { assert workflow.out.compare.every { item -> filters(workflow.out.compare, item[0].id).every { f -> f == 'PASS' } } },
+                { assert filters(workflow.out.normalized, 'S1_wes').any { f -> f != 'PASS' } },
                 // E07/E14 outside the region are kept in the normalized VCF only
                 { assert records(workflow.out.normalized, 'S1_wgs').size() == 12 },
                 { assert records(workflow.out.compare, 'S1_wgs').size() == 10 },
-                // S2 panel: 1/2/MT renamed, contig lines from the reference, chrM kept in normalized VCF
+                // S2 panel: 1/2 renamed, MT (chrM) dropped, contig lines from the reference
                 { assert records(workflow.out.normalized, 'S2_panel') == [
-                    'chr1:4150:.:C:G', 'chr1:5500:.:A:C', 'chr2:4000:.:C:G', 'chr2:4500:.:G:T', 'chrM:100:.:T:A'] },
-                { assert header(workflow.out.normalized, 'S2_panel')[0..2] == [
-                    '##contig=<ID=chr1,length=30000>', '##contig=<ID=chr2,length=20000>', '##contig=<ID=chrM,length=16569>'] },
+                    'chr1:4150:.:C:G', 'chr1:5500:.:A:C', 'chr2:4000:.:C:G', 'chr2:4500:.:G:T'] },
+                { assert header(workflow.out.normalized, 'S2_panel')[0..1] == [
+                    '##contig=<ID=chr1,length=30000>', '##contig=<ID=chr2,length=20000>'] },
                 // S2 wgs: normal column came first in the input; tumor is first now
                 { assert header(workflow.out.normalized, 'S2_wgs').last().endsWith('FORMAT\tS2_wgs_T\tS2_wgs_N') },
-                // contig reports (6) and REF-allele reports (6)
-                { assert workflow.out.reports.size() == 12 },
-                { assert report(workflow.out.reports, 'S2_panel', 'vcf').contains('status\tfixed') },
-                { assert report(workflow.out.reports, 'S2_panel', 'vcf').contains('renamed_contigs\t1->chr1,2->chr2,MT->chrM') },
-                { assert report(workflow.out.reports, 'S2_wes', 'vcf').contains('header_length_fixes\tchrM:16570->16569') }
+                // bcftools norm logs and harmonization summaries: one per VCF and branch
+                { assert workflow.out.norm_logs.size() == 12 },
+                { assert workflow.out.summaries.size() == 12 }
+            )
+        }
+    }
+
+    test("synthetic - without --filter_pass_only all records are compared") {
+
+        when {
+            workflow {
+                """
+                def base = params.pipelines_testdata_base_path + 'synthetic/'
+                def genome = file("${outputDir}/genome.bed")
+                genome.parent.mkdirs()
+                genome.text = 'chr1\\t0\\t30000\\nchr2\\t0\\t20000\\n'
+                def no_rename = file("${outputDir}/none.rename_chrs.tsv")
+                no_rename.text = ''
+                def meta = [id: 'S1_wes', sample: 'S1', technology: 'wes', tumor_id: 'S1_wes_T', normal_id: 'S1_wes_N']
+                input[0] = channel.of([meta, file(base + 'vcf/S1_wes.vcf.gz'), file(base + 'vcf/S1_wes.vcf.gz.tbi'), [], [], [], [], []])
+                input[1] = channel.of([meta, no_rename])
+                input[2] = channel.value([[id: 'synthetic'], file(base + 'reference/synthetic.fa'), file(base + 'reference/synthetic.fa.fai'), []])
+                input[3] = channel.value(genome)
+                input[4] = channel.of([meta, file(base + 'bed/panel.bed')])
+                input[5] = false
+                """
+            }
+        }
+
+        then {
+            def filters = path(workflow.out.compare[0][1]).linesGzip.findAll { line -> !line.startsWith('#') }.collect { line -> line.tokenize('\t')[6] }
+            assertAll(
+                { assert workflow.success },
+                { assert filters.any { f -> f != 'PASS' } },
+                { assert workflow.out.norm_logs.size() == 1 },
+                { assert workflow.out.summaries.size() == 1 }
             )
         }
     }
