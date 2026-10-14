@@ -3,26 +3,26 @@ nextflow_process {
     name "Test Process CHECK_REFERENCE"
     script "../main.nf"
     process "CHECK_REFERENCE"
+    config "./nextflow.config"
     tag "modules"
     tag "modules_local"
     tag "check_reference"
 
-    // VCF cases (renaming, header length fixes) are tested with the extracted facts in
-    // subworkflows/local/preprocess_vcf/tests
-
-    test("bed - no-chr names are renamed, unknown contigs dropped") {
+    test("bed - no-chr names are renamed, chrM and unknown contigs dropped") {
 
         when {
+            params {
+                check_reference_args = ''
+            }
             process {
                 """
                 def base = params.pipelines_testdata_base_path + 'synthetic/'
                 def bed = file("${outputDir}/no_chr.bed")
                 bed.parent.mkdirs()
                 bed.text = '1\\t100\\t200\\tA\\nchrUn_x\\t1\\t5\\tB\\nMT\\t10\\t20\\tC\\n'
-                input[0] = [[id: 'no_chr'], bed]
+                input[0] = [[id: 'no_chr'], bed, []]
                 input[1] = 'bed'
-                input[2] = [[id: 'synthetic'], file(base + 'reference/synthetic.fa.fai', checkIfExists: true)]
-                input[3] = []
+                input[2] = [[id: 'synthetic'], file(base + 'reference/synthetic.fa', checkIfExists: true), file(base + 'reference/synthetic.fa.fai', checkIfExists: true)]
                 """
             }
         }
@@ -32,8 +32,10 @@ nextflow_process {
             assertAll(
                 { assert process.success },
                 { assert report.contains('status\tfixed') },
-                { assert path(process.out.bed[0][1]).text == 'chr1\t100\t200\tA\nchrM\t10\t20\tC\n' },
-                { assert snapshot(process.out.rename, process.out.keep, process.out.bed).match() }
+                { assert report.contains('dropped_mito\tMT') },
+                { assert report.contains('unknown_contigs\tchrUn_x') },
+                { assert path(process.out.bed[0][1]).text == 'chr1\t100\t200\tA\n' },
+                { assert snapshot(process.out.rename, process.out.bed).match() }
             )
         }
     }
@@ -41,16 +43,18 @@ nextflow_process {
     test("bed - interval beyond contig end fails (different build)") {
 
         when {
+            params {
+                check_reference_args = ''
+            }
             process {
                 """
                 def base = params.pipelines_testdata_base_path + 'synthetic/'
                 def bed = file("${outputDir}/wrong_build.bed")
                 bed.parent.mkdirs()
                 bed.text = 'chr1\\t100\\t200\\nchr1\\t29000\\t31000\\n'
-                input[0] = [[id: 'wrong_build'], bed]
+                input[0] = [[id: 'wrong_build'], bed, []]
                 input[1] = 'bed'
-                input[2] = [[id: 'synthetic'], file(base + 'reference/synthetic.fa.fai', checkIfExists: true)]
-                input[3] = []
+                input[2] = [[id: 'synthetic'], file(base + 'reference/synthetic.fa', checkIfExists: true), file(base + 'reference/synthetic.fa.fai', checkIfExists: true)]
                 """
             }
         }
@@ -63,23 +67,104 @@ nextflow_process {
         }
     }
 
-    test("vcf - stub") {
+    test("vcf - chrM with another length is dropped, REF alleles match") {
+
+        when {
+            params {
+                check_reference_args = '--samples S2_wes_T,S2_wes_N'
+            }
+            process {
+                """
+                def base = params.pipelines_testdata_base_path + 'synthetic/'
+                input[0] = [[id: 'S2_wes'], file(base + 'vcf/S2_wes.vcf.gz', checkIfExists: true), file(base + 'vcf/S2_wes.vcf.gz.tbi', checkIfExists: true)]
+                input[1] = 'vcf'
+                input[2] = [[id: 'synthetic'], file(base + 'reference/synthetic.fa', checkIfExists: true), file(base + 'reference/synthetic.fa.fai', checkIfExists: true)]
+                """
+            }
+        }
+
+        then {
+            def report = path(process.out.report[0][1]).readLines()
+            assertAll(
+                { assert process.success },
+                { assert report.contains('dropped_mito\tchrM') },
+                { assert report.contains('records_on_mito\t1') },
+                { assert report.contains('length_mismatches\tnone') },
+                { assert report.contains('ref_mismatches\t0') },
+                { assert snapshot(process.out.report, process.out.rename).match() }
+            )
+        }
+    }
+
+    test("vcf - chrM length checked with --keep-mito, unknown sample: fails") {
+
+        when {
+            params {
+                check_reference_args = '--samples S2_wes_T,TUMOR1 --keep-mito'
+            }
+            process {
+                """
+                def base = params.pipelines_testdata_base_path + 'synthetic/'
+                input[0] = [[id: 'S2_wes'], file(base + 'vcf/S2_wes.vcf.gz', checkIfExists: true), []]
+                input[1] = 'vcf'
+                input[2] = [[id: 'synthetic'], file(base + 'reference/synthetic.fa', checkIfExists: true), file(base + 'reference/synthetic.fa.fai', checkIfExists: true)]
+                """
+            }
+        }
+
+        then {
+            def log = process.stdout + process.stderr
+            assertAll(
+                { assert process.failed },
+                { assert log.any { line -> line.contains("sample(s) TUMOR1 not in the VCF") } },
+                { assert log.any { line -> line.contains('chrM:16570 (reference chrM:16569)') } }
+            )
+        }
+    }
+
+    test("vcf - --warn-only turns the errors into warnings") {
+
+        when {
+            params {
+                check_reference_args = '--samples S2_wes_T,S2_wes_N --keep-mito --warn-only'
+            }
+            process {
+                """
+                def base = params.pipelines_testdata_base_path + 'synthetic/'
+                input[0] = [[id: 'S2_wes'], file(base + 'vcf/S2_wes.vcf.gz', checkIfExists: true), []]
+                input[1] = 'vcf'
+                input[2] = [[id: 'synthetic'], file(base + 'reference/synthetic.fa', checkIfExists: true), file(base + 'reference/synthetic.fa.fai', checkIfExists: true)]
+                """
+            }
+        }
+
+        then {
+            def report = path(process.out.report[0][1]).readLines()
+            assertAll(
+                { assert process.success },
+                { assert report.contains('status\tfixed') },
+                { assert report.any { line -> line.startsWith('warning\t(check switched off)') && line.contains('TUMOR1') == false && line.contains('chrM:16570') } }
+            )
+        }
+    }
+
+    test("bam - stub") {
 
         options "-stub"
 
         when {
+            params {
+                check_reference_args = ''
+            }
             process {
                 """
                 def base = params.pipelines_testdata_base_path + 'synthetic/'
-                def header = file("${outputDir}/header.vcf")
-                header.parent.mkdirs()
-                header.text = '##fileformat=VCFv4.2\\n'
-                def contigs = file("${outputDir}/contigs.txt")
-                contigs.text = 'chr1\\n'
-                input[0] = [[id: 'S1_wgs'], [header, contigs]]
-                input[1] = 'vcf'
-                input[2] = [[id: 'synthetic'], file(base + 'reference/synthetic.fa.fai', checkIfExists: true)]
-                input[3] = []
+                def bam = file("${outputDir}/S1_wgs_tumor.bam")
+                bam.parent.mkdirs()
+                bam.text = ''
+                input[0] = [[id: 'S1_wgs_tumor'], bam, []]
+                input[1] = 'bam'
+                input[2] = [[id: 'synthetic'], file(base + 'reference/synthetic.fa', checkIfExists: true), file(base + 'reference/synthetic.fa.fai', checkIfExists: true)]
                 """
             }
         }

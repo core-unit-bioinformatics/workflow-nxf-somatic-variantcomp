@@ -1,12 +1,12 @@
 {
-    "bed - no-chr names are renamed, unknown contigs dropped": {
+    "bed - no-chr names are renamed, chrM and unknown contigs dropped": {
         "content": [
             [
                 [
                     {
                         "id": "no_chr"
                     },
-                    "no_chr.bed.rename_chrs.tsv:md5,14801ac78ee3e79bedc362be118283ad"
+                    "no_chr.bed.rename_chrs.tsv:md5,75f839e5897338dfa93c637852c2d7bd"
                 ]
             ],
             [
@@ -14,92 +14,76 @@
                     {
                         "id": "no_chr"
                     },
-                    "no_chr.bed.keep_contigs.txt:md5,268d2dbf8367d27eeb4d2cfefd1e5208"
-                ]
-            ],
-            [
-                [
-                    {
-                        "id": "no_chr"
-                    },
-                    "no_chr.bed.harmonized.bed:md5,5e881d57eb025db163f54c7563f523df"
+                    "no_chr.bed.harmonized.bed:md5,c0924a4392f3cac71926f3090bd122ad"
                 ]
             ]
         ],
-        "timestamp": "2026-10-08T14:02:27.251171589",
+        "timestamp": "2026-10-14T08:54:19.131410136",
         "meta": {
             "nf-test": "0.9.5",
             "nextflow": "26.04.4"
         }
     },
-    "vcf - stub": {
+    "bam - stub": {
         "content": [
             {
                 "0": [
                     [
                         {
-                            "id": "S1_wgs"
+                            "id": "S1_wgs_tumor"
                         },
-                        "S1_wgs.vcf.reference_check.tsv:md5,766653b6adb4a5cbd2bde22112125ba9"
+                        "S1_wgs_tumor.bam.reference_check.tsv:md5,766653b6adb4a5cbd2bde22112125ba9"
                     ]
                 ],
                 "1": [
                     [
                         {
-                            "id": "S1_wgs"
+                            "id": "S1_wgs_tumor"
                         },
-                        "S1_wgs.vcf.rename_chrs.tsv:md5,d41d8cd98f00b204e9800998ecf8427e"
+                        "S1_wgs_tumor.bam.rename_chrs.tsv:md5,d41d8cd98f00b204e9800998ecf8427e"
                     ]
                 ],
                 "2": [
-                    [
-                        {
-                            "id": "S1_wgs"
-                        },
-                        "S1_wgs.vcf.keep_contigs.txt:md5,d41d8cd98f00b204e9800998ecf8427e"
-                    ]
+                    
                 ],
                 "3": [
-                    
-                ],
-                "4": [
-                    
-                ],
-                "5": [
                     [
                         "CHECK_REFERENCE",
                         "python",
                         "3.12.15"
                     ]
                 ],
-                "bed": [
-                    
-                ],
-                "keep": [
+                "4": [
                     [
-                        {
-                            "id": "S1_wgs"
-                        },
-                        "S1_wgs.vcf.keep_contigs.txt:md5,d41d8cd98f00b204e9800998ecf8427e"
+                        "CHECK_REFERENCE",
+                        "pysam",
+                        "0.24.1"
                     ]
                 ],
-                "regions": [
+                "bed": [
                     
                 ],
                 "rename": [
                     [
                         {
-                            "id": "S1_wgs"
+                            "id": "S1_wgs_tumor"
                         },
-                        "S1_wgs.vcf.rename_chrs.tsv:md5,d41d8cd98f00b204e9800998ecf8427e"
+                        "S1_wgs_tumor.bam.rename_chrs.tsv:md5,d41d8cd98f00b204e9800998ecf8427e"
                     ]
                 ],
                 "report": [
                     [
                         {
-                            "id": "S1_wgs"
+                            "id": "S1_wgs_tumor"
                         },
-                        "S1_wgs.vcf.reference_check.tsv:md5,766653b6adb4a5cbd2bde22112125ba9"
+                        "S1_wgs_tumor.bam.reference_check.tsv:md5,766653b6adb4a5cbd2bde22112125ba9"
+                    ]
+                ],
+                "versions_pysam": [
+                    [
+                        "CHECK_REFERENCE",
+                        "pysam",
+                        "0.24.1"
                     ]
                 ],
                 "versions_python": [
@@ -111,7 +95,32 @@
                 ]
             }
         ],
-        "timestamp": "2026-10-08T14:04:27.580755731",
+        "timestamp": "2026-10-14T09:05:00.819271887",
+        "meta": {
+            "nf-test": "0.9.5",
+            "nextflow": "26.04.4"
+        }
+    },
+    "vcf - chrM with another length is dropped, REF alleles match": {
+        "content": [
+            [
+                [
+                    {
+                        "id": "S2_wes"
+                    },
+                    "S2_wes.vcf.reference_check.tsv:md5,fc99d5716ad75f190696994845a7d4b8"
+                ]
+            ],
+            [
+                [
+                    {
+                        "id": "S2_wes"
+                    },
+                    "S2_wes.vcf.rename_chrs.tsv:md5,d41d8cd98f00b204e9800998ecf8427e"
+                ]
+            ]
+        ],
+        "timestamp": "2026-10-14T08:56:02.278641427",
         "meta": {
             "nf-test": "0.9.5",
             "nextflow": "26.04.4"
