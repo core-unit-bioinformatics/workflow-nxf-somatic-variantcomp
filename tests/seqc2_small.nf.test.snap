@@ -667,9 +667,6 @@
             ],
             [
                 "GRCh38.d1.vd1_chr22.repeats.bed:md5,be992081868525a9c539a86d212f378c",
-                "variants.vep.vcf.gz:md5,a9fee082fca2a7c22add2dc27e87f333",
-                "variants.vep.vcf.gz.tbi:md5,6e54e59c1c7057183b720cb72b0e1163",
-                "variants.vep.vcf.gz_summary.html:md5,e6db8ed48953bc7044bf57303a1e21ab",
                 "SEQC2_FD_1_wgs_vs_wes.metrics.tsv:md5,938ab0c3c68e89ef0ac2c2cc24197668",
                 "SEQC2_FD_1_wgs_vs_wes.variants.tsv:md5,9c4dc50e07ed82821e25ffef35db522c",
                 "SEQC2_IL_1_wgs_vs_wes.metrics.tsv:md5,cc351304f5cc3cdfaedf04441f76a382",
@@ -833,7 +830,7 @@
                 "multiqc_variantcomp_callable.txt:md5,203103882a19cba6d696920ac0230413",
                 "multiqc_variantcomp_classes.txt:md5,1aa879c5429d1520db945861e9c261f6",
                 "multiqc_variantcomp_harmonization.txt:md5,8714d7a8e21b8e078da1cbfe8c87adaf",
-                "multiqc_variantcomp_input_checks.txt:md5,93355016514cfa7c7ba576e187903834",
+                "multiqc_variantcomp_input_checks.txt:md5,7484ab71b08610f62502b66d215d87c7",
                 "multiqc_variantcomp_metrics.txt:md5,b80449ba39a299ba144da6c8e73c4624",
                 "multiqc_variantcomp_normalization.txt:md5,ad42a479578e1442577c6f6df5389dd7",
                 "multiqc_variantcomp_per_sample.txt:md5,629580a485f10f60fd84dae7be98cd46",
@@ -879,7 +876,7 @@
                 "SEQC2_NV_1_wgs.pass.norm.norm.log:md5,40cffae0543c95f31b0a80dd9ae723e4"
             ]
         ],
-        "timestamp": "2026-10-14T12:27:51.695797571",
+        "timestamp": "2026-10-14T14:46:51.072505709",
         "meta": {
             "nf-test": "0.9.5",
             "nextflow": "26.04.4"
