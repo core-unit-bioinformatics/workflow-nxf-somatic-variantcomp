@@ -13,6 +13,7 @@ vcf_preprocessed/**/*.vcf.gz
 vcf_preprocessed/**/*.vcf.gz.tbi
 benchmark/**/vcfeval/*
 discordance/**/evidence/*
+annotation/vep/*
 report/plots/*.png
 known_variants/**/*.vcf.gz
 known_variants/**/*.vcf.gz.tbi
