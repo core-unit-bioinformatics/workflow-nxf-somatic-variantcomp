@@ -60,6 +60,11 @@ all problems are reported at once, nothing else starts before it passed):
 - All rows of a technology must use the same `target_bed` and `library_type`.
 - `capture` and `amplicon` technologies need a `target_bed`.
 - A `normal_bam` needs a `tumor_bam` and a `normal_id`.
+- With `--callable_regions` or `--read_evidence` (both default `true`), every row needs a
+  `tumor_bam`; with `--callable_regions` and `--require_normal_coverage` (default `true`),
+  every paired row (with `normal_id`) also needs a `normal_bam`. The error names the rows
+  and the parameter to switch off if no alignments are available. With both options off,
+  the alignment columns are ignored.
 - Columns of earlier versions (`vcf_index`, `tumor_bai`, `normal_bai`) are rejected with a
   message; tab-separated sheets are rejected.
 
@@ -73,10 +78,10 @@ naming the file and record otherwise.
 
 | Requirement | Details | Checked by |
 | --- | --- | --- |
-| Format | VCF 4.1–4.3 (or BCF), plain, gzip or bgzip compressed; read by HTSlib | `bcftools view` |
-| Sample columns | the tumor column (`tumor_id`) and, for paired calls, the normal column (`normal_id`); other columns are removed | `check_reference.py`, `bcftools view -s` |
-| Reference | contigs and lengths of the configured reference (safe renaming, see below); REF alleles match the FASTA (≤ `--max_ref_mismatch`) | `check_reference.py`, `bcftools norm --check-ref x` |
-| Allele depths | `FORMAT/AD` (Number=R: ref, alt) for the tumor, or `FORMAT/AF` + `FORMAT/DP`; every tumor record needs a VAF (see [Harmonization](#harmonization-of-vaf-depth-and-alt-reads)) | `harmonize_vcf.py` |
+| Format | VCF 4.1–4.3 (or BCF), plain, gzip or bgzip compressed; read by HTSlib | `check_reference.py vcf` (pysam), `bcftools view` |
+| Sample columns | the tumor column (`tumor_id`) and, for paired calls, the normal column (`normal_id`); other columns are removed | `check_reference.py vcf`, `bcftools view -s` |
+| Reference | contigs and lengths of the configured reference (safe renaming, see below); REF alleles match the FASTA (≤ `--max_ref_mismatch`) | `check_reference.py vcf` (at the start), `bcftools norm --check-ref x` |
+| Allele fractions | `FORMAT/AF` and/or `FORMAT/AD` (Number=R: ref, alt) for the tumor; `FORMAT/DP` is used if present (see [Harmonization](#harmonization-of-vaf-depth-and-alt-reads)) | `harmonize_vcf.py` |
 | FILTER | the caller's FILTER column; `PASS` (or `.`) = passed; the uniform filters are applied on top | `bcftools view` |
 | Unfiltered | all records written by the caller, including filtered ones (e.g. DRAGEN `*.hard-filtered.vcf.gz`, which despite its name contains all calls with FILTER set) | – |
 | Somatic | every record is a somatic call of the tumor; the GT of the input is not used | `harmonize_vcf.py` |
@@ -110,42 +115,43 @@ filtering, VAF strata, detection power and the tables in one way for every VCF
 INFO tags: `VC_T_VAF`, `VC_T_DP`, `VC_T_ALT`, `VC_T_SRC` for the tumor and `VC_N_*` for the
 normal, plus `VC_TYPE` (SNV, MNV, INS, DEL, COMPLEX) and `VC_LEN` (length difference).
 
-For each sample, the first rule that applies is used:
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `--vaf_source` | `auto` | Source of the VAF: `auto` = `FORMAT/AF` if present (not missing, not NaN), else `AD[1] / sum(AD)`; `af` = `FORMAT/AF` only; `ad` = `AD[1] / sum(AD)` only. |
+| `--max_missing_vaf` | `0.05` | Allowed fraction of tumor records without VAF. Above it, the VCF gets a warning and its VAF-based results (VAF strata, detection power) are reported as NA. |
 
-| Rule | Condition | VAF | Depth | Alt reads | `VC_*_SRC` |
-| --- | --- | --- | --- | --- | --- |
-| 1 | `FORMAT/AD` has a ref and an alt value | `AD[1] / sum(AD)` | `FORMAT/DP` if present, else `sum(AD)` | `AD[1]` | `AD` |
-| 2 | no usable AD, but `FORMAT/AF` and `FORMAT/DP` | `AF` | `DP` | `round(AF × DP)` | `AF_DP` |
-| 3 | neither | missing | `DP` if present | missing | – |
+In every mode, for each sample:
 
-If AD is `0,0` (no reads, e.g. filtered GATK MuTect2 3.8 calls), the VAF is undefined: it
-is left missing (the caller's AF is not used), alt reads are 0, and the record is counted
-as `zero_depth`, with a warning. These records don't count against `--max-missing-vaf`.
+| Value | Source (first that applies) |
+| --- | --- |
+| VAF | per `--vaf_source` (see above); `VC_*_SRC` is `AF` or `AD` |
+| Depth | `FORMAT/DP`, else `sum(AD)` |
+| Alt reads | `AD[1]`, else `round(AF × DP)` |
 
-Why these choices:
+If AD is `0,0` (no reads, e.g. filtered GATK MuTect2 3.8 calls with AF = 1), the VAF is
+undefined: it is left missing (also if the caller wrote an AF), alt reads are 0, and the
+record is counted as `zero_depth`, with a warning. These records don't count against
+`--max_missing_vaf`.
 
-- VAF uses `sum(AD)` as denominator, so numerator and denominator count the same reads.
-  Callers often count only informative reads in AD (DRAGEN, Mutect2), so `DP` can be larger
-  than `sum(AD)`; using `DP` would underestimate the VAF.
-- Depth prefers `FORMAT/DP`, because it is the coverage the caller reports and is what the
-  `--min_depth` filter is meant to act on.
-- The caller's own `FORMAT/AF` is not used when AD is available: callers estimate it
-  differently (e.g. Mutect2 reports a model-based estimate), which would make VAFs of
-  different technologies incomparable.
+Why `auto` prefers `FORMAT/AF`: it is the caller's own estimate (DRAGEN and Mutect2 write
+it per sample), and it is what users of the caller see. `ad` computes the same VAF for every
+caller from the read counts (numerator and denominator count the same reads), which can be
+preferred when callers of very different kinds are compared.
 
-Checks:
+Checks (an error names the file and record):
 
 - Every record must have exactly one ALT (the input is split before); `AD` must have two
   values after splitting; AD and DP must not be negative; AF must be within [0, 1].
+- The header needs `FORMAT/AF` or `FORMAT/AD`.
 - `FORMAT/AF = nan` is treated as missing (GATK MuTect2 3.8 writes it for a normal without
-  alt reads); it is counted (`*_af_nan` in the summary). AD is used where present.
-- Every tumor record needs a VAF (rule 1 or 2). The allowed fraction of tumor records
-  without VAF is set by `ext.args = '--max-missing-vaf 0'` of `HARMONIZE_VCF` in
-  `conf/modules.config`. A normal without reads at a site is allowed (counted only).
-- Rule 2 is reported as a warning with the number of records.
+  alt reads); it is counted (`*_af_nan` in the summary).
+- Above `--max_missing_vaf` tumor records without VAF, a WARNING is printed and the header
+  line `##variantcomp_vaf=unavailable` is written; `benchmark_metrics.py` then reports the
+  VAF strata of this VCF as NA. A normal without reads at a site is allowed (counted only).
 
-The counts per rule and sample are written to
-`vcf_preprocessed/<sample>/<sample>_<technology>.normalized.harmonize_summary.tsv`.
+The counts per source and sample are written to
+`vcf_preprocessed/<sample>/<sample>_<technology>.*.harmonize_summary.tsv` and shown in the
+MultiQC report.
 
 The tumor GT is set to `0/1` and the normal GT to `0/0`: every record of a somatic VCF is a
 tumor call, and callers fill GT differently (splitting a multiallelic record can leave
@@ -154,16 +160,35 @@ tumor call, and callers fill GT differently (splitting a multiallelic record can
 ## Reference genome
 
 All inputs must be on the reference given with `--fasta` (plain or bgzipped; a `.fai` can be
-given with `--fasta_fai` and is created otherwise). The pipeline checks every input against
-it:
+given with `--fasta_fai` and is created otherwise). **Before anything else runs**, the
+subworkflow `CHECK_INPUTS` checks every input against it with `bin/check_reference.py`
+(pysam): every VCF (header contigs, sample columns, REF alleles against the FASTA), every
+alignment header, every BED (target, `--regions_bed`, `--exclude_bed`, `--repeats_bed`,
+stratification and known-variant regions) and every known-variant list. All reports are
+collected; no other step starts until all checks passed.
 
 | Check | Action |
 | --- | --- |
 | Contig names differ only by the `chr` prefix or `MT`/`chrM` | renamed automatically |
-| Contig on the reference but with a different length in a VCF header (mitochondrial only, e.g. `chrM` 16570 vs 16571) | header rewritten from the `.fai` |
-| Contig with a different length (nuclear), BED interval beyond a contig end | **error**: different genome build |
+| Contig of the reference missing in a VCF header | header rewritten from the `.fai` |
+| Mitochondrial contig (`chrM`/`MT`) | **dropped** from all inputs and reported (records/intervals); its length is not checked. `--keep_mito` keeps it, with normal checks. |
+| Contig with a different length (any nuclear contig), BED interval beyond a contig end | **error**: different genome build. Lengths are never fixed. |
 | More than `--max_ref_mismatch` (default 1%) of VCF REF alleles differ from the FASTA | **error**: different build or reference |
 | Records/intervals on contigs absent from the reference (decoys, alt contigs, ...) | dropped and reported |
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `--check_vcf_contigs` | `true` | Contig problems of VCFs are errors; `false` makes them warnings. |
+| `--check_ref_alleles` | `true` | Compare the REF alleles of every VCF with the FASTA; `false` skips it (`bcftools norm --check-ref x` still removes mismatching records). |
+| `--check_bam_contigs` | `true` | Contig problems of alignment headers are errors; `false` makes them warnings. |
+| `--check_bed_contigs` | `true` | Format and contig problems of BEDs are errors; `false` makes them warnings. |
+| `--check_known_variants` | `true` | Contig, position and REF problems of known-variant lists are errors; `false` makes them warnings. |
+| `--keep_mito` | `false` | Keep the mitochondrial contig. |
+| `--max_ref_mismatch` | `0.01` | Maximum fraction of REF alleles that differ from the FASTA. |
+
+Switching a check off keeps the contig renaming (it is still computed); only the errors
+become warnings. The check reports are written to `input_checks/` and summarized in the
+MultiQC report.
 
 There is no liftover. Convert inputs to one build before running the pipeline.
 
@@ -172,50 +197,100 @@ There is no liftover. Convert inputs to one build before running the pipeline.
 The comparison is restricted to the intersection of the target BEDs of all targeted
 technologies. Technologies without a BED (WGS) are genome-wide and don't restrict it.
 
-| Parameter | Description |
-| --- | --- |
-| `--regions_bed` | Restrict the comparison further, e.g. to high-confidence regions of a truth set. |
-| `--exclude_bed` | Remove regions, e.g. a blacklist or problematic regions. |
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `--regions_bed` | – | Restrict the comparison further, e.g. to high-confidence regions of a truth set. |
+| `--exclude_bed` | – | Remove regions, e.g. a blacklist or problematic regions. |
+| `--min_region_bp` | `10000` | Minimum size (bp) of the common region and of every sample's callable region; smaller regions stop the run (they would give meaningless metrics, and usually mean wrong BEDs). |
 
 ## Coverage and callable regions
 
-If tumor alignments (BAM/CRAM) are given for **every** technology of a sample, the
-comparison for that sample is restricted to the bases that are callable in all of them:
+With `--callable_regions` (default `true`), the comparison for every sample is restricted
+to the bases that are callable in all its alignments. Every row then needs a `tumor_bam`
+(checked at the start); set `--callable_regions false` if no alignments are available.
 
 - `mosdepth` computes the depth of every alignment in the common region.
 - In `--callable_mode base` (default), a base is callable if its depth is at least
-  `--min_coverage` (default 10).
+  `--min_coverage_tumor` (tumor alignments) or `--min_coverage_normal` (normal alignments).
 - In `--callable_mode region`, a common-region interval is callable if its mean depth is at
-  least `--min_coverage`. This is the approach of the original OCA+/WES comparison; mean
+  least these thresholds. This is the approach of the original OCA+/WES comparison; mean
   depth can hide low-coverage parts of an interval.
 - With `--require_normal_coverage` (default `true`), the normal alignments must be callable,
-  too.
-- Reads flagged as duplicates are excluded, except for `library_type` `amplicon`, where all
-  reads of an amplicon look like duplicates.
-- Alignment headers are checked against the reference like VCFs and BEDs.
+  too: they are added to the intersection, and every paired row needs a `normal_bam`.
+  With `false`, only the tumor alignments define the callable region; normal alignments are
+  still used for read evidence.
+- Reads flagged as duplicates are excluded, except for `library_type` `amplicon` with
+  `--amplicon_keep_duplicates` (default `true`), where all reads of an amplicon look like
+  duplicates.
 
-Samples without alignments for every technology keep the common region. The comparison
-still works for them, but variants in poorly covered parts of a target can't be
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `--callable_regions` | `true` | Restrict the comparison to callable bases (needs BAMs). |
+| `--min_coverage_tumor` | `10` | Minimum depth of a tumor alignment. Also the threshold of the `low_coverage` class. |
+| `--min_coverage_normal` | `10` | Minimum depth of a normal alignment. |
+| `--callable_mode` | `base` | `base` (per base, `mosdepth --quantize`) or `region` (mean depth per interval). |
+| `--require_normal_coverage` | `true` | Normals must be callable too (needs normal BAMs). |
+| `--amplicon_keep_duplicates` | `true` | Keep duplicate-flagged reads of amplicon libraries. |
+
+Without callable regions, variants in poorly covered parts of a target can't be
 distinguished from real discordance.
 
 ## Discordance analysis
 
+Every variant found in only one technology gets a class that explains why the other
+technology misses it (see [`output.md`](output.md#discordance)). With `--read_evidence`
+(default `true`), the reads of every alignment are counted at the compared positions
+(`bcftools mpileup`); every row then needs a `tumor_bam`. With `--read_evidence false`
+the evidence columns and the evidence-based classes are omitted.
+
 | Parameter | Default | Description |
 | --- | --- | --- |
-| `--gene_bed` | – | BED4 with gene names in column 4, e.g. derived from GENCODE. |
-| `--stratification` | – | Comma-separated sheet with columns `name` and `bed` (relative paths resolved against the sheet), e.g. GIAB stratifications for homopolymers, tandem repeats, segmental duplications, low mappability. |
+| `--read_evidence` | `true` | Count reads at the discordant positions (needs BAMs). |
+| `--evidence_min_mapq` | `20` | Minimum mapping quality of a counted read. |
+| `--evidence_min_baseq` | `13` | Minimum base quality of a counted base. |
+| `--evidence_max_depth` | `100000` | Maximum reads per position and alignment (`bcftools mpileup --max-depth`). |
 | `--germline_vaf` | `0.1` | Normal VAF from which a discordant variant is classified as `germline_in_normal`. |
 | `--evidence_min_alt_reads` | `2` | Alt reads in a normal needed for `germline_in_normal`. |
 | `--power_min_alt_reads` | `3` | Alt reads a caller needs (power model). |
 | `--detection_power` | `0.95` | Power from which a truth variant counts as detectable. |
 | `--low_vaf` | `0.1` | VAF threshold of the low-VAF feature in the enrichment tests. |
+| `--enrichment_fdr` | `0.05` | False discovery rate (Benjamini–Hochberg) of the enrichment tests. |
 
-```csv title="stratification.csv"
-name,bed
-homopolymer,giab/GRCh38_AllHomopolymers_ge7bp_imperfectge11bp_slop5.bed.gz
-tandem_repeat,giab/GRCh38_AllTandemRepeats.bed.gz
-segmental_duplication,giab/GRCh38_segdups.bed.gz
-```
+## Annotation
+
+Every compared variant is annotated in the subworkflow `ANNOTATE_VARIANTS`, the same way
+as in [variantinterpretation](https://github.com/cio-abcd/variantinterpretation):
+
+- **Ensembl VEP** (`--vep`, default `true`): consequence (SO terms), gene symbol, impact,
+  variant class and biotype, extracted with `bcftools +split-vep` (one consequence per
+  allele and gene, `--flag_pick_allele_gene`). VEP runs offline, either with a cache
+  (`--vep_cache`) or with a bgzipped, tabix-indexed GTF (`--vep_gtf`, e.g. GENCODE); exactly
+  one of them is required, otherwise the run stops at the start. Set `--vep false` to skip
+  it.
+- **Repeats** (`--annotate_repeats`, default `true`): microsatellite regions of the
+  reference from `msisensor-pro scan`, or a precomputed BED (`--repeats_bed`: contig,
+  start, end, repeat unit, repeat times; the file written by a previous run can be reused).
+- **Stratifications** (`--stratification`, optional): any BEDs of genomic context.
+
+The consequences are grouped into `synonymous`, `non_synonymous` and `other`; the report
+tests the enrichment of discordant variants per group, repeat context, variant class,
+impact and stratum.
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `--vep` | `true` | Annotate with Ensembl VEP. |
+| `--vep_cache` | – | VEP cache directory (offline). |
+| `--vep_gtf` | – | bgzipped GTF with `.tbi`, used instead of a cache (`--gtf`). |
+| `--vep_cache_version` | `116` | Cache version. |
+| `--vep_genome` | `GRCh38` | Genome assembly of the cache. |
+| `--vep_species` | `homo_sapiens` | Species of the cache. |
+| `--vep_args` | `--flag_pick_allele_gene --terms SO --no_escape --symbol --biotype --variant_class --canonical` | VEP options in every mode. |
+| `--vep_cache_args` | `--check_existing --var_synonyms --clin_sig_allele 1` | Extra VEP options used only with a cache. |
+| `--annotate_repeats` | `true` | Annotate repeat context. |
+| `--repeats_bed` | – | Precomputed repeat BED (skips `msisensor-pro scan`). |
+| `--stratification` | – | Comma-separated sheet with columns `name` and `bed` (relative paths resolved against the sheet), e.g. GIAB stratifications for homopolymers, tandem repeats, segmental duplications, low mappability. |
+
+`--gene_bed` of earlier versions was removed: genes come from VEP.
 
 ## Known variants
 
@@ -236,14 +311,16 @@ seqc2_truth,all,benchmark,truth/sSNV.vcf.gz;truth/sINDEL.vcf.gz,truth/High-Confi
 | `variants` | One or more VCF, CSV or TSV files separated by `;`. CSV/TSV columns: `chrom`, `pos` (1-based), `ref`, `alt`, optional `gene`, `label`, `vaf`. |
 | `regions` | Optional BED (`n/a` if none), e.g. the confident regions of a truth set. |
 
-`--stratification` and `--known_variants` are plain file parameters. Each sheet is checked
-by `bin/check_sheets.py` in the subworkflow that uses it (`DISCORDANCE`,
-`PREPARE_KNOWN_VARIANTS`): required columns, unique names, allowed modes, samples that
+`--stratification` and `--known_variants` are plain file parameters. Both sheets are checked
+by `bin/check_sheets.py` at the start of the run (`CHECK_INPUTS`): required columns, unique names, allowed modes, samples that
 exist in the samplesheet, existing files with the right extensions. All problems are
 reported at once; the checked sheets are written to `pipeline_info/*.validated.csv`.
 
-Every list is checked against the reference (contig names are renamed if needed; a REF
-mismatch is an error) and normalized like the VCFs.
+Every list is checked against the reference at the start of the run
+(`known_variants.py prepare`: contig names are renamed if needed; chrM entries are dropped
+unless `--keep_mito`; a REF mismatch is an error, a warning with
+`--check_known_variants false`) and normalized like the VCFs. There is no limit on the
+number of required variants.
 
 **`required`**: a small list of variants (e.g. fewer than 10 manually checked, clinically
 relevant variants) that **every technology must find**. For every technology the pipeline
@@ -269,17 +346,17 @@ with the same metrics as the main benchmark. If the list contains a VAF (VCF `IN
 
 The input VCFs are **unfiltered** (all calls with the caller's FILTER column). The pipeline
 applies one set of filters identically to every technology. VAF, depth and alt read counts
-are computed from FORMAT/AD the same way for every caller.
+are computed the same way for every caller (see [Harmonization](#harmonization-of-vaf-depth-and-alt-reads)).
 
 | Parameter | Default | Description |
 | --- | --- | --- |
-| `--filter_pass_only` | `true` | Only calls with FILTER `PASS` (or `.`) are compared. |
+| `--filter_pass_only` | `true` | Only calls with FILTER `PASS` (or `.`) are compared. The other records are split off right after sample selection and normalized in the same way, so that a missed variant called with another FILTER is classified as `filtered_non_pass`. |
 | `--min_vaf` | `0` (off) | Minimum tumor VAF. |
 | `--min_depth` | `0` (off) | Minimum tumor depth. |
 | `--min_alt_reads` | `0` (off) | Minimum tumor alt read count. |
 
-Filtered calls are kept in the normalized VCFs, so a missed variant can later be classified
-as "present but filtered".
+Calls removed by the uniform filters are kept in the unfiltered normalized VCFs, so a
+missed variant can later be classified as `present_but_filtered`.
 
 ## Comparison options
 

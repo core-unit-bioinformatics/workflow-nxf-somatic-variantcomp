@@ -56,7 +56,9 @@ singularity {
 input: /path/to/project/samplesheet.csv
 fasta: /path/to/reference/hg19.fa
 truth_technology: wgs
-gene_bed: /path/to/annotation/genes.bed
+vep_cache: /path/to/vep_cache          # offline Ensembl VEP cache (or vep_gtf: genes.gtf.gz)
+vep_cache_version: 116
+vep_genome: GRCh37
 stratification: /path/to/annotation/stratification.csv
 known_variants: /path/to/project/known_variants.csv
 outdir: /path/to/project/results/variantcomp
@@ -69,6 +71,12 @@ nextflow run /path/to/pipelines/workflow-nxf-somatic-variantcomp \
     -params-file params.yaml \
     -resume
 ```
+
+The VEP cache must be downloaded beforehand (e.g. `vep_install -a cf -s homo_sapiens -y
+GRCh37 -c /path/to/vep_cache --CONVERT`, version matching `vep_cache_version`); the
+pipeline never downloads it. Without a cache, `vep_gtf` (bgzipped, tabix-indexed GTF)
+gives consequences and genes without the cache-only annotations. The repeat BED of
+msisensor-pro (`annotation/repeats/`) can be reused in later runs with `repeats_bed`.
 
 Limit the memory of the Nextflow head job if the login/head node is shared, e.g.
 `export NXF_OPTS="-Xms500M -Xmx8G"`.

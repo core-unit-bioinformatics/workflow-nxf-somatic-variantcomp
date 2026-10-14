@@ -22,7 +22,7 @@ truth:
 # Annotation for the discordance analysis (GRCh38, chr names)
 annotation:
   genes:
-    # GENCODE basic gene annotation -> BED4 (gene_name)
+    # GENCODE basic gene annotation -> chr22 GTF (bgzip + tabix) for VEP --gtf
     url: "https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_46/gencode.v46.basic.annotation.gtf.gz"
   stratifications:
     # GIAB genome stratifications v3.5 (Dwarshuis et al. 2024, Nat Commun 15:9029)
