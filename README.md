@@ -29,77 +29,87 @@ therefore require:
 
 ![Metro map of workflow-nxf-somatic-variantcomp](docs/images/variantcomp_metro_map.png)
 
-The map runs from top to bottom. Each grey box is a subworkflow, each row a step that
-every sample goes through (numbers as in the table below). Each coloured line is a use
-case and stops at the steps that run in it:
+The map runs from top to bottom. Each grey box is a subworkflow, each row a step
+(numbers as in the table below). Each coloured line starts at one input, runs through the
+steps that process it and merges into the step that consumes it:
 
-- **green — always:** the VCFs of all technologies are checked, normalized, filtered
-  identically and compared with the truth technology;
-- **blue — targeted technologies:** target BEDs (WES, panels) define the common
-  comparison region; `--regions_bed` / `--exclude_bed` refine it;
-- **orange — with alignments (BAM/CRAM):** callable regions from coverage restrict the
-  comparison, and read counts explain missed or extra calls;
-- **pink — with `--gene_bed` / `--stratification`:** genes and genomic context
-  (repeats, homopolymers, ...) of every variant and enrichment statistics;
-- **yellow — `--known_variants`, mode `required`:** a clinical checklist, PASS/FAIL per
-  sample, technology and variant;
-- **red — `--known_variants`, mode `benchmark`:** recall and precision of every technology
-  against an external truth set.
+- **green — VCFs (always):** the central line. The VCFs of all technologies are checked,
+  normalized, filtered identically, compared with the truth technology, classified,
+  annotated and reported;
+- **brown — reference FASTA:** indexed once; the dashed lines show where it feeds the
+  checks, normalization, vcfeval and VEP;
+- **blue — target BEDs:** checked, sorted and intersected into the common comparison
+  region (`--regions_bed` / `--exclude_bed` refine it); merges into COVERAGE (or, without
+  alignments, directly into the filter step 7.8);
+- **orange — alignments (`--callable_regions`, `--read_evidence`):** callable regions
+  restrict the comparison (step 7.8), read counts explain missed or extra calls (step 9.2);
+- **pink — `--stratification` and repeats:** genomic context of every variant (step 10.4);
+- **red — VEP cache or GTF (`--vep`):** consequence, gene, impact (step 10.2);
+- **yellow — `--known_variants`:** a required clinical checklist (PASS/FAIL per sample,
+  technology and variant) or an external truth set; merges into the report.
 
 Every step runs one tool (mostly nf-core modules) or one script of `bin/`; the options of
-every step are set in `conf/modules.config`.
+every step are set in `conf/modules/<subworkflow>.config`.
 
 <!-- steps:start (generated: scripts/make_metro_map.py --markdown) -->
-| Step | What happens | Tools | Runs for |
+
+| Step | What happens | Tools | Line |
 | --- | --- | --- | --- |
-| **PIPELINE_INITIALISATION, CHECK_SAMPLESHEET, PREPARE_ALIGNMENTS** | _read and check the samplesheet_ | | |
-| 1.1 | **Read the samplesheet, check every column.** The samplesheet is read as in the nf-core template: nf-schema checks every column (names, library types, file extensions). Relative paths are resolved against the samplesheet's directory; VCF and alignment indices are looked up next to the files. | `nf-schema` | Targeted technologies, Always, With alignments (BAM/CRAM) |
-| 1.2 | **Check rows: truth technology per sample, one BED per technology.** Rules across rows, before anything else runs: every sample has the truth technology and another technology, no duplicate rows, one target BED and library type per technology, existing files. All problems are reported at once with line numbers. | `check_sheets.py` | Targeted technologies, Always, With alignments (BAM/CRAM) |
-| 1.3 | **Index alignments without an index.** Alignments without a `.bai`/`.csi`/`.crai` next to them are indexed once; they are needed for coverage and read evidence. | `samtools index` | With alignments (BAM/CRAM) |
+| **PIPELINE_INITIALISATION, CHECK_SAMPLESHEET** | _read and check the samplesheet_ | | |
+| 1.1 | **Read the samplesheet, check every column.** The samplesheet is read as in the nf-core template: nf-schema checks every column (names, library types, file extensions). Relative paths are resolved against the samplesheet's directory; VCF and alignment indices are looked up next to the files. | `nf-schema` | VCFs of all technologies |
+| 1.2 | **Check rows: truth technology, one BED per technology.** Rules across rows: every sample has the truth technology and another technology, no duplicate rows, one target BED and library type per technology, alignments where the options need them. All problems are reported at once with line numbers. | `check_sheets.py` | VCFs of all technologies |
 | **PREPARE_REFERENCE** | _index the reference genome_ | | |
-| 2.1 | **Unpack and index the reference FASTA.** A gzipped FASTA is unpacked and indexed; the `.fai` (contig names and lengths) is the reference every input is checked against. | `gunzip, samtools faidx` | Always |
-| 2.2 | **Genome BED: one interval per reference contig.** One interval per contig, used as comparison region when no technology has a target BED (WGS only) and to drop records on other contigs. | `gawk` | Always |
+| 2.1 | **Unpack and index the reference FASTA.** A gzipped FASTA is unpacked and indexed; the `.fai` (contig names and lengths) is the reference every input is checked against. | `gunzip, samtools faidx` | Reference genome (FASTA) |
+| 2.2 | **Genome BED: one interval per compared contig.** One interval per compared contig (the mitochondrial contig is left out unless `--keep_mito`); the comparison region of WGS-only runs. | `gawk` | Reference genome (FASTA) |
+| **CHECK_INPUTS** | _check every input against the reference, before anything else_ | | |
+| 3.1 | **VCFs: contigs, lengths, samples, REF alleles.** Contig names (safe renames chr/no-chr, MT/chrM), contig lengths (any difference is an error: another build), the tumor/normal columns and the REF allele of every record against the FASTA (`--max_ref_mismatch`). Switch off with `--check_vcf_contigs` / `--check_ref_alleles`. | `check_reference.py (pysam)` | VCFs of all technologies |
+| 3.2 | **Alignment headers: contigs and lengths.** Contig names and lengths of every alignment header (`--check_bam_contigs`). | `check_reference.py (pysam)` | Alignments |
+| 3.3 | **Target, regions and exclude BEDs.** BED format, contig names and interval ends of the target BEDs, `--regions_bed` and `--exclude_bed` (`--check_bed_contigs`). | `check_reference.py` | Target BEDs (+ --regions_bed / --exclude_bed) |
+| 3.4 | **Stratification sheet and BEDs, --repeats_bed.** The `--stratification` sheet (columns, unique names, files) and every stratification BED; a precomputed `--repeats_bed`. | `check_sheets.py, check_reference.py` | Stratification BEDs (--stratification) and repeat regions |
+| 3.5 | **Known-variant sheet and lists: positions, REF alleles.** The `--known_variants` sheet (columns, modes, samples, files) and every list: contigs, positions and REF alleles against the FASTA (`--check_known_variants`). Every later step starts only after all checks of 1.2 and 3.x passed. | `check_sheets.py, known_variants.py` | Known variants (--known_variants) |
+| **PREPARE_ALIGNMENTS** | _index the alignments_ | | |
+| 4.1 | **Index alignments without an index.** Alignments without a `.bai`/`.csi`/`.crai` next to them are indexed once. | `samtools index` | Alignments |
 | **PREPARE_REGIONS** | _build the common comparison region_ | | |
-| 3.1 | **Check target BEDs against the reference, rename contigs.** Contig names that differ only by the `chr` prefix or `MT`/`chrM` are renamed, intervals on unknown contigs are dropped and reported; intervals beyond a contig end stop the run (other genome build). | `check_reference.py` | Targeted technologies |
-| 3.2 | **Sort the BEDs in reference order.** All BEDs are sorted in the contig order of the reference, which the following bedtools steps need. | `bedtools sort` | Targeted technologies |
-| 3.3 | **Keep bases targeted by every technology.** Only bases covered by the target BED of every targeted technology are kept (WGS counts as genome-wide), so every technology could have called a variant there. | `bedtools multiinter, gawk, merge` | Targeted technologies |
-| 3.4 | **Restrict to --regions_bed, remove --exclude_bed (optional).** Optional: the region is restricted to `--regions_bed` and `--exclude_bed` is removed (e.g. difficult regions). | `bedtools intersect, subtract` | Targeted technologies |
-| 3.5 | **Common region (genome if no target BEDs) and its size.** The final common comparison region (`regions/common_targets.bed`), merged; its size and the share of each technology's targets are summarized. | `bedtools merge, region_summary.py` | Targeted technologies, Always |
-| **COVERAGE** | _find the bases callable in all technologies of a sample_ | | |
-| 4.1 | **Check alignment contigs against the reference.** Contig names and lengths of every alignment are compared with the reference (same rules as for BEDs); the common region is translated to the alignment's contig names. | `samtools idxstats, check_reference.py` | With alignments (BAM/CRAM) |
-| 4.2 | **Depth per base and per common-region interval.** mosdepth classifies every base as below or above `--min_coverage` and computes the mean depth per common-region interval (duplicates are kept for amplicon libraries). | `mosdepth` | With alignments (BAM/CRAM) |
-| 4.3 | **Callable bases per alignment (depth >= --min_coverage).** The callable bases of each alignment (base mode; region mode uses the mean depth per interval), renamed to reference contigs and sorted. | `mosdepth_callable.py, bedtools sort` | With alignments (BAM/CRAM) |
-| 4.4 | **Bases callable in all alignments of a sample (in common region).** Per sample: bases callable in the tumor (and normal) alignment of every technology, inside the common region. Variants are only compared there, so missing coverage in one technology does not count as a miss. | `bedtools multiinter, gawk, intersect` | With alignments (BAM/CRAM) |
-| **PREPROCESS_VCF** | _normalize every VCF in the same way_ | | |
-| 5.1 | **Check VCF contigs, contig lengths and sample names.** Contig names and lengths of the VCF header and records are checked against the reference, and the tumor/normal sample columns must exist. Safe fixes are prepared, a different build stops the run. | `bcftools view -h, query, check_reference.py` | Always |
-| 5.2 | **Keep tumor (+ normal) columns, recompress with BGZF.** Only the tumor (and normal) columns are kept, in this order, and the VCF is written as bgzipped VCF with index (inputs may be plain gzip). | `bcftools view` | Always |
-| 5.3 | **Rename contigs to the reference (chr prefix, MT/chrM).** Contigs are renamed to the reference names (`1` -> `chr1`, `MT` -> `chrM`). | `bcftools annotate` | Always |
-| 5.4 | **Remove records on other contigs and gVCF blocks.** Records on contigs absent from the reference and gVCF reference blocks (only ALT `<NON_REF>`/`<*>`) are removed. | `bcftools view` | Always |
-| 5.5 | **Rewrite the contig header from the reference.** Contig header lines are rewritten from the reference index (fixes wrong lengths, e.g. chrM, and missing contig lines). | `bcftools reheader` | Always |
-| 5.6 | **Split multiallelics, left-align, split MNVs, deduplicate.** Multiallelic records are split, indels left-aligned, MNVs split into SNVs, records whose REF differs from the FASTA removed and counted, duplicates removed. Same representation for every caller. | `bcftools norm` | Always |
-| 5.7 | **Stop if too many REF alleles differ (other genome build).** The fraction of REF mismatches from step 5.6 is checked: above `--max_ref_mismatch` the VCF is on another reference and the run stops. | `check_reference.py` | Always |
-| 5.8 | **Same VAF, depth and alt reads for every caller (from AD).** VAF, depth and alt reads are computed the same way for every caller (from FORMAT/AD, else AF + DP; documented in docs/usage.md) and stored as `VC_*` INFO tags; GT is set to tumor 0/1, normal 0/0. Every tumor record needs a VAF. | `harmonize_vcf.py` | Always |
-| 5.9 | **Uniform filters; keep the common (or callable) region.** The same filters for every technology (`--filter_pass_only`, `--min_vaf`, `--min_depth`, `--min_alt_reads`) and restriction to the comparison region: the common region, or with alignments the sample's callable region. The unfiltered VCF is kept for the discordance step. | `bcftools view` | Always, With alignments (BAM/CRAM) |
+| 5.1 | **Sort and intersect all target BEDs.** Every target BED is sorted, and only the bases targeted by every technology are kept (bedtools multiinter; WGS counts as genome-wide). | `bedtools sort, multiinter, gawk, merge` | Target BEDs (+ --regions_bed / --exclude_bed) |
+| 5.2 | **Restrict to --regions_bed, remove --exclude_bed.** Optional: restriction to `--regions_bed` and removal of `--exclude_bed`. | `bedtools intersect, subtract` | Target BEDs (+ --regions_bed / --exclude_bed) |
+| 5.3 | **Common region (genome if no BED) and its size.** The common comparison region (`regions/common_targets.bed`), merged, and its size per technology; it must have at least `--min_region_bp` bp. | `bedtools merge, region_summary.py` | Target BEDs (+ --regions_bed / --exclude_bed) |
+| **COVERAGE** | _find the bases callable in all alignments of a sample_ | | |
+| 6.1 | **Common region in the alignment's contig names.** The common region is translated to the alignment's contig names (e.g. `1` instead of `chr1`). | `check_reference.py rename-bed` | Alignments |
+| 6.2 | **Depth per base and per common-region interval.** mosdepth classifies every base as below or above the threshold and computes the mean depth per common-region interval (duplicates kept for amplicon libraries). | `mosdepth` | Alignments |
+| 6.3 | **Callable bases per alignment (tumor / normal threshold).** Callable bases of each alignment: tumor depth ≥ `--min_coverage_tumor`, normal depth ≥ `--min_coverage_normal` (base mode; region mode uses the mean depth). | `mosdepth_callable.py` | Alignments |
+| 6.4 | **Bases callable in all alignments of a sample.** Per sample: bases callable in every alignment of every technology, inside the common region (at least `--min_region_bp`). The sample is compared only there, so missing coverage in one technology is not counted as a miss. | `bedtools multiinter, intersect` | Alignments |
+| **PREPROCESS_VCF, NORMALIZE_VCF** | _normalize every VCF in the same way_ | | |
+| 7.1 | **Keep tumor (+ normal) columns, recompress with BGZF.** Only the tumor (and normal) columns are kept, in this order; written as bgzipped VCF with index (inputs may be plain gzip). | `bcftools view` | VCFs of all technologies |
+| 7.2 | **Split PASS and non-PASS records (--filter_pass_only).** With `--filter_pass_only` (default): PASS records (FILTER `PASS`/`.`) are compared; the other records go through the same steps so that the discordance step can name their FILTER. | `bcftools view` | VCFs of all technologies |
+| 7.3 | **Rename contigs; remove other contigs and gVCF blocks.** Contigs are renamed to the reference names; records on other contigs (and the mitochondrial contig) and gVCF reference blocks are removed. | `bcftools annotate, view` | VCFs of all technologies |
+| 7.4 | **Rewrite the contig header from the reference.** Contig header lines are rewritten from the reference index (adds missing contig lines). | `bcftools reheader` | VCFs of all technologies |
+| 7.5 | **Split multiallelics, left-align, split MNVs, deduplicate.** Multiallelic records are split, indels left-aligned, MNVs split into SNVs, records whose REF differs from the FASTA and duplicates removed: the same representation for every caller. | `bcftools norm` | VCFs of all technologies |
+| 7.6 | **Same VAF, depth, alt reads for every caller.** VAF, depth and alt reads are computed the same way for every caller (`--vaf_source`: FORMAT/AF, else AD) and stored as `VC_*` INFO tags; GT is set to tumor 0/1, normal 0/0. | `harmonize_vcf.py` | VCFs of all technologies |
+| 7.7 | **All records together (PASS + non-PASS).** PASS and non-PASS records together: the normalized VCF that the discordance step searches. | `bcftools concat` | VCFs of all technologies |
+| 7.8 | **Uniform filters; keep the common (or callable) region.** The same filters for every technology (`--min_vaf`, `--min_depth`, `--min_alt_reads`) and the comparison region: the common region, or with `--callable_regions` the sample's callable region. | `bcftools view` | VCFs of all technologies |
 | **BENCHMARK** | _compare every technology with the truth technology_ | | |
-| 6.1 | **Match calls haplotype-aware: TP, FN, FP.** Each technology's calls are matched with the truth technology's calls of the same sample, haplotype-aware, so different representations of one variant still match (TP, FN = missed, FP = only in the query). | `rtg vcfeval` | Always |
-| 6.2 | **Exact-allele and same-position matches.** Record-by-record comparison by CHROM/POS/REF/ALT and by position only, to see how much discordance is representation or another allele. | `bcftools isec` | Always |
-| 6.3 | **Recall, precision, F1 per sample (overall, type, VAF).** Recall, precision and F1 per sample and technology: overall, SNV vs. indel, by truth VAF (detection limit) and query VAF (low-VAF false positives), exact and position matches. | `benchmark_metrics.py` | Always |
-| 6.4 | **Combine samples: summed (micro) and mean (macro).** Over all samples: from the summed counts (micro) and as mean +- sd of the per-sample values (macro). Main result: `benchmark/metrics.aggregated.tsv`. | `aggregate_metrics.py` | Always |
+| 8.1 | **Match calls haplotype-aware: TP, FN, FP.** Each technology is matched with the truth technology of the same sample, haplotype-aware, so different representations of one variant still match (TP, FN = missed, FP = only in the query). | `rtg vcfeval` | VCFs of all technologies |
+| 8.2 | **Exact-allele and same-position matches.** Record-by-record comparison by CHROM/POS/REF/ALT and by position only. | `bcftools isec` | VCFs of all technologies |
+| 8.3 | **Recall, precision, F1 per sample (overall, type, VAF).** Recall, precision and F1 per sample and technology: overall, SNV vs. indel, by truth VAF (detection limit) and query VAF (low-VAF false positives), exact and position matches. | `benchmark_metrics.py` | VCFs of all technologies |
+| 8.4 | **Combine samples: summed (micro) and mean (macro).** Over all samples: from the summed counts (micro) and as mean ± sd of the per-sample values (macro). Main result: `benchmark/metrics.aggregated.tsv`. | `aggregate_metrics.py` | VCFs of all technologies |
 | **DISCORDANCE** | _explain why variants differ_ | | |
-| 7.1 | **Positions of all compared variants of a sample.** All positions of compared variants of a sample are collected, so every alignment is looked at the same sites. | `bcftools query` | With alignments (BAM/CRAM) |
-| 7.2 | **Read counts of every alignment at these positions.** Allele counts of every tumor and normal alignment at these positions (MQ >= 20, BQ >= 13), normalized like the calls. | `bcftools mpileup + call, bcftools norm` | With alignments (BAM/CRAM) |
-| 7.3 | **Reason for every FN/FP; detection power of the query.** Each FN/FP gets a reason from the other technology's view: called but filtered, germline (alt reads in the normal), low coverage, alt reads below the caller's threshold, no alt reads, or absent (no alignment). For truth variants, the binomial detection power of the query gives the power-adjusted recall. | `classify_discordance.py` | Always, With alignments (BAM/CRAM) |
-| 7.4 | **Check the stratification sheet, the gene and stratification BEDs.** The `--stratification` sheet is checked (columns, unique names, existing BEDs); gene and stratification BEDs (repeats, homopolymers, ...) are checked against the reference and sorted. | `check_sheets.py, check_reference.py, bedtools sort` | With --gene_bed / --stratification |
-| 7.5 | **Add genes and genomic context to every variant.** Every compared variant gets its gene(s) and a yes/no per stratification; result: `discordance/variants.annotated.tsv`. | `bedtools map, intersect -c, annotate_variants.py` | With --gene_bed / --stratification |
+| 9.1 | **Read counts of every alignment at the compared positions.** With `--read_evidence` (default): the positions of all compared variants are looked up in every tumor and normal alignment (MQ ≥ `--evidence_min_mapq`, BQ ≥ `--evidence_min_baseq`), normalized like the calls. | `bcftools query, mpileup + call, norm` | Alignments |
+| 9.2 | **Reason for every FN/FP; detection power.** Each FN/FP gets a reason from the other technology's view: called but non-PASS, called but filtered by the uniform filters, germline (alt reads in the normal), low coverage, alt reads below the caller's threshold, no alt reads, or absent. For truth variants, the binomial detection power gives the power-adjusted recall. | `classify_discordance.py` | VCFs of all technologies |
+| **ANNOTATE_VARIANTS** | _annotate every compared variant_ | | |
+| 10.1 | **Compared variants as sites VCF.** All compared variants of all comparisons as one sorted sites-only VCF. | `annotate_variants.py to-vcf` | VCFs of all technologies |
+| 10.2 | **Consequence, gene, impact, variant class.** Ensembl VEP (offline; `--vep_cache` or `--vep_gtf`, options as in cio-abcd/variantinterpretation): the most severe consequence and its gene, impact, variant class and biotype per variant. | `Ensembl VEP, bcftools +split-vep` | VEP cache or GTF (--vep) |
+| 10.3 | **Repeat regions of the reference.** msisensor-pro scans the reference for repeat (microsatellite) regions, or `--repeats_bed` is used (`--annotate_repeats`). | `msisensor-pro scan` | Stratification BEDs (--stratification) and repeat regions |
+| 10.4 | **Repeat context and stratifications per variant.** Every variant gets its repeat unit and length and a yes/no per stratification BED. | `bedtools map, intersect -c` | Stratification BEDs (--stratification) and repeat regions |
+| 10.5 | **Merge all annotations into the variant table.** Result: `discordance/variants.annotated.tsv` (consequence group synonymous / non-synonymous / other, gene, impact, variant class, repeat, strata). | `annotate_variants.py merge` | VCFs of all technologies |
 | **PREPARE_KNOWN_VARIANTS, KNOWN_VARIANTS** | _check known variants_ | | |
-| 8.1 | **Check the known-variant sheet; read the lists, check positions.** The `--known_variants` sheet is checked (columns, unique names, modes, samples of the samplesheet, existing files). Known variants from CSV, TSV or VCF lists are mapped to reference contigs, positions and alleles checked, and written as a sorted VCF. | `check_sheets.py, known_variants.py prepare` | --known_variants, mode required, --known_variants, mode benchmark |
-| 8.2 | **Normalize like the calls; stop on any REF mismatch.** The list is normalized like the calls (split, left-align, atomize); any REF allele that differs from the FASTA stops the run. | `bcftools norm, check_reference.py` | --known_variants, mode required, --known_variants, mode benchmark |
-| 8.3 | **PASS/FAIL of each variant per sample and technology.** Required mode: each listed variant must be found in every technology of the sample: PASS, or FAIL as filtered, outside the comparison region or not called (with read evidence if alignments are given). | `known_variants.py check` | With alignments (BAM/CRAM), --known_variants, mode required |
-| 8.4 | **Checklist summary over all samples.** Required mode: one table over all lists, samples and technologies, a warning per failed variant, and optionally a stop (`--fail_on_missing_required`). | `known_summary.py` | --known_variants, mode required |
-| 8.5 | **Recall/precision of every technology vs the truth set.** Benchmark mode: every technology is compared with the external truth set inside its confident regions, with the same metrics as the main benchmark. | `rtg vcfeval, bcftools isec, benchmark_metrics.py` | --known_variants, mode benchmark |
+| 11.1 | **Normalize the lists like the calls.** The checked known-variant lists are normalized like the calls (split, left-align, atomize). | `bcftools norm` | Known variants (--known_variants) |
+| 11.2 | **Required: PASS/FAIL per sample and technology.** Required mode: each listed variant must be found in every technology of the sample: PASS, or FAIL as filtered, outside the comparison region or not called (with read evidence if available). | `known_variants.py check` | Known variants (--known_variants) |
+| 11.3 | **Required: summary and recall over all samples.** Required mode: one table over all lists, samples and technologies with recall per technology, a warning per failed variant, optionally a stop (`--fail_on_missing_required`). | `known_summary.py` | Known variants (--known_variants) |
+| 11.4 | **Benchmark: every technology vs the truth set.** Benchmark mode: every technology is compared with the external truth set inside its confident regions, with the metrics of the main benchmark. | `rtg vcfeval, bcftools isec, benchmark_metrics.py` | Known variants (--known_variants) |
 | **REPORT** | _summarize_ | | |
-| 9.1 | **Enrichment statistics, gene table and plots.** Are discordant variants enriched for indels, low VAF, stratifications or genes compared with concordant ones (Fisher's exact test, Benjamini-Hochberg)? Plus gene table, class counts and plots. | `variantcomp_report.py` | Always, With --gene_bed / --stratification |
-| 9.2 | **Interactive report of all results.** One report with metrics, discordance classes, recall by VAF, coverage (mosdepth), required variants and software versions. | `MultiQC` | all use cases |
+| 12.1 | **Enrichment, gene and annotation tables, plots.** Are discordant variants enriched for indels, low VAF, non-synonymous consequences, repeats, strata or genes (Fisher's exact test, Benjamini-Hochberg from SciPy)? Discordance per annotation value, gene table, plots. | `variantcomp_report.py` | VCFs of all technologies |
+| 12.2 | **MultiQC report with every step summary.** One report with metrics, discordance, annotation, required variants, every step summary (input checks, bcftools norm, harmonization, regions, coverage) and software versions. | `MultiQC, mqc_tables.py` | VCFs of all technologies |
+
 <!-- steps:end -->
 
 All tools and datasets, with their authors and publications, are listed in
