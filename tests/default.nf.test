@@ -37,13 +37,21 @@ nextflow_pipeline {
                 { assert overallCounts("$outputDir/benchmark/S1/S1_wgs_vs_panel.metrics.tsv") == ['8', '2', '8', '1'] },
                 { assert overallCounts("$outputDir/benchmark/S2/S2_wgs_vs_wes.metrics.tsv") == ['2', '1', '2', '1'] },
                 { assert overallCounts("$outputDir/benchmark/S2/S2_wgs_vs_panel.metrics.tsv") == ['3', '0', '3', '1'] },
-                // discordance: E08 filtered in wes; E12 insertion in the tandem repeat; genes assigned
-                { assert annotated.find { r -> r.query == 'wes' && r.pos == '4700' }.class == 'present_but_filtered' },
+                // discordance: E08 called with a non-PASS FILTER in wes; E12 insertion in the tandem
+                // repeat; genes assigned by VEP (synthetic GTF)
+                { assert annotated.find { r -> r.query == 'wes' && r.pos == '4700' }.class == 'filtered_non_pass' },
                 { assert annotated.find { r -> r.query == 'panel' && r.pos == '2999' }.tandem_repeat == 'yes' },
                 { assert annotated.find { r -> r.query == 'panel' && r.pos == '4999' }.homopolymer == 'yes' },
+                // GIAB stratifications (synthetic stand-ins): same overlap as the strata above
+                { assert annotated.find { r -> r.query == 'panel' && r.pos == '4999' }.giab_homopolymer == 'yes' },
+                { assert annotated.find { r -> r.query == 'panel' && r.pos == '2999' }.giab_tandem_repeat == 'yes' },
                 { assert annotated.every { r -> r.gene.startsWith('GENE_') } },
                 // known variants: E01 passes everywhere, E08 filtered in wes, E07 outside the region
-                { assert path("$outputDir/known_variants/required_summary.tsv").readLines().contains('required_demo\tS1\twes\t3\t1\t2\tno') },
+                { assert path("$outputDir/known_variants/required_summary.tsv").readLines().contains('required_demo\tS1\twes\t3\t1\t2\t0.3333\tno') },
+                { assert path("$outputDir/known_variants/required_summary.tsv").readLines().contains('required_demo\tall\twes\t3\t1\t2\t0.3333\tno') },
+                // every step summary reaches MultiQC; the input checks ran for every VCF and BED
+                { assert path("$outputDir/input_checks/vcf/S2_panel.vcf.reference_check.tsv").readLines().contains('renamed_contigs\t1->chr1,2->chr2') },
+                { assert path("$outputDir/input_checks/vcf/S2_wes.vcf.reference_check.tsv").readLines().contains('records_on_mito\t1') },
                 { assert path("$outputDir/known_variants/required_variants.tsv").text.contains('chr1\t4700\tG\tT\tFAIL_filtered') },
                 // external truth = designed truth: wgs is perfect, wes/panel as against wgs
                 { assert overallCounts("$outputDir/known_variants/benchmark/S1/S1_designed_truth_vs_wgs.metrics.tsv") == ['10', '0', '10', '0'] },

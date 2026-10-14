@@ -16,6 +16,9 @@
                 "BCFTOOLS_ANNOTATE": {
                     "bcftools": "1.23.1"
                 },
+                "BCFTOOLS_CONCAT_ALL": {
+                    "bcftools": "1.23.1"
+                },
                 "BCFTOOLS_ISEC_EXACT": {
                     "bcftools": "1.23.1"
                 },
@@ -25,13 +28,10 @@
                 "BCFTOOLS_NORM": {
                     "bcftools": "1.23.1"
                 },
-                "BCFTOOLS_QUERY_CONTIGS": {
-                    "bcftools": "1.23.1"
-                },
-                "BCFTOOLS_QUERY_SITES": {
-                    "bcftools": "1.23.1"
-                },
                 "BCFTOOLS_REHEADER": {
+                    "bcftools": "1.23.1"
+                },
+                "BCFTOOLS_SPLITVEP": {
                     "bcftools": "1.23.1"
                 },
                 "BCFTOOLS_VIEW_CLEAN": {
@@ -40,7 +40,10 @@
                 "BCFTOOLS_VIEW_COMPARE": {
                     "bcftools": "1.23.1"
                 },
-                "BCFTOOLS_VIEW_HEADER": {
+                "BCFTOOLS_VIEW_NON_PASS": {
+                    "bcftools": "1.23.1"
+                },
+                "BCFTOOLS_VIEW_PASS": {
                     "bcftools": "1.23.1"
                 },
                 "BCFTOOLS_VIEW_SELECT": {
@@ -49,7 +52,7 @@
                 "BEDTOOLS_INTERSECT_STRATA": {
                     "bedtools": "2.31.1"
                 },
-                "BEDTOOLS_MAP_GENES": {
+                "BEDTOOLS_MAP_REPEATS": {
                     "bedtools": "2.31.1"
                 },
                 "BEDTOOLS_MERGE": {
@@ -61,10 +64,10 @@
                 "BEDTOOLS_MULTIINTER": {
                     "bedtools": "2.31.1"
                 },
-                "BEDTOOLS_SORT": {
+                "BEDTOOLS_SORT_ANNOTATION": {
                     "bedtools": "2.31.1"
                 },
-                "BEDTOOLS_SORT_ANNOTATION": {
+                "BEDTOOLS_SORT_INPUT": {
                     "bedtools": "2.31.1"
                 },
                 "BENCHMARK_METRICS": {
@@ -74,22 +77,12 @@
                 "CHECK_KNOWN": {
                     "python": "3.12.15"
                 },
-                "CHECK_REFERENCE_ANNOTATION": {
-                    "python": "3.12.15"
-                },
                 "CHECK_REFERENCE_BED": {
-                    "python": "3.12.15"
-                },
-                "CHECK_REFERENCE_KNOWN": {
+                    "pysam": "0.24.1",
                     "python": "3.12.15"
                 },
                 "CHECK_REFERENCE_VCF": {
-                    "python": "3.12.15"
-                },
-                "CHECK_REF_ALLELES": {
-                    "python": "3.12.15"
-                },
-                "CHECK_REF_ALLELES_KNOWN": {
+                    "pysam": "0.24.1",
                     "python": "3.12.15"
                 },
                 "CHECK_SAMPLESHEET": {
@@ -101,6 +94,11 @@
                 "CLASSIFY_DISCORDANCE": {
                     "pysam": "0.24.1",
                     "python": "3.12.15"
+                },
+                "ENSEMBLVEP_VEP": {
+                    "ensemblvep": 116.1,
+                    "perl-math-cdf": 0.1,
+                    "tabix": "1.22.1"
                 },
                 "GAWK_ALL": {
                     "gawk": "5.3.1"
@@ -142,7 +140,16 @@
                 "KNOWN_VCFEVAL": {
                     "rtgtools": 3.13
                 },
+                "MQC_TABLES": {
+                    "python": "3.12.15"
+                },
+                "MSISENSORPRO_SCAN": {
+                    "msisensor-pro": "1.3.0"
+                },
                 "REGION_SUMMARY": {
+                    "python": "3.12.15"
+                },
+                "REPEATS_TO_BED": {
                     "python": "3.12.15"
                 },
                 "RTGTOOLS_FORMAT": {
@@ -163,11 +170,21 @@
                 "VARIANTS_TO_BED": {
                     "python": "3.12.15"
                 },
+                "VARIANTS_TO_VCF": {
+                    "python": "3.12.15"
+                },
                 "Workflow": {
-                    "core-unit-bioinformatics/workflow-nxf-somatic-variantcomp": "v0.13.1-dev"
+                    "core-unit-bioinformatics/workflow-nxf-somatic-variantcomp": "v0.14.0-dev"
                 }
             },
             [
+                "annotation",
+                "annotation/repeats",
+                "annotation/repeats/synthetic.repeats.bed",
+                "annotation/vep",
+                "annotation/vep/variants.vep.vcf.gz",
+                "annotation/vep/variants.vep.vcf.gz.tbi",
+                "annotation/vep/variants.vep.vcf.gz_summary.html",
                 "benchmark",
                 "benchmark/S1",
                 "benchmark/S1/S1_wgs_vs_panel.metrics.tsv",
@@ -237,7 +254,6 @@
                 "benchmark/metrics.per_pair.tsv",
                 "benchmark/power.aggregated.tsv",
                 "benchmark/power.per_pair.tsv",
-                "coverage",
                 "discordance",
                 "discordance/S1",
                 "discordance/S1/S1_wgs_vs_panel.discordance.tsv",
@@ -249,11 +265,26 @@
                 "discordance/S2/S2_wgs_vs_panel.power.tsv",
                 "discordance/S2/S2_wgs_vs_wes.discordance.tsv",
                 "discordance/S2/S2_wgs_vs_wes.power.tsv",
-                "discordance/reference_check",
-                "discordance/reference_check/genes.reference_check.tsv",
-                "discordance/reference_check/homopolymer.reference_check.tsv",
-                "discordance/reference_check/tandem_repeat.reference_check.tsv",
                 "discordance/variants.annotated.tsv",
+                "input_checks",
+                "input_checks/bed",
+                "input_checks/bed/known_regions_designed_truth.reference_check.tsv",
+                "input_checks/bed/stratum_giab_homopolymer.reference_check.tsv",
+                "input_checks/bed/stratum_giab_tandem_repeat.reference_check.tsv",
+                "input_checks/bed/stratum_homopolymer.reference_check.tsv",
+                "input_checks/bed/stratum_tandem_repeat.reference_check.tsv",
+                "input_checks/bed/target_panel.reference_check.tsv",
+                "input_checks/bed/target_wes.reference_check.tsv",
+                "input_checks/known_variants",
+                "input_checks/known_variants/designed_truth.known.reference_check.tsv",
+                "input_checks/known_variants/required_demo.known.reference_check.tsv",
+                "input_checks/vcf",
+                "input_checks/vcf/S1_panel.vcf.reference_check.tsv",
+                "input_checks/vcf/S1_wes.vcf.reference_check.tsv",
+                "input_checks/vcf/S1_wgs.vcf.reference_check.tsv",
+                "input_checks/vcf/S2_panel.vcf.reference_check.tsv",
+                "input_checks/vcf/S2_wes.vcf.reference_check.tsv",
+                "input_checks/vcf/S2_wgs.vcf.reference_check.tsv",
                 "known_variants",
                 "known_variants/benchmark",
                 "known_variants/benchmark/S1",
@@ -304,10 +335,6 @@
                 "known_variants/lists/designed_truth.known.normalized.vcf.gz.tbi",
                 "known_variants/lists/required_demo.known.normalized.vcf.gz",
                 "known_variants/lists/required_demo.known.normalized.vcf.gz.tbi",
-                "known_variants/reference_check",
-                "known_variants/reference_check/designed_truth.ref_alleles.tsv",
-                "known_variants/reference_check/designed_truth.regions.reference_check.tsv",
-                "known_variants/reference_check/required_demo.ref_alleles.tsv",
                 "known_variants/required",
                 "known_variants/required/required_demo",
                 "known_variants/required/required_demo/required_demo_S1.known_summary.tsv",
@@ -316,6 +343,9 @@
                 "known_variants/required_variants.tsv",
                 "multiqc",
                 "multiqc/multiqc_data",
+                "multiqc/multiqc_data/consequences_all__plot_Coding_consequences.txt",
+                "multiqc/multiqc_data/consequences_all__plot_Consequences_all_.txt",
+                "multiqc/multiqc_data/consequences_all__plot_Consequences_most_severe_.txt",
                 "multiqc/multiqc_data/llms-full.txt",
                 "multiqc/multiqc_data/multiqc.log",
                 "multiqc/multiqc_data/multiqc.parquet",
@@ -324,31 +354,53 @@
                 "multiqc/multiqc_data/multiqc_software_versions.txt",
                 "multiqc/multiqc_data/multiqc_sources.txt",
                 "multiqc/multiqc_data/multiqc_variantcomp_classes.txt",
+                "multiqc/multiqc_data/multiqc_variantcomp_harmonization.txt",
+                "multiqc/multiqc_data/multiqc_variantcomp_input_checks.txt",
                 "multiqc/multiqc_data/multiqc_variantcomp_metrics.txt",
+                "multiqc/multiqc_data/multiqc_variantcomp_normalization.txt",
                 "multiqc/multiqc_data/multiqc_variantcomp_per_sample.txt",
                 "multiqc/multiqc_data/multiqc_variantcomp_recall_vaf_plot.txt",
+                "multiqc/multiqc_data/multiqc_variantcomp_regions.txt",
                 "multiqc/multiqc_data/multiqc_variantcomp_required.txt",
+                "multiqc/multiqc_data/multiqc_variantcomp_strata.txt",
+                "multiqc/multiqc_data/position_in_protein_plot.txt",
+                "multiqc/multiqc_data/variant_classes_plot.txt",
+                "multiqc/multiqc_data/variants_by_chromosome_plot.txt",
+                "multiqc/multiqc_data/vep-general-stats.txt",
+                "multiqc/multiqc_data/vep.txt",
                 "multiqc/multiqc_plots",
                 "multiqc/multiqc_plots/pdf",
                 "multiqc/multiqc_plots/pdf/variantcomp_classes-cnt.pdf",
                 "multiqc/multiqc_plots/pdf/variantcomp_classes-pct.pdf",
+                "multiqc/multiqc_plots/pdf/variantcomp_harmonization.pdf",
+                "multiqc/multiqc_plots/pdf/variantcomp_input_checks.pdf",
                 "multiqc/multiqc_plots/pdf/variantcomp_metrics.pdf",
+                "multiqc/multiqc_plots/pdf/variantcomp_normalization.pdf",
                 "multiqc/multiqc_plots/pdf/variantcomp_per_sample.pdf",
                 "multiqc/multiqc_plots/pdf/variantcomp_recall_vaf_plot.pdf",
+                "multiqc/multiqc_plots/pdf/variantcomp_regions.pdf",
                 "multiqc/multiqc_plots/pdf/variantcomp_required.pdf",
                 "multiqc/multiqc_plots/png",
                 "multiqc/multiqc_plots/png/variantcomp_classes-cnt.png",
                 "multiqc/multiqc_plots/png/variantcomp_classes-pct.png",
+                "multiqc/multiqc_plots/png/variantcomp_harmonization.png",
+                "multiqc/multiqc_plots/png/variantcomp_input_checks.png",
                 "multiqc/multiqc_plots/png/variantcomp_metrics.png",
+                "multiqc/multiqc_plots/png/variantcomp_normalization.png",
                 "multiqc/multiqc_plots/png/variantcomp_per_sample.png",
                 "multiqc/multiqc_plots/png/variantcomp_recall_vaf_plot.png",
+                "multiqc/multiqc_plots/png/variantcomp_regions.png",
                 "multiqc/multiqc_plots/png/variantcomp_required.png",
                 "multiqc/multiqc_plots/svg",
                 "multiqc/multiqc_plots/svg/variantcomp_classes-cnt.svg",
                 "multiqc/multiqc_plots/svg/variantcomp_classes-pct.svg",
+                "multiqc/multiqc_plots/svg/variantcomp_harmonization.svg",
+                "multiqc/multiqc_plots/svg/variantcomp_input_checks.svg",
                 "multiqc/multiqc_plots/svg/variantcomp_metrics.svg",
+                "multiqc/multiqc_plots/svg/variantcomp_normalization.svg",
                 "multiqc/multiqc_plots/svg/variantcomp_per_sample.svg",
                 "multiqc/multiqc_plots/svg/variantcomp_recall_vaf_plot.svg",
+                "multiqc/multiqc_plots/svg/variantcomp_regions.svg",
                 "multiqc/multiqc_plots/svg/variantcomp_required.svg",
                 "multiqc/multiqc_report.html",
                 "pipeline_info",
@@ -359,14 +411,12 @@
                 "regions",
                 "regions/common_targets.bed",
                 "regions/common_targets.summary.tsv",
-                "regions/reference_check",
-                "regions/reference_check/panel.bed.reference_check.tsv",
-                "regions/reference_check/wes.bed.reference_check.tsv",
                 "regions/targets",
                 "regions/targets/panel.bed",
                 "regions/targets/wes.bed",
                 "report",
                 "report/plots",
+                "report/plots/discordance_by_annotation.png",
                 "report/plots/discordance_classes.png",
                 "report/plots/enrichment.png",
                 "report/plots/recall_by_vaf.png",
@@ -374,64 +424,69 @@
                 "report/variantcomp.classes.tsv",
                 "report/variantcomp.enrichment.tsv",
                 "report/variantcomp.genes.tsv",
+                "report/variantcomp.strata.tsv",
                 "vcf_preprocessed",
                 "vcf_preprocessed/S1",
                 "vcf_preprocessed/S1/S1_panel.compare.vcf.gz",
                 "vcf_preprocessed/S1/S1_panel.compare.vcf.gz.tbi",
-                "vcf_preprocessed/S1/S1_panel.normalized.harmonize_summary.tsv",
+                "vcf_preprocessed/S1/S1_panel.non_pass.normalized.harmonize_summary.tsv",
                 "vcf_preprocessed/S1/S1_panel.normalized.vcf.gz",
                 "vcf_preprocessed/S1/S1_panel.normalized.vcf.gz.tbi",
+                "vcf_preprocessed/S1/S1_panel.pass.normalized.harmonize_summary.tsv",
                 "vcf_preprocessed/S1/S1_wes.compare.vcf.gz",
                 "vcf_preprocessed/S1/S1_wes.compare.vcf.gz.tbi",
-                "vcf_preprocessed/S1/S1_wes.normalized.harmonize_summary.tsv",
+                "vcf_preprocessed/S1/S1_wes.non_pass.normalized.harmonize_summary.tsv",
                 "vcf_preprocessed/S1/S1_wes.normalized.vcf.gz",
                 "vcf_preprocessed/S1/S1_wes.normalized.vcf.gz.tbi",
+                "vcf_preprocessed/S1/S1_wes.pass.normalized.harmonize_summary.tsv",
                 "vcf_preprocessed/S1/S1_wgs.compare.vcf.gz",
                 "vcf_preprocessed/S1/S1_wgs.compare.vcf.gz.tbi",
-                "vcf_preprocessed/S1/S1_wgs.normalized.harmonize_summary.tsv",
+                "vcf_preprocessed/S1/S1_wgs.non_pass.normalized.harmonize_summary.tsv",
                 "vcf_preprocessed/S1/S1_wgs.normalized.vcf.gz",
                 "vcf_preprocessed/S1/S1_wgs.normalized.vcf.gz.tbi",
+                "vcf_preprocessed/S1/S1_wgs.pass.normalized.harmonize_summary.tsv",
                 "vcf_preprocessed/S2",
                 "vcf_preprocessed/S2/S2_panel.compare.vcf.gz",
                 "vcf_preprocessed/S2/S2_panel.compare.vcf.gz.tbi",
-                "vcf_preprocessed/S2/S2_panel.normalized.harmonize_summary.tsv",
+                "vcf_preprocessed/S2/S2_panel.non_pass.normalized.harmonize_summary.tsv",
                 "vcf_preprocessed/S2/S2_panel.normalized.vcf.gz",
                 "vcf_preprocessed/S2/S2_panel.normalized.vcf.gz.tbi",
+                "vcf_preprocessed/S2/S2_panel.pass.normalized.harmonize_summary.tsv",
                 "vcf_preprocessed/S2/S2_wes.compare.vcf.gz",
                 "vcf_preprocessed/S2/S2_wes.compare.vcf.gz.tbi",
-                "vcf_preprocessed/S2/S2_wes.normalized.harmonize_summary.tsv",
+                "vcf_preprocessed/S2/S2_wes.non_pass.normalized.harmonize_summary.tsv",
                 "vcf_preprocessed/S2/S2_wes.normalized.vcf.gz",
                 "vcf_preprocessed/S2/S2_wes.normalized.vcf.gz.tbi",
+                "vcf_preprocessed/S2/S2_wes.pass.normalized.harmonize_summary.tsv",
                 "vcf_preprocessed/S2/S2_wgs.compare.vcf.gz",
                 "vcf_preprocessed/S2/S2_wgs.compare.vcf.gz.tbi",
-                "vcf_preprocessed/S2/S2_wgs.normalized.harmonize_summary.tsv",
+                "vcf_preprocessed/S2/S2_wgs.non_pass.normalized.harmonize_summary.tsv",
                 "vcf_preprocessed/S2/S2_wgs.normalized.vcf.gz",
                 "vcf_preprocessed/S2/S2_wgs.normalized.vcf.gz.tbi",
-                "vcf_preprocessed/reference_check",
-                "vcf_preprocessed/reference_check/S1_panel.norm.norm.log",
-                "vcf_preprocessed/reference_check/S1_panel.ref_alleles.tsv",
-                "vcf_preprocessed/reference_check/S1_panel.vcf.reference_check.tsv",
-                "vcf_preprocessed/reference_check/S1_wes.norm.norm.log",
-                "vcf_preprocessed/reference_check/S1_wes.ref_alleles.tsv",
-                "vcf_preprocessed/reference_check/S1_wes.vcf.reference_check.tsv",
-                "vcf_preprocessed/reference_check/S1_wgs.norm.norm.log",
-                "vcf_preprocessed/reference_check/S1_wgs.ref_alleles.tsv",
-                "vcf_preprocessed/reference_check/S1_wgs.vcf.reference_check.tsv",
-                "vcf_preprocessed/reference_check/S2_panel.norm.norm.log",
-                "vcf_preprocessed/reference_check/S2_panel.ref_alleles.tsv",
-                "vcf_preprocessed/reference_check/S2_panel.vcf.reference_check.tsv",
-                "vcf_preprocessed/reference_check/S2_wes.norm.norm.log",
-                "vcf_preprocessed/reference_check/S2_wes.ref_alleles.tsv",
-                "vcf_preprocessed/reference_check/S2_wes.vcf.reference_check.tsv",
-                "vcf_preprocessed/reference_check/S2_wgs.norm.norm.log",
-                "vcf_preprocessed/reference_check/S2_wgs.ref_alleles.tsv",
-                "vcf_preprocessed/reference_check/S2_wgs.vcf.reference_check.tsv"
+                "vcf_preprocessed/S2/S2_wgs.pass.normalized.harmonize_summary.tsv",
+                "vcf_preprocessed/norm_logs",
+                "vcf_preprocessed/norm_logs/S1_panel.non_pass.norm.norm.log",
+                "vcf_preprocessed/norm_logs/S1_panel.pass.norm.norm.log",
+                "vcf_preprocessed/norm_logs/S1_wes.non_pass.norm.norm.log",
+                "vcf_preprocessed/norm_logs/S1_wes.pass.norm.norm.log",
+                "vcf_preprocessed/norm_logs/S1_wgs.non_pass.norm.norm.log",
+                "vcf_preprocessed/norm_logs/S1_wgs.pass.norm.norm.log",
+                "vcf_preprocessed/norm_logs/S2_panel.non_pass.norm.norm.log",
+                "vcf_preprocessed/norm_logs/S2_panel.pass.norm.norm.log",
+                "vcf_preprocessed/norm_logs/S2_wes.non_pass.norm.norm.log",
+                "vcf_preprocessed/norm_logs/S2_wes.pass.norm.norm.log",
+                "vcf_preprocessed/norm_logs/S2_wgs.non_pass.norm.norm.log",
+                "vcf_preprocessed/norm_logs/S2_wgs.pass.norm.norm.log"
             ],
             [
+                "synthetic.repeats.bed:md5,a3fd263d9a5107eef4fdb446f35af71b",
+                "variants.vep.vcf.gz:md5,a4c4864a3a83c0fa65891cb8c3547bd7",
+                "variants.vep.vcf.gz.tbi:md5,a13e81252081cddd353711c61022f539",
+                "variants.vep.vcf.gz_summary.html:md5,91470ec10dd959232c9328a9126f9397",
                 "S1_wgs_vs_panel.metrics.tsv:md5,af4eeda87a45d90edeca2ff0e1add7fe",
                 "S1_wgs_vs_panel.variants.tsv:md5,4406443638070d6c0c5bff04bcf5add9",
                 "S1_wgs_vs_wes.metrics.tsv:md5,c152736e37b9fada98d41a4d932547a3",
-                "S1_wgs_vs_wes.variants.tsv:md5,17a16b59e2acf68c17293722a6fecd62",
+                "S1_wgs_vs_wes.variants.tsv:md5,ed2eff6b6e1a0e7623ba7ac2f1118777",
                 "S2_wgs_vs_panel.metrics.tsv:md5,5e52eaedd1c2e432dab58867ac8628c8",
                 "S2_wgs_vs_panel.variants.tsv:md5,aff4e27a779ae6ce1ccc7431782d0b88",
                 "S2_wgs_vs_wes.metrics.tsv:md5,50f56c1863ba21972c893c8e24d531c6",
@@ -440,75 +495,96 @@
                 "metrics.per_pair.tsv:md5,897622dbc63cc600a354a8ae1c0b987e",
                 "power.aggregated.tsv:md5,8ae24172f572ae18bc04dda610e2e92f",
                 "power.per_pair.tsv:md5,0fb85043dd97427dcb1898a98302a568",
-                "S1_wgs_vs_panel.discordance.tsv:md5,53cefadc314033781405c30aabeffc1e",
+                "S1_wgs_vs_panel.discordance.tsv:md5,94e57d5d370832553334b669d8929d3a",
                 "S1_wgs_vs_panel.power.tsv:md5,ac09429e752094d307513c66c367d186",
-                "S1_wgs_vs_wes.discordance.tsv:md5,f3c379524ce618eb39a4c131ef102a80",
+                "S1_wgs_vs_wes.discordance.tsv:md5,a9bfda339bcef4cf18d15f10da78d65e",
                 "S1_wgs_vs_wes.power.tsv:md5,15105b2198837f5620f176fc4d85ce73",
-                "S2_wgs_vs_panel.discordance.tsv:md5,b630a470492c1255f8263d3b888f003d",
+                "S2_wgs_vs_panel.discordance.tsv:md5,5f0199526ffede7200b1522466a452d8",
                 "S2_wgs_vs_panel.power.tsv:md5,3f080a812073657e85983892a5c3bbcb",
-                "S2_wgs_vs_wes.discordance.tsv:md5,2a6af6e794ecb6db24e1bb31a9f707f7",
+                "S2_wgs_vs_wes.discordance.tsv:md5,e8ec2ccc37000dff7ce89c86c4f9ae9b",
                 "S2_wgs_vs_wes.power.tsv:md5,f4debbd1ddb8dfb6a4130e313ef1be65",
-                "genes.reference_check.tsv:md5,8baf00d39b0613c96f0ce14984b1dd7c",
-                "homopolymer.reference_check.tsv:md5,731456605716a3fd135c83b274d7ea7d",
-                "tandem_repeat.reference_check.tsv:md5,bb7cdba5d6a4d8c4490d26fbebeb0b43",
-                "variants.annotated.tsv:md5,aa6a96e2ae426b72ac96d10938f88bda",
+                "variants.annotated.tsv:md5,ecc2a3cb06438eebd4ab46979b7ba414",
+                "known_regions_designed_truth.reference_check.tsv:md5,bb37afd6d71835874b35f5ccbfeed228",
+                "stratum_giab_homopolymer.reference_check.tsv:md5,9f79793640653706605385356b31480c",
+                "stratum_giab_tandem_repeat.reference_check.tsv:md5,0bc3dea73f5fcb43fe84c9f6ae3e4e22",
+                "stratum_homopolymer.reference_check.tsv:md5,fc97aede54f80501adc022781ba798a1",
+                "stratum_tandem_repeat.reference_check.tsv:md5,7e27b7c65b052b54aa35848a2f6942a2",
+                "target_panel.reference_check.tsv:md5,e0a9ce4ca7d0dff64b728dddc1f92c00",
+                "target_wes.reference_check.tsv:md5,29dc123bbc345fdec67a9661d7c35faf",
+                "designed_truth.known.reference_check.tsv:md5,2490c297a7c14a65bd41dc7a806dede6",
+                "required_demo.known.reference_check.tsv:md5,a95c5ce97df270aa9483192ad1df9f07",
+                "S1_panel.vcf.reference_check.tsv:md5,6edec831169d1bdc3fb3c2d8d259676c",
+                "S1_wes.vcf.reference_check.tsv:md5,94131d256a1992efea606937b0af9f40",
+                "S1_wgs.vcf.reference_check.tsv:md5,ce4b587659566b195e273d2605361445",
+                "S2_panel.vcf.reference_check.tsv:md5,622452659885535f7696caa235d592ea",
+                "S2_wes.vcf.reference_check.tsv:md5,fc99d5716ad75f190696994845a7d4b8",
+                "S2_wgs.vcf.reference_check.tsv:md5,7c672156e5d7be8b11a972f43d5a6a9d",
                 "S1_designed_truth_vs_panel.metrics.tsv:md5,5e7de9b1a05c872f512664aeef7f2920",
                 "S1_designed_truth_vs_panel.variants.tsv:md5,b8814816530aa80443fbcd6396d8fe70",
                 "S1_designed_truth_vs_wes.metrics.tsv:md5,00e43d67ad8682673b4727dd22f433e0",
-                "S1_designed_truth_vs_wes.variants.tsv:md5,6d749f91c70551f15c6225c9c4dbb9f8",
+                "S1_designed_truth_vs_wes.variants.tsv:md5,7109610d2089010c753a1d99153a82a2",
                 "S1_designed_truth_vs_wgs.metrics.tsv:md5,600a202b482902d12aef7feb46878514",
                 "S1_designed_truth_vs_wgs.variants.tsv:md5,a6892e33b6d3f206923a1a6c53f47df6",
                 "known_benchmark.aggregated.tsv:md5,5a912352347ab359ab402e516dd2baa6",
                 "known_benchmark.per_pair.tsv:md5,11b27459b987f6af4ec023c03cdc7314",
-                "designed_truth.ref_alleles.tsv:md5,8db16b70a72ac4f349c301ea9a393edb",
-                "designed_truth.regions.reference_check.tsv:md5,acf67f9b3c07e6c76607023be6f69511",
-                "required_demo.ref_alleles.tsv:md5,43d8e8a70670ce6872cc15c94fce79ed",
-                "required_demo_S1.known_summary.tsv:md5,161216e868d8386af2f05d2046caa958",
+                "required_demo_S1.known_summary.tsv:md5,6e109ae2ae6d3b997e16fb5cc11d9834",
                 "required_demo_S1.known_variants.tsv:md5,103ef35009c3006cf1d705bc84a23abd",
-                "required_summary.tsv:md5,8b14e271e67e1e0c74d9b12c468f63be",
+                "required_summary.tsv:md5,4326e4f6de86aaff0bc48dc8653d5127",
                 "required_variants.tsv:md5,37faff7aee5b5e93923d783967d58387",
-                "multiqc_citations.txt:md5,4c806e63a283ec1b7e78cdae3a923d4f",
-                "multiqc_variantcomp_classes.txt:md5,3f6fa632b34ad39705b4d9029ed6c3b8",
+                "consequences_all__plot_Coding_consequences.txt:md5,824d082e7d1e9c83fd8d1b73ecc77aa6",
+                "consequences_all__plot_Consequences_all_.txt:md5,f73b1725fa33fc964ea66e2e3e42e92b",
+                "consequences_all__plot_Consequences_most_severe_.txt:md5,824d082e7d1e9c83fd8d1b73ecc77aa6",
+                "multiqc_citations.txt:md5,afe6b13a9c0770828d9bc9515d6db802",
+                "multiqc_variantcomp_classes.txt:md5,e07aec057362ef67c330e6174a22766a",
+                "multiqc_variantcomp_harmonization.txt:md5,6a6438ea96078e3ffbafcc2d9ed4caa9",
+                "multiqc_variantcomp_input_checks.txt:md5,32ecff7daef97921d44cfc53da3130a6",
                 "multiqc_variantcomp_metrics.txt:md5,14a45859c9eb439069469ed1b242c37b",
+                "multiqc_variantcomp_normalization.txt:md5,2a6ba6f05a80d9f7f2592b056a3c61f6",
                 "multiqc_variantcomp_per_sample.txt:md5,e5fbc340742d4ee46877b4b4fecab558",
                 "multiqc_variantcomp_recall_vaf_plot.txt:md5,f86bb9acad154250adc98e93edab01b4",
-                "multiqc_variantcomp_required.txt:md5,1dd8bbbdf59f9af9d42537586df988f5",
+                "multiqc_variantcomp_regions.txt:md5,2f2d5061f9f2b8b01afe509424ec277d",
+                "multiqc_variantcomp_required.txt:md5,4e8fb08aba3b14b51d13417e2824aab2",
+                "multiqc_variantcomp_strata.txt:md5,0f1bfb8628721e84c7445784ffd4cffd",
+                "position_in_protein_plot.txt:md5,bc0b67e48156adedfba602e040dea108",
+                "variant_classes_plot.txt:md5,8c2be2ce1a77cc3990dc29bcbbf89eb9",
+                "variants_by_chromosome_plot.txt:md5,7d4ad59441df9b1e7926d6a2f4a538f2",
+                "vep-general-stats.txt:md5,a0c5f6e554c85e113bc13614d5d1dba4",
+                "vep.txt:md5,b8cb44011fc7f8ce7d232c7a15cf2281",
                 "common_targets.bed:md5,05beabccb7d0af813ec94b6dad30a3c6",
-                "common_targets.summary.tsv:md5,354fd9bf32178ede1809d465548a223c",
-                "panel.bed.reference_check.tsv:md5,14aadf2013c3efc77f69d77814d471a4",
-                "wes.bed.reference_check.tsv:md5,35076003ce60ea0730384a1ba9fa985e",
+                "common_targets.summary.tsv:md5,e95b2155163e6d15ad0fe1d7b2240c6f",
                 "panel.bed:md5,05beabccb7d0af813ec94b6dad30a3c6",
                 "wes.bed:md5,fbe9a533baa9b14958cddea97db4ea48",
-                "variantcomp.classes.tsv:md5,dcd6756b67f7ea5c17babc6e7d013289",
-                "variantcomp.enrichment.tsv:md5,6d126ecf5264bb2764693d4480a93881",
+                "variantcomp.classes.tsv:md5,4f7bfb765fc69b4a99a05e69eaf18728",
+                "variantcomp.enrichment.tsv:md5,345161f582704299f9fccd1eba2fd7ff",
                 "variantcomp.genes.tsv:md5,72f9781a82b2ad928bc7302d0adfbcdd",
-                "S1_panel.normalized.harmonize_summary.tsv:md5,cfb651bdc72a8f636bb18acba1fe58ea",
-                "S1_wes.normalized.harmonize_summary.tsv:md5,021f6e76c387ce86c71e56a323aee096",
-                "S1_wgs.normalized.harmonize_summary.tsv:md5,d0451033f806bd20e5bb0e1ad1268575",
-                "S2_panel.normalized.harmonize_summary.tsv:md5,57ed2bdc496e53a3ad9f0b6be9105208",
-                "S2_wes.normalized.harmonize_summary.tsv:md5,ef6173f51cbe465c9118af0811e41f2e",
-                "S2_wgs.normalized.harmonize_summary.tsv:md5,ef6173f51cbe465c9118af0811e41f2e",
-                "S1_panel.norm.norm.log:md5,fafc8e7c1df374b2e0cb3e8482bd93ae",
-                "S1_panel.ref_alleles.tsv:md5,bb71f59c48768a37acd636b4f43790c9",
-                "S1_panel.vcf.reference_check.tsv:md5,c82df0ec5c51d18403b77d3f1175938e",
-                "S1_wes.norm.norm.log:md5,a2a6cc1be2c5f4b0de89d3d8fd70421b",
-                "S1_wes.ref_alleles.tsv:md5,1dd4695ad1e9201b171af34204858b85",
-                "S1_wes.vcf.reference_check.tsv:md5,4ef0fd7a07c8ddf53fb0be7cb024137f",
-                "S1_wgs.norm.norm.log:md5,be9f99d96cb0ce0b823c70edba985454",
-                "S1_wgs.ref_alleles.tsv:md5,43ecb682714ffba9664f4d7e0068e91b",
-                "S1_wgs.vcf.reference_check.tsv:md5,bd3568278f4c763239005c1fa9522c0b",
-                "S2_panel.norm.norm.log:md5,22b5e474139b79fff1f1540b1c888fe6",
-                "S2_panel.ref_alleles.tsv:md5,0b4431758ec3b84812171bbe86cc180a",
-                "S2_panel.vcf.reference_check.tsv:md5,45389e33f260962c185d3ae7878c746a",
-                "S2_wes.norm.norm.log:md5,db47819a679324c6aa103e507740e853",
-                "S2_wes.ref_alleles.tsv:md5,412e3555adb7824404e03bb31115dd6b",
-                "S2_wes.vcf.reference_check.tsv:md5,a1c2d733eb35c9edba003f24f20e14a4",
-                "S2_wgs.norm.norm.log:md5,db47819a679324c6aa103e507740e853",
-                "S2_wgs.ref_alleles.tsv:md5,412e3555adb7824404e03bb31115dd6b",
-                "S2_wgs.vcf.reference_check.tsv:md5,9d59d057624c00b71d780af3ce5c1877"
+                "variantcomp.strata.tsv:md5,526c6441fdb5c26ffb81514b2f4f06dc",
+                "S1_panel.non_pass.normalized.harmonize_summary.tsv:md5,82db154e8d52980cd2314f84c53b7b12",
+                "S1_panel.pass.normalized.harmonize_summary.tsv:md5,e9b0bb9db68312fc379b4d2e9db05f0d",
+                "S1_wes.non_pass.normalized.harmonize_summary.tsv:md5,2d27ce277984add09d966ffe39cd02e3",
+                "S1_wes.pass.normalized.harmonize_summary.tsv:md5,cc21862af180211d967957e8ac212af9",
+                "S1_wgs.non_pass.normalized.harmonize_summary.tsv:md5,82db154e8d52980cd2314f84c53b7b12",
+                "S1_wgs.pass.normalized.harmonize_summary.tsv:md5,a3ce5751d9f6424c32cd454f710f856e",
+                "S2_panel.non_pass.normalized.harmonize_summary.tsv:md5,82db154e8d52980cd2314f84c53b7b12",
+                "S2_panel.pass.normalized.harmonize_summary.tsv:md5,6d36e42b1bfbcff9b74c66949084f667",
+                "S2_wes.non_pass.normalized.harmonize_summary.tsv:md5,82db154e8d52980cd2314f84c53b7b12",
+                "S2_wes.pass.normalized.harmonize_summary.tsv:md5,209fc08140d29b9924cbf793fbd1a61a",
+                "S2_wgs.non_pass.normalized.harmonize_summary.tsv:md5,82db154e8d52980cd2314f84c53b7b12",
+                "S2_wgs.pass.normalized.harmonize_summary.tsv:md5,209fc08140d29b9924cbf793fbd1a61a",
+                "S1_panel.non_pass.norm.norm.log:md5,75533da6899b110504992ccaadfc5ef5",
+                "S1_panel.pass.norm.norm.log:md5,fafc8e7c1df374b2e0cb3e8482bd93ae",
+                "S1_wes.non_pass.norm.norm.log:md5,24dea39db3884e5e001ec8b93d451f43",
+                "S1_wes.pass.norm.norm.log:md5,544e953c6cdea3b2c5f88dfc695e6a95",
+                "S1_wgs.non_pass.norm.norm.log:md5,75533da6899b110504992ccaadfc5ef5",
+                "S1_wgs.pass.norm.norm.log:md5,be9f99d96cb0ce0b823c70edba985454",
+                "S2_panel.non_pass.norm.norm.log:md5,75533da6899b110504992ccaadfc5ef5",
+                "S2_panel.pass.norm.norm.log:md5,db47819a679324c6aa103e507740e853",
+                "S2_wes.non_pass.norm.norm.log:md5,75533da6899b110504992ccaadfc5ef5",
+                "S2_wes.pass.norm.norm.log:md5,c54ce01fd99970fb0a3ee17d82f03252",
+                "S2_wgs.non_pass.norm.norm.log:md5,75533da6899b110504992ccaadfc5ef5",
+                "S2_wgs.pass.norm.norm.log:md5,c54ce01fd99970fb0a3ee17d82f03252"
             ]
         ],
-        "timestamp": "2026-10-13T15:19:35.251834125",
+        "timestamp": "2026-10-14T11:45:30.386635135",
         "meta": {
             "nf-test": "0.9.5",
             "nextflow": "26.04.4"
