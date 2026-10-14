@@ -108,8 +108,16 @@ Notes:
   `bcftools view -t`, and the pipeline must also accept such input.
 - The SEQC2 VCF headers list the 2,779 contigs of `GRCh38.d1.vd1`, while the small
   reference only contains chr22. This deliberately exercises the reference check.
-- Downloads use `curl` with resume and retries. Re-running `prepare` reuses cached and
-  finished files.
+- Downloads are done in Python (`urllib`) with resume and retries. Re-running `prepare`
+  reuses cached and finished files.
+- HTTPS needs a CA bundle; the script uses the first existing one of `--ca-bundle`,
+  `$CURL_CA_BUNDLE`, `$SSL_CERT_FILE`, `$REQUESTS_CA_BUNDLE`, the Python package
+  `certifi` and the usual system paths, and exports it as `CURL_CA_BUNDLE` /
+  `SSL_CERT_FILE` for samtools/bcftools reading remote files. This fixes
+  `curl: (77) error adding trust anchors from file: /home/conda/feedstock_root/...`,
+  which occurs when a conda build of curl/htslib keeps its unrelocated build-time CA path.
+- The GIAB v3.5 stratifications are subset to the dataset's contigs and written in the
+  release layout to `annotation/giab/GRCh38/` (`--giab_dir`, default `--giab_files`).
 
 ## nf-test
 

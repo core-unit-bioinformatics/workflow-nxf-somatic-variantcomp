@@ -23,8 +23,16 @@ Pseudo-samples are SEQC2 center/replicate pairs (e.g. IL_1 = WGS_IL_1 + WES_IL_1
 All pairs are sequenced from the same DNA batch, so each pair behaves like one
 tumor/normal "patient" sequenced with WGS and WES.
 
-Required tools on PATH: curl, samtools, bcftools, tabix, bgzip, bedtools
-(all in envs/variantcomp-dev.yaml).
+Required tools on PATH: samtools, bcftools, tabix, bgzip, bedtools (all in
+envs/variantcomp-dev.yaml). Downloads are done in Python (urllib, resumable).
+
+TLS certificates: HTTPS downloads (Python) and remote reads of samtools/bcftools
+(htslib/libcurl) need a CA bundle. The first existing file of $CURL_CA_BUNDLE,
+$SSL_CERT_FILE, $REQUESTS_CA_BUNDLE, the Python package certifi and the usual system
+paths is used and exported as CURL_CA_BUNDLE and SSL_CERT_FILE for the tools. This
+avoids `curl: (77) error adding trust anchors` with conda builds whose built-in CA path
+was not relocated (a path under /home/conda/feedstock_root/...); --ca-bundle sets the
+file explicitly.
 
 Examples:
   seqc2_testdata.py prepare --mode small
@@ -40,8 +48,12 @@ import hashlib
 import logging
 import os
 import shutil
+import ssl
 import subprocess
 import sys
+import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 import yaml
@@ -50,7 +62,14 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 PIPELINE_DIR = SCRIPT_DIR.parent.parent
 DEFAULT_CONFIG = SCRIPT_DIR / "seqc2_testdata.yaml"
 DEFAULT_TESTDATA = PIPELINE_DIR.parent / "workflow-nxf-somatic-variantcomp-testdata" / "seqc2"
-REQUIRED_TOOLS = ["curl", "samtools", "bcftools", "tabix", "bgzip", "bedtools"]
+REQUIRED_TOOLS = ["samtools", "bcftools", "tabix", "bgzip", "bedtools"]
+# CA bundles of common Linux distributions (Debian/Ubuntu, RHEL/Fedora, openSUSE, Alpine)
+SYSTEM_CA_BUNDLES = [
+    "/etc/ssl/certs/ca-certificates.crt",
+    "/etc/pki/tls/certs/ca-bundle.crt",
+    "/etc/ssl/ca-bundle.pem",
+    "/etc/ssl/cert.pem",
+]
 DEFAULT_PROFILES = {"small": "test_seqc2,conda", "full": "test_full,singularity"}
 
 log = logging.getLogger("seqc2_testdata")
@@ -73,6 +92,86 @@ def md5sum(path, chunk=1 << 20):
     return digest.hexdigest()
 
 
+def find_ca_bundle(explicit=None):
+    """Path of the first existing CA bundle: --ca-bundle, env vars, certifi, system paths."""
+    candidates = [explicit] if explicit else []
+    # environment variables only count if they point to a file (a broken conda
+    # placeholder path is skipped)
+    candidates += [os.environ.get(var) for var in ("CURL_CA_BUNDLE", "SSL_CERT_FILE")]
+    candidates.append(os.environ.get("REQUESTS_CA_BUNDLE"))
+    try:
+        import certifi
+
+        candidates.append(certifi.where())
+    except ImportError:
+        pass
+    candidates += SYSTEM_CA_BUNDLES
+    for path in candidates:
+        if path and Path(path).is_file():
+            return str(path)
+    if explicit:
+        sys.exit(f"ERROR: --ca-bundle {explicit} does not exist")
+    return None
+
+
+def setup_tls(explicit=None):
+    """SSL context for urllib; exports the CA bundle for htslib/libcurl (samtools, bcftools)."""
+    bundle = find_ca_bundle(explicit)
+    if bundle is None:
+        log.warning(
+            "no CA bundle found (set --ca-bundle or install certifi); using Python's defaults"
+        )
+        return ssl.create_default_context()
+    # htslib reads CURL_CA_BUNDLE for https:// inputs (samtools faidx/view on URLs)
+    os.environ["CURL_CA_BUNDLE"] = bundle
+    os.environ["SSL_CERT_FILE"] = bundle
+    log.info("CA bundle: %s", bundle)
+    return ssl.create_default_context(cafile=bundle)
+
+
+SSL_CONTEXT = None  # set by main() via setup_tls()
+
+
+def http_get(url, part, retries=5, delay=10):
+    """Download url into the file part; resumes a partial file (HTTP Range); retries."""
+    for attempt in range(1, retries + 1):
+        # bytes already downloaded by an earlier, interrupted attempt
+        offset = part.stat().st_size if part.exists() else 0
+        headers = {"Range": f"bytes={offset}-"} if offset else {}
+        try:
+            request = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(request, context=SSL_CONTEXT, timeout=300) as resp:
+                # 206: the server continues at offset; 200: it sends the whole file
+                mode = "ab" if offset and resp.status == 206 else "wb"
+                with open(part, mode) as fh:
+                    shutil.copyfileobj(resp, fh, 1 << 20)
+            return
+        except urllib.error.HTTPError as err:
+            # 416: nothing left to download (the partial file is complete)
+            if err.code == 416 and offset:
+                return
+            # other client errors (404, 403, ...) won't go away by retrying
+            if 400 <= err.code < 500:
+                raise RuntimeError(f"download of {url} failed: HTTP {err.code}") from err
+            reason = f"HTTP {err.code}"
+        except (urllib.error.URLError, TimeoutError, ConnectionError, ssl.SSLError) as err:
+            reason = str(getattr(err, "reason", err))
+        log.warning("download of %s failed (%s); attempt %d/%d", url, reason, attempt, retries)
+        if attempt < retries:
+            time.sleep(delay)
+    raise RuntimeError(f"download of {url} failed after {retries} attempts")
+
+
+def http_text(url):
+    """Content of a small text file at url, or None if it can't be fetched."""
+    try:
+        with urllib.request.urlopen(url, context=SSL_CONTEXT, timeout=120) as resp:
+            return resp.read().decode()
+    except (urllib.error.URLError, TimeoutError, ConnectionError, ssl.SSLError) as err:
+        log.warning("could not fetch %s: %s", url, getattr(err, "reason", err))
+        return None
+
+
 def download(url, dest, md5=None):
     """Download url to dest (resumable); verify md5 if given. Skips finished files."""
     dest = Path(dest)
@@ -84,7 +183,8 @@ def download(url, dest, md5=None):
         log.warning("md5 mismatch for cached %s, downloading again", dest.name)
         dest.unlink()
     part = dest.with_name(dest.name + ".part")
-    run(["curl", "-fsSL", "--retry", "5", "--retry-delay", "10", "-C", "-", "-o", part, url])
+    log.info("download: %s", url)
+    http_get(url, part)
     if md5 is not None:
         observed = md5sum(part)
         if observed != md5:
@@ -102,16 +202,15 @@ def fetch_md5_table(url, cache_file):
     Without either, files are downloaded/used without md5 verification.
     """
     cache_file = Path(cache_file)
-    out = subprocess.run(["curl", "-fsSL", "--retry", "3", url], capture_output=True)
-    if out.returncode == 0:
+    text = http_text(url)
+    if text is not None:
         cache_file.parent.mkdir(parents=True, exist_ok=True)
-        cache_file.write_bytes(out.stdout)
-        text = out.stdout.decode()
+        cache_file.write_text(text)
     elif cache_file.exists():
-        log.warning("could not fetch %s, using cached copy %s", url, cache_file)
+        log.warning("using cached copy %s", cache_file)
         text = cache_file.read_text()
     else:
-        log.warning("could not fetch %s: files will NOT be md5-verified", url)
+        log.warning("%s unavailable: files will NOT be md5-verified", url)
         return {}
     table = {}
     for line in text.splitlines():
@@ -286,11 +385,12 @@ class Dataset:
         return not self.contigs or chrom in self.contigs
 
     def prepare_annotation(self):
-        """Gene annotation for VEP (GENCODE GTF, bgzipped + tabix) and GIAB stratification
-        BEDs, restricted to the contigs."""
+        """Gene annotation for VEP (GENCODE GTF, bgzipped + tabix) and the GIAB genome
+        stratifications (folder with the layout of the GIAB release, for --giab_dir),
+        restricted to the contigs."""
         acfg = self.cfg["annotation"]
         ann_dir = self.out / "annotation"
-        (ann_dir / "stratification").mkdir(parents=True, exist_ok=True)
+        ann_dir.mkdir(parents=True, exist_ok=True)
 
         url = acfg["genes"]["url"]
         gtf = download(url, self.cache / "annotation" / Path(url).name)
@@ -312,33 +412,31 @@ class Dataset:
         genes = ann_dir / "genes.gtf.gz"
         run(["tabix", "-f", "-p", "gff", str(genes)])
 
+        # GIAB stratifications: same relative paths as in the release (the pipeline's
+        # default --giab_files), restricted to the contigs, gzip-compressed
         scfg = acfg["stratifications"]
         base = scfg["base_url"].rstrip("/")
+        # local folder named after the build ('GRCh38@all' -> 'GRCh38': no '@' in file names)
+        giab_dir = ann_dir / "giab" / Path(base).name.split("@")[0]
         md5 = fetch_md5_table(f"{base}/{scfg['md5']}", self.cache / "annotation" / scfg["md5"])
-        rows = []
-        for name, rel in scfg["files"].items():
+        for _name, rel in scfg["files"].items():
             src = download(
                 f"{base}/{rel}", self.cache / "annotation" / Path(rel).name, md5.get(Path(rel).name)
             )
+            dest = giab_dir / rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
             self.sources.append(
-                (
-                    f"annotation/stratification/{name}.bed",
-                    f"{base}/{rel}",
-                    md5.get(Path(rel).name, "n/a"),
-                )
+                (str(dest.relative_to(self.out)), f"{base}/{rel}", md5.get(Path(rel).name, "n/a"))
             )
-            dest = ann_dir / "stratification" / f"{name}.bed"
-            with gzip.open(src, "rt") as fin, dest.open("w") as fout:
-                for line in fin:
-                    if line.startswith("#"):
-                        continue
-                    chrom = line.split("\t", 1)[0]
-                    if self.keep_contig(chrom):
-                        fout.write(line)
-            rows.append(f"{name},annotation/stratification/{name}.bed\n")
-        strat = self.out / "stratification.csv"
-        strat.write_text("name,bed\n" + "".join(rows))
-        return genes, strat
+            # mtime=0: the same content gives the same gzip file (stable checksums)
+            with gzip.open(src, "rt") as fin, open(dest, "wb") as raw:
+                with gzip.GzipFile(fileobj=raw, mode="wb", mtime=0) as fout:
+                    for line in fin:
+                        if line.startswith("#"):
+                            continue
+                        if self.keep_contig(line.split("\t", 1)[0]):
+                            fout.write(line.encode())
+        return genes, giab_dir
 
     # BAMs ----------------------------------------------------------------------
 
@@ -487,13 +585,13 @@ class Dataset:
         path.write_text("\n".join(rows) + "\n")
         return path
 
-    def write_params(self, fasta, truth, genes, strat, known):
+    def write_params(self, fasta, truth, genes, giab_dir, known):
         params = {
             "input": "samplesheet.csv",
             "truth_technology": "wgs",
             "fasta": str(fasta.relative_to(self.out)),
             "vep_gtf": str(genes.relative_to(self.out)),
-            "stratification": str(strat.relative_to(self.out)),
+            "giab_dir": str(giab_dir.relative_to(self.out)),
             "known_variants": str(known.relative_to(self.out)),
         }
         # callable regions and read evidence need alignments for every row: switch them
@@ -547,8 +645,8 @@ class Dataset:
             "| `vcf/` | Unfiltered MuTect2 (GATK 3.8) tumor/normal VCFs per pseudo-sample |",
             "| `bam/` | BAM slices (WES targets +/- padding in the BAM windows, subsampled) |",
             "| `truth/` | SEQC2 somatic reference call set v1.2.1 + high-confidence regions |",
-            "| `annotation/` | Genes (GENCODE v46 basic) and GIAB v3.5 stratifications |",
-            "| `stratification.csv` | Stratification sheet (name, BED) for `--stratification` |",
+            "| `annotation/genes.gtf.gz` | Genes (GENCODE v46 basic) for `--vep_gtf` |",
+            "| `annotation/giab/` | GIAB v3.5 stratifications (release layout) for `--giab_dir` |",
             "| `known_variants.csv`, `known/` | Known-variant sheet for `--known_variants` |",
             "| `checksums.md5` | md5 of every file in this folder |",
             "",
@@ -573,10 +671,10 @@ class Dataset:
         vcfs = self.prepare_vcfs()
         truth = self.prepare_truth()
         bams = self.prepare_bams(wes_bed)
-        genes, strat = self.prepare_annotation()
+        genes, giab_dir = self.prepare_annotation()
         self.write_samplesheet(vcfs, bams, wes_bed)
         known = self.write_known_variants(truth)
-        self.write_params(fasta, truth, genes, strat, known)
+        self.write_params(fasta, truth, genes, giab_dir, known)
         self.write_provenance(args)
         log.info("Done: %s", self.out)
 
@@ -635,6 +733,10 @@ def main(argv=None):
         p.add_argument("--cache", type=Path, help="download cache (default: <outdir>/.downloads)")
         p.add_argument("--pairs", help="comma-separated SEQC2 pairs (default: from config)")
         p.add_argument("--with-bams", action="store_true", help="add (full) BAMs for all pairs")
+        p.add_argument(
+            "--ca-bundle",
+            help="CA certificate bundle for HTTPS (default: env vars, certifi, system paths)",
+        )
 
     def runopts(p):
         p.add_argument("--rundir", type=Path, help="run folder (default: ./seqc2_<mode>_run)")
@@ -675,6 +777,9 @@ def main(argv=None):
     outdir = args.outdir or DEFAULT_TESTDATA / args.mode
 
     if args.command in ("prepare", "all"):
+        # HTTPS for urllib and for htslib (samtools/bcftools on URLs)
+        global SSL_CONTEXT
+        SSL_CONTEXT = setup_tls(args.ca_bundle)
         pairs = args.pairs.split(",") if args.pairs else None
         Dataset(cfg, args.mode, outdir, args.cache, pairs, args.with_bams).prepare(argv)
     if args.command in ("run", "all"):
