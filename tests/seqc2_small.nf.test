@@ -18,10 +18,21 @@ nextflow_pipeline {
             def stable_path = getAllFilesFromDir(params.outdir, relative: true, includeDir: true, ignore: ['pipeline_info/*.{html,json,txt}'])
             def stable_content = getAllFilesFromDir(params.outdir, ignoreFile: 'tests/.nftignore')
             def validated = path("$outputDir/pipeline_info/samplesheet.validated.csv").readLines()
+            def annotatedHeader = path("$outputDir/discordance/variants.annotated.tsv").readLines()[0].tokenize('\t')
+            def callable = path("$outputDir/coverage/callable_summary.tsv").readLines()
             assert workflow.success
             assertAll(
                 { assert validated.size() == 7 },
                 { assert validated.count { line -> line.startsWith('SEQC2_') } == 6 },
+                // every row has tumor and normal alignments (callable regions, read evidence)
+                { assert validated.drop(1).every { line -> line.contains('_T.bam') && line.contains('_N.bam') } },
+                { assert callable.size() == 4 },
+                // input checks: every VCF and alignment checked at the start
+                { assert file("$outputDir/input_checks/vcf").list().size() == 6 },
+                { assert file("$outputDir/input_checks/alignments").list().size() == 12 },
+                // annotation: VEP (GENCODE chr22 GTF), repeats, GIAB stratifications (default --giab_files)
+                { assert ['gene', 'consequence_group', 'in_repeat', 'giab_homopolymer', 'giab_tandem_repeat',
+                          'giab_segmental_duplication', 'giab_low_mappability', 'giab_all_difficult'].every { c -> c in annotatedHeader } },
                 { assert snapshot(
                     removeNextflowVersion("$outputDir/pipeline_info/variantcomp_software_mqc_versions.yml"),
                     stable_path,
