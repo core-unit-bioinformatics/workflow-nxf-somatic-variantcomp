@@ -57,6 +57,11 @@ def mqc_header(args):
     )
 
 
+def by_file_name(paths):
+    """Paths sorted by file name: stable row order whatever folders Nextflow staged them in."""
+    return sorted(paths, key=lambda path: (Path(path).name, str(path)))
+
+
 def row_name(path, strip):
     """Row name of a file: its name without the --strip suffix."""
     name = Path(path).name
@@ -75,7 +80,7 @@ def write_table(path, header_text, columns, rows):
 def key_value(args):
     """One row per key/value summary; warnings and errors counted."""
     rows, columns = [], []
-    for path in sorted(args.inputs):
+    for path in by_file_name(args.inputs):
         values = {"warnings": 0, "errors": 0}
         with open(path) as fh:
             lines = fh.read().splitlines()
@@ -102,7 +107,7 @@ def key_value(args):
 def norm_logs(args):
     """One row per bcftools norm log with its seven counts."""
     rows = []
-    for path in sorted(args.inputs):
+    for path in by_file_name(args.inputs):
         match = None
         with open(path) as fh:
             for line in fh:
@@ -120,7 +125,7 @@ def norm_logs(args):
 def table(args):
     """All rows of TSVs with one common header; the first --id-columns form the row name."""
     rows, header = [], None
-    for path in sorted(args.inputs):
+    for path in by_file_name(args.inputs):
         with open(path, newline="") as fh:
             reader = csv.DictReader(fh, delimiter="\t")
             if header is None:

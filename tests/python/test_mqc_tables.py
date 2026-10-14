@@ -66,3 +66,21 @@ def test_table_rows_and_mismatching_header(tmp_path):
     b.write_text("other\tcolumns\n")
     proc, _ = run(tmp_path, "table", str(a), str(b))
     assert proc.returncode == 1 and "header differs" in proc.stderr
+
+
+def test_rows_sorted_by_file_name_not_staging_folder(tmp_path):
+    # Nextflow stages inputs as in1/, in2/, ... in arrival order: the row order must
+    # only depend on the file names
+    for folder, name in (
+        ("in1", "b.vcf.reference_check.tsv"),
+        ("in2", "a.vcf.reference_check.tsv"),
+    ):
+        (tmp_path / folder).mkdir()
+        (tmp_path / folder / name).write_text("key\tvalue\nstatus\tok\n")
+    paths = [
+        str(tmp_path / "in1" / "b.vcf.reference_check.tsv"),
+        str(tmp_path / "in2" / "a.vcf.reference_check.tsv"),
+    ]
+    proc, lines = run(tmp_path, "key-value", *paths, "--strip", ".reference_check.tsv")
+    assert proc.returncode == 0, proc.stderr
+    assert [line.split("\t")[0] for line in lines[5:]] == ["a.vcf", "b.vcf"]
