@@ -203,15 +203,13 @@ def validateInputParameters() {
 }
 
 //
-// GIAB stratification BEDs given as file params (--giab_<name>): [ [ name, path ], ... ];
+// GIAB stratification BEDs given as file params (--giab_homopolymer, ...): [ [ name, path ], ... ];
 // a param that is not set is not used. The files are checked in CHECK_INPUTS.
 //
 def giabStratifications() {
     def names = ['homopolymer', 'tandem_repeat', 'segmental_duplication', 'low_mappability', 'all_difficult']
-    return names
-        .findAll { name -> params["giab_${name}"] }
-        .collect { name -> [name, params["giab_${name}"].toString()] }
-}
+    def given = names.findAll { name -> params['giab_' + name] }
+    return given.collect { name -> [name, params['giab_' + name].toString()] }
 }
 
 //

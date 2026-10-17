@@ -88,7 +88,7 @@ workflow VARIANTCOMP {
         exclude_bed ? file(exclude_bed, checkIfExists: true) : null,
         repeats_bed ? file(repeats_bed, checkIfExists: true) : null,
         stratification,
-        // GIAB genome stratifications given as --giab_<name> files: [ [ name, path ], ... ]
+        // GIAB genome stratifications given as --giab_* file params: [ [ name, path ], ... ]
         giabStratifications(),
         known_variants
     )
