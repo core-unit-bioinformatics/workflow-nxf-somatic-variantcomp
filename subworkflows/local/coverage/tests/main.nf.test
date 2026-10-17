@@ -19,7 +19,7 @@ nextflow_workflow {
                     def i = { role -> bams ? file(base + 'bam/' + pair + '_' + tech + '_' + role + '.bam.bai') : [] }
                     [[id: 'SEQC2_' + pair + '_' + tech, sample: 'SEQC2_' + pair, technology: tech, library_type: lib,
                       tumor_id: 'TUMOR', normal_id: 'NORMAL'],
-                     file(base + 'vcf/' + pair + '_' + tech + '.mutect2.vcf.gz'), [], b.call('T'), i.call('T'), b.call('N'), i.call('N'), []]
+                     file(base + 'vcf/' + pair + '_' + tech + '.bwa.muTect2.vcf.gz'), [], b.call('T'), i.call('T'), b.call('N'), i.call('N'), []]
                 }
                 // alignments are indexed (missing indices are created by PREPARE_ALIGNMENTS)
                 input[0] = channel.of(entry.call('IL_1', 'wgs', 'wgs', true), entry.call('IL_1', 'wes', 'capture', true),
