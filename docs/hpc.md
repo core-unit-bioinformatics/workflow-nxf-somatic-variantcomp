@@ -91,17 +91,20 @@ Limit the memory of the Nextflow head job if the login/head node is shared, e.g.
 
 ## 4. Full SEQC2 test (T2)
 
-The full SEQC2 HCC1395/HCC1395BL WES + WGS test uses 12 pseudo-samples genome-wide:
+The full SEQC2 HCC1395/HCC1395BL WES + WGS test uses the first replicate of every center
+genome-wide. The data are prepared with seqc2-toolkit (separate repo):
 
 ```bash
-# on a machine with internet access (about 3 GB without BAMs)
-tests/seqc2/seqc2_testdata.py prepare --mode full --outdir /transfer/seqc2_full
-# on the HPC
-tests/seqc2/seqc2_testdata.py run --mode full --outdir /data/seqc2_full \
-    --rundir /data/seqc2_full_run --profile test_full,singularity -c hpc.config
+# on a machine with internet access (about 3.5 GB without BAMs)
+seqc2 fetch datasets/variantcomp_full.yaml --outdir /transfer/seqc2/full
+seqc2 samplesheet datasets/variantcomp_full.yaml --outdir /transfer/seqc2/full --profile variantcomp
+# on the HPC (the folder copied to /data/seqc2/full)
+nextflow run /path/to/pipelines/workflow-nxf-somatic-variantcomp \
+    -profile test_full,singularity -c hpc.config \
+    --pipelines_testdata_base_path /data/ --outdir /data/seqc2_full_run/results -resume
 ```
 
-`--with-bams` also downloads the full BAMs (10-160 GB each), which enables coverage-based
-callable regions and read evidence. Expected results: WGS against the SEQC2 truth set
+`data.bam: true` in the dataset config also downloads the full BAMs (10-160 GB each), which
+enables coverage-based callable regions and read evidence (set both params to true). Expected results: WGS against the SEQC2 truth set
 (`known_variants/benchmark/known_benchmark.aggregated.tsv`) should be close to the
 published values for MuTect2 on BWA alignments (Xiao et al. 2021).

@@ -94,8 +94,8 @@ MNVs atomized and indels left-aligned before matching.
 
 | Input | Caller and version | VCF version | Data | Test |
 | --- | --- | --- | --- | --- |
-| SEQC2 somatic VCFs (HCC1395 / HCC1395BL, sites IL_1 and FD_1, WES and WGS, chr22 slice) | GATK MuTect2 3.8-0-ge9d806836 | VCFv4.2, FORMAT/AD, FORMAT/AF (Number=1), FORMAT/DP | `tests/seqc2/` (T1 on the Pi; T2 full data on the HPC) | `-profile test_seqc2` |
-| SEQC2 high-confidence somatic call set v1.2.1 as external truth (known variants, mode `benchmark`) | – (sites-only VCF) | VCFv4.2 | `tests/seqc2/` | `-profile test_seqc2` |
+| SEQC2 somatic VCFs (HCC1395 / HCC1395BL, pairs IL_1, FD_1 and NV_1, WES and WGS, chr22 slice, BWA alignments) | GATK MuTect2 3.8-0-ge9d806836 | VCFv4.2, FORMAT/AD, FORMAT/AF (Number=1), FORMAT/DP | test-data repo `seqc2/small/`, prepared with seqc2-toolkit (T1 on the Pi; T2 full data on the HPC) | `-profile test_seqc2` |
+| SEQC2 high-confidence somatic call set v1.2.1 as external truth (known variants, mode `benchmark`) | – (sites-only VCF) | VCFv4.2 | test-data repo `seqc2/small/truth/` | `-profile test_seqc2` |
 | Synthetic DRAGEN-like VCFs with edge cases (duplicates, MNVs, multiallelics, gVCF blocks, `1`/`MT` contig names, wrong chrM header length, normal-first sample order) | synthetic, modelled on DRAGEN somatic output | VCFv4.2, FORMAT/AD, FORMAT/AF (Number=A), FORMAT/DP | test-data repo `synthetic/` | `-profile test` |
 | Known-variant lists | – | CSV / TSV lists, sites-only VCF | test-data repo `synthetic/known/` | `-profile test` |
 

@@ -8,7 +8,7 @@
 | T0 | nf-test function/module/subworkflow tests | synthetic dataset | anywhere | `nf-test test --tag subworkflows_local --profile +conda` |
 | T0 | Pipeline on the synthetic edge-case dataset | `synthetic/` | anywhere | `-profile test` |
 | T1 | Pipeline on small SEQC2 data (chr22) | `seqc2/small/` | laptop / Raspberry Pi | `-profile test_seqc2` |
-| T2 | Pipeline on full SEQC2 data | `seqc2/full/` (prepared on the HPC) | HPC | `-profile test_full` |
+| T2 | Pipeline on full SEQC2 data | `seqc2/full/` (prepared with seqc2-toolkit) | HPC | `-profile test_full` |
 
 All test **data** live in the separate repository `workflow-nxf-somatic-variantcomp-testdata`.
 By default, the test profiles expect a checkout of it next to this repository:
@@ -74,50 +74,43 @@ MuTect2 (GATK 3.8) calls on BWA alignments, with records kept and FILTER set. Th
 GRCh38 (`GRCh38.d1.vd1`). The SEQC2 truth set v1.2.1 and its high-confidence regions
 are included for the known-variants feature.
 
-`tests/seqc2/seqc2_testdata.py` (configured by `tests/seqc2/seqc2_testdata.yaml`) is
-the single entry point:
+The data are prepared with **seqc2-toolkit** (`../seqc2-toolkit/`, a separate repo used
+by several workflows): it selects the SEQC2 files, downloads only what is missing into a
+shared md5-checked cache, builds the dataset folder (subsets, indices, BAM slices) and
+writes the vcf-comp samplesheet, params and known-variant sheet with its `variantcomp`
+profile. Install it into the dev env with `pip install -e ../seqc2-toolkit`.
 
-| Subcommand | Does |
-| --- | --- |
-| `prepare` | Download (resumable, md5-verified where SEQC2 publishes checksums, cached in `<outdir>/.downloads`), subset, index, and write `samplesheet.csv`, `params.yaml`, `checksums.md5` and `README.md` with full provenance |
-| `run` | Run the workflow on a prepared dataset: resolve `params.yaml`, create a run folder, call `nextflow run` with `-resume` |
-| `all` | `prepare` + `run` |
-
-| Mode | Content | Size | Default profile |
+| Dataset config (seqc2-toolkit) | Content | Size | Profile here |
 | --- | --- | --- | --- |
-| `small` | chr22 only; pseudo-samples IL_1, FD_1, NV_1; BAM slices (WES targets ±100 bp in chr22:23-24 Mb and 50-50.8 Mb, reads subsampled to 50% with a fixed seed) for IL_1 | ~50 MB (+130 MB download cache) | `test_seqc2,conda` |
-| `full` | Genome-wide; 12 pseudo-samples; VCFs only (`--with-bams` adds the full BAMs, 10-160 GB each) | ~3 GB without BAMs (reference 2.9 GB) | `test_full,singularity` |
+| `datasets/variantcomp_small.yaml` | chr22; pairs IL_1, FD_1, NV_1; WGS + WES; bwa + MuTect2; BAM slices (WES targets ±100 bp in chr22:23-24 Mb and 50-50.8 Mb, 50% of the reads, fixed seed) for every pair; truth v1.2.1, GENCODE 46 GTF, GIAB v3.5 | ~150 MB | `test_seqc2` |
+| `datasets/variantcomp_full.yaml` | Genome-wide; first replicate of every center with WGS and WES; VCFs only (`data.bam: true` adds the full BAMs, 10-160 GB each) | ~3.5 GB (reference 3.2 GB) | `test_full` |
 
 ```bash
-# small (this is what the test-data repo contains)
-tests/seqc2/seqc2_testdata.py prepare --mode small
-tests/seqc2/seqc2_testdata.py run --mode small
-
-# full, on the HPC
-tests/seqc2/seqc2_testdata.py prepare --mode full --outdir /scratch/seqc2/full
-tests/seqc2/seqc2_testdata.py run --mode full --outdir /scratch/seqc2/full \
-    --rundir /scratch/seqc2/run_full --profile test_full,singularity -c my_hpc.config
+cd ../seqc2-toolkit
+# small: this is what the test-data repo contains (seqc2/small/)
+seqc2 fetch datasets/variantcomp_small.yaml \
+    --outdir ../workflow-nxf-somatic-variantcomp-testdata/seqc2/small
+seqc2 samplesheet datasets/variantcomp_small.yaml --profile variantcomp \
+    --outdir ../workflow-nxf-somatic-variantcomp-testdata/seqc2/small
+# run the pipeline on it (or: nextflow run . -profile test_seqc2,conda)
+seqc2 run datasets/variantcomp_small.yaml --profile variantcomp \
+    --outdir ../workflow-nxf-somatic-variantcomp-testdata/seqc2/small \
+    --pipeline ../workflow-nxf-somatic-variantcomp --nf-profile conda
 ```
 
-Further `nextflow` arguments can be passed after `--`, e.g.
-`... run --mode small -- -with-report report.html`.
+The dataset folder holds `dataset.json`, `checksums.md5`, `README.md` (sources, settings)
+and the toolkit's manifest; the workflow files are in `seqc2/small/variantcomp/`
+(`samplesheet.csv`, `params.yaml`, `known_variants.csv`, `known/`). `seqc2 fetch` again
+does nothing if all files are up to date; `seqc2 verify` checks all md5 sums.
 
 Notes:
 
-- Some SEQC2 VCFs are plain gzip, not BGZF. The script streams them with
-  `bcftools view -t`, and the pipeline must also accept such input.
+- Some SEQC2 VCFs are plain gzip, not BGZF; the toolkit recompresses them with
+  `bcftools view` (the pipeline also accepts plain gzip input).
 - The SEQC2 VCF headers list the 2,779 contigs of `GRCh38.d1.vd1`, while the small
   reference only contains chr22. This deliberately exercises the reference check.
-- Downloads are done in Python (`urllib`) with resume and retries. Re-running `prepare`
-  reuses cached and finished files.
-- HTTPS needs a CA bundle; the script uses the first existing one of `--ca-bundle`,
-  `$CURL_CA_BUNDLE`, `$SSL_CERT_FILE`, `$REQUESTS_CA_BUNDLE`, the Python package
-  `certifi` and the usual system paths, and exports it as `CURL_CA_BUNDLE` /
-  `SSL_CERT_FILE` for samtools/bcftools reading remote files. This fixes
-  `curl: (77) error adding trust anchors from file: /home/conda/feedstock_root/...`,
-  which occurs when a conda build of curl/htslib keeps its unrelocated build-time CA path.
-- The GIAB v3.5 stratifications are subset to the dataset's contigs and written in the
-  release layout to `annotation/giab/GRCh38/`; `params.yaml` sets one `--giab_<name>` per file.
+- The toolkit downloads in Python with an explicit CA bundle (no `curl`), which avoids
+  `curl: (77) error adding trust anchors` with conda builds of curl.
 
 ## nf-test
 

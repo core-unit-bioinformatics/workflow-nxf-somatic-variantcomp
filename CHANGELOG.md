@@ -8,6 +8,8 @@ Dates follow ISO 8601 (`YYYY-MM-DD`).
 
 ### `Changed`
 
+- SEQC2 test data are prepared with the separate **seqc2-toolkit** (dataset configs `variantcomp_small` / `variantcomp_full`, workflow profile `variantcomp`) instead of `tests/seqc2/seqc2_testdata.py`, which is removed (decision D31). The test data layout changed: the samplesheet and known-variant sheet are in `seqc2/small/variantcomp/`, VCFs are named `<pair>_<technology>.<aligner>.<caller>.vcf.gz`, the GTF `gencode.v46.basic.annotation.gtf.gz`; the file contents are unchanged
+
 - GIAB genome stratifications: one file parameter per stratification (`--giab_homopolymer`, `--giab_tandem_repeat`, `--giab_segmental_duplication`, `--giab_low_mappability`, `--giab_all_difficult`); a given file switches its annotation on, no file (the default) means no GIAB annotation. Replaces `--giab_stratifications`, `--giab_dir` and `--giab_files` (decision D30). `download_resources.py` and the SEQC2 dataset script write one parameter per file.
 
 ## v0.15.0-dev - [2026-10-14]

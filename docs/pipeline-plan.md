@@ -287,11 +287,10 @@ Singularity images are amd64, so container runs go to the HPC.
 | T1 `-profile test` | SEQC2 slices: a few Mb on chr22 (GRCh38) or windows around AmpliSeq amplicons. VCF subsets (WGS/WES MuTect2 + Strelka), BAM slices fetched remotely by region (`samtools view` on the FTP URLs with index), AmpliSeq slices, truth subset, matching FASTA. Target size ≤ ~10 MB | Pi (conda) + CI | End-to-end pipeline test, nf-test snapshot |
 | T2 `-profile test_full` | Full SEQC2, one center (e.g. IL or NV): WGS (truth: SEQC2 v1.2.1, and WGS as technology truth), WES, AmpliSeq. Upstream calling with **nf-core/sarek** (`--step variant_calling`, Mutect2 [+ Strelka2]) from the provided BAMs, restricted to the union of targets, so all three technologies use the same caller | HPC | Realistic validation. Sanity check: WGS vs. SEQC2 truth close to the published numbers |
 
-Test-data preparation is codified, with no manual steps:
-
-- `scripts/prepare_seqc2_testdata.py` (Python, calls samtools/bcftools/bedtools)
-- `scripts/envs/testdata.yaml`
-- `docs/testing.md`
+Test-data preparation is codified, with no manual steps: since 2026-10-17 with
+**seqc2-toolkit** (separate repo, decision D31): dataset configs
+`datasets/variantcomp_small.yaml` (T1) and `datasets/variantcomp_full.yaml` (T2), workflow
+profile `variantcomp`; see `docs/testing.md`.
 
 T1 files are either committed to `tests/data/` (if ≤ ~10 MB) or published as
 a separate test-data repo. That is decision D6.
@@ -387,6 +386,7 @@ vcf-comp-dev/                                  # workspace (no git)
 | D28 | GIAB stratifications (user, 2026-10-14) | The GIAB genome stratifications v3.5 are part of the annotation: `--giab_stratifications` (default true) with `--giab_dir` (local folder, release layout) and `--giab_files` (`name=path`, GRCh38 defaults). They are checked in `CHECK_INPUTS` like every BED and give `giab_<name>` columns. If on without `--giab_dir`, the run stops at the start. |
 | D30 | GIAB parameters (user, 2026-10-14; replaces the parameters of D28) | One file parameter per GIAB stratification (`--giab_homopolymer`, `--giab_tandem_repeat`, `--giab_segmental_duplication`, `--giab_low_mappability`, `--giab_all_difficult`). A given file switches its annotation on; without files (the default) there is no GIAB annotation. `--giab_stratifications`, `--giab_dir` and `--giab_files` are removed. |
 | D29 | Offline resources (user, 2026-10-14) | No process downloads data. `scripts/download_resources.py` downloads the VEP cache, the GIAB stratifications and optionally a GENCODE GTF (checksums verified) and writes `resources.config` for `-c`. Downloads in Python with an explicit CA bundle (fixes curl exit 77 with unrelocated conda CA paths). |
+| D31 | SEQC2 test data (user, 2026-10-17) | The SEQC2 download and preparation script moves out of this repo into **seqc2-toolkit**, a separate repo (`../seqc2-toolkit/`) usable for any workflow: catalog of the SEQC2 server, dataset configs (selection of technologies, centers/replicates, aligners, callers, VCF/BAM, subsets), md5-checked shared cache, manifest of derived files, and workflow profiles (samplesheet/params templates) shipped in the toolkit (`variantcomp`, `variantinterpretation`). Default selection: one center and one technology (WGS of IL_1, bwa + MuTect2). `tests/seqc2/` is removed. |
 | – | Open (2026-10-08) | The discordance class `outside_callable` can't occur, because both technologies of a sample share the comparison region; such calls are `present_but_filtered`. To discuss: drop the class or define it differently (e.g. call outside the *query* technology's own callable region). |
 | D13 | Callers (implementation, 2026-10-08) | No caller profiles are needed (D10): the `caller` samplesheet column is informational. |
 | D11 | Normalization order (implementation, 2026-10-07) | Records on non-reference contigs are dropped before the header is rewritten from the `.fai`. Records with a symbolic ALT only are dropped before `norm`, and remaining symbolic alleles of split records are dropped during harmonization. See CLAUDE.md for the full order. |

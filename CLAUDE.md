@@ -55,9 +55,11 @@ VAF/detection-power awareness are essential.
 8. git from the beginning. Version every feature and step properly.
 9. Dev/test tooling goes into the conda env `envs/variantcomp-dev.yaml`
    (name `variantcomp-dev`).
-10. Test data: SEQC2 HCC1395/HCC1395BL, **WES + WGS only for now**. A
-    reusable, reproducible script (`tests/seqc2/`) handles download,
-    preparation, samplesheet/params generation and the pipeline run.
+10. Test data: SEQC2 HCC1395/HCC1395BL, **WES + WGS only for now**. They are
+    prepared with **seqc2-toolkit** (`../seqc2-toolkit/`, separate repo, usable
+    for any workflow): download, selection, preparation, samplesheet/params
+    generation (profile `variantcomp`) and the pipeline run (user decision,
+    2026-10-17).
 11. If something can't run on this machine, prepare everything (bundle,
     scripts, docs) so the user can transfer it and run it on the HPC.
 12. **Reference consistency check + safe auto-fixes.** Check that every input
@@ -305,8 +307,9 @@ nf-core-style pipelines.
 - Test tiers:
   - **T0**: pytest for `bin/` + module/subworkflow nf-tests on synthetic
     edge-case data.
-  - **T1**: `-profile test`, SEQC2 small slices (prepared by
-    `tests/seqc2/`), stored in the test-data repo, runs on the Pi.
+  - **T1**: `-profile test_seqc2`, SEQC2 small slices (prepared by
+    seqc2-toolkit, `datasets/variantcomp_small.yaml`), stored in the test-data
+    repo, runs on the Pi.
   - **T2**: `-profile test_full`, full SEQC2 WES + WGS on the HPC.
 - nf-test shares conda environments via `tests/nextflow.config`
   (`NFT_CONDA_CACHE`).
