@@ -371,7 +371,9 @@ Annotation columns of `discordance/variants.annotated.tsv`:
 - `known_variants/benchmark/known_benchmark.aggregated.tsv`, `.per_pair.tsv`, and
   `benchmark/<sample>/`: every technology against each external truth set, with the columns
   of the main benchmark (`truth` is the list name).
-- `known_variants/lists/`: the normalized known-variant VCFs.
+- `known_variants/lists/`: the normalized known-variant VCFs: the records of the input lists
+  (ID, QUAL, FILTER, INFO kept), on the reference contigs, split and left-aligned, with
+  `INFO/VC_T_VAF` (truth VAF, if known) and, for CSV/TSV lists, `INFO/KV_GENE`.
 
 </details>
 

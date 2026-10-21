@@ -332,7 +332,7 @@ seqc2_truth,all,benchmark,truth/sSNV.vcf.gz;truth/sINDEL.vcf.gz,truth/High-Confi
 | `name` | Name of the list (unique). |
 | `sample` | Samplesheet sample, or `all` for every sample. |
 | `mode` | `required` or `benchmark` (see below). |
-| `variants` | One or more VCF, CSV or TSV files separated by `;`. CSV/TSV columns: `chrom`, `pos` (1-based), `ref`, `alt`, optional `gene`, `label`, `vaf`. |
+| `variants` | One or more VCF, CSV or TSV files separated by `;`. CSV/TSV columns: `chrom`, `pos` (1-based), `ref`, `alt`, optional `gene`, `label`, `vaf`. VCF: the ID column is the label, INFO/`GENE` (or `KV_GENE`) the gene, the VAF is read from `--vaf-tag` or the first of INFO/`VC_T_VAF`, `TVAF`, `VAF`, `AF`. |
 | `regions` | Optional BED (`n/a` if none), e.g. the confident regions of a truth set. |
 
 `--stratification` and `--known_variants` are plain file parameters. Both sheets are checked
@@ -345,6 +345,20 @@ Every list is checked against the reference at the start of the run
 unless `--keep_mito`; a REF mismatch is an error, a warning with
 `--check_known_variants false`) and normalized like the VCFs. There is no limit on the
 number of required variants.
+
+What the prepared list contains:
+
+- **VCF lists are kept as they are**: ID (also several IDs separated by `;`), QUAL, FILTER
+  and every INFO field with its header definition. Only the contig names are mapped to
+  the reference and the sample columns are dropped (sites-only). Multiallelic records are
+  split by `bcftools norm` afterwards, which also splits Number=A/R INFO fields.
+- Added are only `INFO/VC_T_VAF` (Number=A, one value per ALT; only if a VAF is known) and,
+  for CSV/TSV lists, the ID (from `label`; whitespace becomes `_`) and `INFO/KV_GENE`
+  (from `gene`).
+- The same INFO or FILTER ID defined with another Number/Type in two files of one list is
+  an error; a record with a problem in one ALT allele is not used at all.
+- FILTER is kept for information: the external benchmark compares every record of the
+  list (`rtg vcfeval --all-records`), whatever its FILTER.
 
 **`required`**: a small list of variants (e.g. fewer than 10 manually checked, clinically
 relevant variants) that **every technology must find**. For every technology the pipeline

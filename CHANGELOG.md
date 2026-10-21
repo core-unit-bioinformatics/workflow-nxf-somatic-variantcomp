@@ -18,6 +18,7 @@ Dates follow ISO 8601 (`YYYY-MM-DD`).
 
 ### `Fixed`
 
+- Known-variant VCFs: `known_variants.py prepare` copied the ID into `INFO/KV_LABEL`; an ID list like `COSM50383;COSM50383` then broke the INFO column and `bcftools norm` failed (`Could not add dummy header for INFO`). The records are now kept as they are (ID, QUAL, FILTER and all INFO fields with their header definitions; multiallelic records are split by `bcftools norm`); only `INFO/VC_T_VAF` (now Number=A) and, for CSV/TSV lists, the ID and `INFO/KV_GENE` are added. `KV_LABEL` is removed: the label is the ID
 - The pipeline didn't compile after the GIAB file parameters (stray brace in the utils subworkflow; `nextflow inspect` / `nf-core pipelines download`: "Script compilation failed")
 
 ## v0.15.0-dev - [2026-10-14]
