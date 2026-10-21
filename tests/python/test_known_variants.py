@@ -264,3 +264,101 @@ def test_prepare_ref_mismatch_fails_unless_warn_only(tmp_path, ref):
     result = run(*args, *out, "--warn-only")
     assert result.returncode == 0, result.stderr
     assert [r.id for r in pysam.VariantFile(str(tmp_path / "k.vcf.gz"))] == ["good"]
+
+
+def test_prepare_vcf_keeps_fields_and_survives_bcftools_norm(tmp_path, ref):
+    """IDs with ';' (several IDs), FILTER, all INFO fields and multiallelic records are kept;
+    the output passes bcftools norm with the arguments of KNOWN_NORM (regression: an ID
+    copied into an INFO label broke the INFO column)."""
+    fasta, seq = ref
+    b1, b2, b3 = seq[99], seq[199], seq[299]
+    alts3 = [b for b in "ACGT" if b != b3][:2]
+    vcf = tmp_path / "known.vcf"
+    vcf.write_text(
+        "##fileformat=VCFv4.2\n##contig=<ID=1,length=2000>\n"
+        '##FILTER=<ID=LowQual,Description="low quality">\n'
+        '##INFO=<ID=GENE,Number=1,Type=String,Description="gene">\n'
+        '##INFO=<ID=AF,Number=A,Type=Float,Description="allele frequency">\n'
+        '##INFO=<ID=SOMATIC,Number=0,Type=Flag,Description="somatic">\n'
+        '##INFO=<ID=CLNSIG,Number=.,Type=String,Description="clinical significance">\n'
+        "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n"
+        f"1\t100\tCOSM50383;COSM50383\t{b1}\t{alt_of(b1)}\t50\tPASS\tGENE=KRAS;AF=0.25;SOMATIC;CLNSIG=Pathogenic,Likely_pathogenic\n"
+        f"1\t200\trs755026998;rs755026998\t{b2}\t{alt_of(b2)}\t.\tLowQual\tGENE=TP53;AF=0.1\n"
+        f"1\t300\trs1\t{b3}\t{','.join(alts3)}\t.\t.\tAF=0.3,0.05\n"
+    )
+    out = tmp_path / "known.vcf.gz"
+    result = run(
+        "prepare",
+        "--input",
+        str(vcf),
+        "--fai",
+        f"{fasta}.fai",
+        "--fasta",
+        str(fasta),
+        "--output",
+        str(out),
+    )
+    assert result.returncode == 0, result.stderr
+    recs = list(pysam.VariantFile(str(out)))
+    assert [r.id for r in recs] == ["COSM50383;COSM50383", "rs755026998;rs755026998", "rs1"]
+    assert [list(r.filter.keys()) for r in recs] == [["PASS"], ["LowQual"], []]
+    assert recs[0].qual == 50 and recs[0].info["SOMATIC"] is True
+    assert recs[0].info["CLNSIG"] == ("Pathogenic", "Likely_pathogenic")
+    assert recs[0].info["GENE"] == "KRAS" and recs[0].chrom == "chr1"
+    # only VC_T_VAF is added (one value per ALT); no label tag
+    assert recs[2].info["VC_T_VAF"] == pytest.approx((0.3, 0.05))
+    assert "KV_LABEL" not in recs[0].header.info and "KV_GENE" not in recs[0].header.info
+    # bcftools norm as in KNOWN_NORM: splits the multiallelic record, keeps the fields
+    normed = tmp_path / "norm.vcf.gz"
+    norm = subprocess.run(
+        [
+            "bcftools",
+            "norm",
+            "--multiallelics",
+            "-any",
+            "--atomize",
+            "--check-ref",
+            "x",
+            "--rm-dup",
+            "exact",
+            "--fasta-ref",
+            str(fasta),
+            "--output-type",
+            "z",
+            "-o",
+            str(normed),
+            str(out),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert norm.returncode == 0, norm.stderr
+    split = list(pysam.VariantFile(str(normed)))
+    assert len(split) == 4
+    assert [r.info["VC_T_VAF"][0] for r in split[2:]] == pytest.approx([0.3, 0.05])
+    assert [r.info["AF"][0] for r in split[2:]] == pytest.approx([0.3, 0.05])
+    assert list(split[1].filter.keys()) == ["LowQual"]
+
+
+def test_prepare_conflicting_header_definitions_fail(tmp_path, ref):
+    fasta, seq = ref
+    paths = []
+    for i, number in enumerate(("1", "A")):
+        path = tmp_path / f"k{i}.vcf"
+        path.write_text(
+            "##fileformat=VCFv4.2\n##contig=<ID=chr1,length=2000>\n"
+            f'##INFO=<ID=SCORE,Number={number},Type=Float,Description="s">\n'
+            "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n"
+            f"chr1\t{100 + i}\t.\t{seq[99 + i]}\t{alt_of(seq[99 + i])}\t.\t.\tSCORE=1\n"
+        )
+        paths.append(str(path))
+    result = run(
+        "prepare",
+        "--input",
+        *paths,
+        "--fai",
+        f"{fasta}.fai",
+        "--output",
+        str(tmp_path / "o.vcf.gz"),
+    )
+    assert result.returncode != 0 and "INFO/SCORE is defined differently" in result.stderr

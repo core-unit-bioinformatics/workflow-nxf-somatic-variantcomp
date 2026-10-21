@@ -4,9 +4,15 @@
 prepare  Read known variants from one or more VCFs or TSVs (columns chrom, pos,
          ref, alt and optionally gene, label, vaf; 1-based positions), map contig
          names to the reference (chr prefix, MT/chrM), check positions and alleles
-         and write a sorted, sites-only VCF (INFO/KV_GENE, INFO/KV_LABEL
-         and, if a VAF is known, INFO/VC_T_VAF, so recall can be stratified by the
-         truth VAF). VCF VAF tags: --vaf-tag, else the first of TVAF, VAF, AF.
+         and write a sorted, sites-only VCF. VCF records are kept as they are (ID,
+         QUAL, FILTER and every INFO field, with their header definitions; multiallelic
+         records stay whole, bcftools norm splits them); only contig names change and
+         the sample columns are dropped. Added are only INFO/VC_T_VAF (Number=A, if a
+         VAF is known, so recall can be stratified by the truth VAF) and, for CSV/TSV
+         lists, INFO/KV_GENE; the label of a CSV/TSV list becomes the ID.
+         VCF VAF tags: --vaf-tag, else the first of VC_T_VAF, TVAF, VAF, AF (Number=A,
+         R or 1). The same INFO/FILTER ID defined differently in two input VCFs is an
+         error.
          With --fasta, every REF allele is compared with the reference: any mismatch
          stops the run (another build), unless --warn-only (check switched off).
          Variants on the mitochondrial contig are dropped (unless --keep-mito).
@@ -30,11 +36,12 @@ check    For the 'required' mode: every known variant must be found in every
 
 INPUT of prepare
   --input   CSV/TSV (header with chrom, pos [1-based], ref, alt; optional gene, label,
-            vaf in [0, 1]) or VCF/BCF (ID = label, INFO/GENE or KV_GENE, VAF tag)
+            vaf in [0, 1]) or VCF/BCF (ID = label, INFO/GENE or KV_GENE = gene, VAF tag)
   --fai, --fasta  reference index and FASTA
 OUTPUT of prepare
-  --output  bgzipped sites-only VCF (+ .tbi): ID = label, INFO/KV_GENE, INFO/KV_LABEL,
-            INFO/VC_T_VAF; --report  check report (key, value)
+  --output  bgzipped sites-only VCF (+ .tbi): the input records (ID, QUAL, FILTER,
+            INFO) on the reference contigs, + INFO/VC_T_VAF (Number=A) and, for CSV/TSV
+            lists, ID = label and INFO/KV_GENE; --report  check report (key, value)
 
 INPUT of check
   --known       VCF of prepare (normalized); --technology, --normalized (harmonized VCF
@@ -53,6 +60,7 @@ OUTPUT of check (--prefix)
 
 import argparse
 import csv
+import re
 import sys
 from pathlib import Path
 
@@ -71,6 +79,16 @@ from check_reference import (  # noqa: E402
 TSV_REQUIRED = ["chrom", "pos", "ref", "alt"]
 
 
+# INFO tags written by prepare (only these are added to the input records)
+ADDED_INFO = {
+    "VC_T_VAF": ("A", "Float", "Tumor VAF of the known variant (if given), one per ALT"),
+    "KV_GENE": ("1", "String", "Gene of the known variant (from a CSV/TSV list)"),
+}
+# characters that are not allowed in a VCF ID (per ID) or in an INFO string value
+BAD_ID = re.compile(r"[\s;]+")
+BAD_INFO = re.compile(r"[\s;=,]+")
+
+
 def first_value(value):
     """First element of a tuple-like INFO value (Number=A/R/.), or the value itself."""
     if isinstance(value, tuple):
@@ -78,35 +96,91 @@ def first_value(value):
     return value
 
 
-def read_known(path, vaf_tag=None):
-    """Yield (chrom, pos, ref, alt, gene, label, vaf) from a VCF or TSV."""
-    if str(path).endswith((".vcf", ".vcf.gz", ".bcf")):
-        with pysam.VariantFile(str(path)) as vcf:
-            # VAF tag: --vaf-tag, else the first of TVAF, VAF, AF defined in the header
-            tags = [vaf_tag] if vaf_tag else ["TVAF", "VAF", "AF"]
-            tag = next((t for t in tags if t in vcf.header.info), None)
-            if vaf_tag and tag is None:
-                sys.exit(f"ERROR: {path}: --vaf-tag {vaf_tag} is not defined in the VCF header")
+def vaf_per_alt(rec, tag, number):
+    """VAF of every ALT of a VCF record from an INFO tag (None if not set or ambiguous).
+
+    Number=A: one value per ALT; Number=R: the REF value is skipped; Number=1 (or '.'):
+    the same value for every ALT.
+    """
+    value = rec.info.get(tag)
+    if value is None:
+        return None
+    n_alts = len(rec.alts or ())
+    if number == "A":
+        values = list(value) if isinstance(value, tuple) else [value]
+    elif number == "R":
+        values = list(value)[1:]
+    else:
+        values = [first_value(value)] * n_alts
+    # a wrong number of values can't be assigned to the ALTs
+    return values if len(values) == n_alts else None
+
+
+def header_lines(header):
+    """INFO and FILTER definitions of a VCF header: {(type, ID): header record}."""
+    return {
+        (h.type, h["ID"]): h for h in header.records if h.type in ("INFO", "FILTER") and "ID" in h
+    }
+
+
+def read_known_vcf(path, vaf_tag=None):
+    """(records, header definitions) of a known-variant VCF; records are kept as they are.
+
+    Every record keeps its ID, QUAL, FILTER and INFO; the VAF (--vaf-tag, else the first
+    of VC_T_VAF, TVAF, VAF, AF in the header) becomes VC_T_VAF (one value per ALT).
+    Sample columns are not kept (sites-only output).
+    """
+    with pysam.VariantFile(str(path)) as vcf:
+        tags = [vaf_tag] if vaf_tag else ["VC_T_VAF", "TVAF", "VAF", "AF"]
+        tag = next((t for t in tags if t in vcf.header.info), None)
+        if vaf_tag and tag is None:
+            sys.exit(f"ERROR: {path}: --vaf-tag {vaf_tag} is not defined in the VCF header")
+        print(
+            (
+                f"INFO: {path}: VAF from INFO/{tag}"
+                if tag
+                else f"INFO: {path}: no VAF tag (VC_T_VAF, TVAF, VAF, AF) in the header; "
+                "VAF-based strata will be 'unknown'"
+            ),
+            file=sys.stderr,
+        )
+        number = str(vcf.header.info[tag].number) if tag else None
+        definitions = header_lines(vcf.header)
+        records, ambiguous = [], 0
+        for rec in vcf:
+            # all INFO fields of the input; VC_T_VAF is (re)written from the VAF tag
+            info = {k: v for k, v in rec.info.items() if k != "VC_T_VAF"}
+            vafs = vaf_per_alt(rec, tag, number) if tag else None
+            if tag and rec.info.get(tag) is not None and vafs is None:
+                ambiguous += 1
+            records.append(
+                {
+                    "chrom": rec.chrom,
+                    "pos": rec.pos,
+                    # the ID column as it is (a list of IDs is separated by ';')
+                    "id": rec.id,
+                    "ref": rec.ref,
+                    "alts": tuple(rec.alts or ()),
+                    "qual": rec.qual,
+                    "filter": list(rec.filter.keys()),
+                    "info": info,
+                    "vafs": vafs,
+                    "source": str(path),
+                }
+            )
+        if ambiguous:
             print(
-                (
-                    f"INFO: {path}: VAF from INFO/{tag}"
-                    if tag
-                    else f"INFO: {path}: no VAF tag "
-                    "(TVAF, VAF, AF) in the header; VAF-based strata will be 'unknown'"
-                ),
+                f"WARNING: {path}: {ambiguous} records have INFO/{tag} values that don't fit "
+                "their ALT alleles; their VAF is unknown",
                 file=sys.stderr,
             )
-            # gene and label: INFO/GENE or KV_GENE; the ID column, else INFO/KV_LABEL
-            gene_tag = next((t for t in ("GENE", "KV_GENE") if t in vcf.header.info), None)
-            label_tag = "KV_LABEL" if "KV_LABEL" in vcf.header.info else None
-            for rec in vcf:
-                # one known variant per ALT allele
-                gene = (rec.info.get(gene_tag) if gene_tag else None) or "."
-                label = rec.id or (rec.info.get(label_tag) if label_tag else None) or "."
-                vaf = first_value(rec.info.get(tag)) if tag else None
-                for alt in rec.alts or ():
-                    yield rec.chrom, rec.pos, rec.ref, alt, str(gene), str(label), vaf
-        return
+    return records, definitions
+
+
+def read_known_table(path):
+    """Known-variant records of a CSV/TSV list (columns chrom, pos, ref, alt; optional
+    gene, label, vaf; 1-based positions): label -> ID, gene -> INFO/KV_GENE."""
+    records = []
     with open_text(path) as fh:
         # CSV or TSV list, by file extension
         delimiter = "\t" if str(path).endswith((".tsv", ".tsv.gz")) else ","
@@ -136,22 +210,60 @@ def read_known(path, vaf_tag=None):
                     sys.exit(f"ERROR: {where}: vaf '{vaf}' is not a number")
                 if not 0 <= vaf <= 1:
                     sys.exit(f"ERROR: {where}: vaf {vaf} is outside [0, 1]")
-            yield (
-                row["chrom"].strip(),
-                int(row["pos"]),
-                row["ref"].strip().upper(),
-                row["alt"].strip().upper(),
-                row.get("gene") or ".",
-                row.get("label") or ".",
-                vaf,
+            # label -> ID (no whitespace; ';' separates several IDs, as in VCF)
+            label = BAD_ID.sub("_", (row.get("label") or "").strip()).strip("_")
+            # gene -> INFO/KV_GENE (an INFO string must not contain ; = , or whitespace)
+            gene = BAD_INFO.sub("_", (row.get("gene") or "").strip()).strip("_")
+            records.append(
+                {
+                    "chrom": row["chrom"].strip(),
+                    "pos": int(row["pos"]),
+                    "id": label or None,
+                    "ref": row["ref"].strip().upper(),
+                    "alts": (row["alt"].strip().upper(),),
+                    "qual": None,
+                    "filter": [],
+                    "info": {"KV_GENE": gene} if gene else {},
+                    "vafs": [vaf] if vaf is not None else None,
+                    "source": f"{where}",
+                }
             )
+    return records
+
+
+def read_known(path, vaf_tag=None):
+    """(records, header definitions) of one known-variant file (VCF/BCF or CSV/TSV)."""
+    if str(path).endswith((".vcf", ".vcf.gz", ".bcf")):
+        return read_known_vcf(path, vaf_tag)
+    return read_known_table(path), {}
+
+
+def merge_definitions(inputs):
+    """INFO/FILTER definitions of all input VCFs; the same ID defined differently is an error."""
+    merged, origin = {}, {}
+    for path, definitions in inputs:
+        for key, hrec in definitions.items():
+            # the toolkit's own tags are defined by prepare
+            if key[0] == "INFO" and key[1] in ADDED_INFO:
+                continue
+            # compare Number and Type (FILTER: only the ID matters)
+            signature = (hrec.get("Number"), hrec.get("Type"))
+            if key in merged and (merged[key].get("Number"), merged[key].get("Type")) != signature:
+                sys.exit(
+                    f"ERROR: {key[0]}/{key[1]} is defined differently in {origin[key]} and {path} "
+                    f"(Number/Type {merged[key].get('Number')}/{merged[key].get('Type')} vs. "
+                    f"{signature[0]}/{signature[1]}); harmonize the headers of the lists"
+                )
+            merged.setdefault(key, hrec)
+            origin.setdefault(key, path)
+    return merged
 
 
 def check_variant(variant, reference, fasta, keep_mito):
     """(kind, value) of one known variant: ('ok', reference contig), ('mito', None) for a
     dropped mitochondrial one, ('error', problem) or ('ref_mismatch', problem)."""
-    chrom, pos, ref, alt, _gene, label, _vaf = variant
-    where = f"{chrom}:{pos} {ref}>{alt} ({label})"
+    chrom, pos, ref, alt, label = variant
+    where = f"{chrom}:{pos} {ref}>{alt} ({label or '.'})"
     # contig name on the reference (chr prefix, MT/chrM); unknown contigs are an error
     ref_chrom = map_contig(chrom, reference)
     if ref_chrom is None:
@@ -179,30 +291,80 @@ def check_variant(variant, reference, fasta, keep_mito):
     return "ok", ref_chrom
 
 
-def write_sites_vcf(path, records, reference):
-    """Sorted sites-only VCF (KV_GENE, KV_LABEL, VC_T_VAF) with tabix index; returns the
-    number of distinct variants written."""
+def check_record(record, reference, fasta, keep_mito):
+    """(kind, reference contig or None, problems) of a record with all its ALT alleles.
+
+    kind: ok, mito, error or ref_mismatch (the worst over the ALTs); a record with a
+    problem in one ALT is not written at all (its INFO belongs to all ALTs).
+    """
+    if not record["alts"]:
+        return (
+            "error",
+            None,
+            [f"{record['source']}: {record['chrom']}:{record['pos']}: no ALT allele"],
+        )
+    results = [
+        check_variant(
+            (record["chrom"], record["pos"], record["ref"], alt, record["id"]),
+            reference,
+            fasta,
+            keep_mito,
+        )
+        for alt in record["alts"]
+    ]
+    problems = [value for kind, value in results if kind in ("error", "ref_mismatch")]
+    kinds = {kind for kind, _ in results}
+    for kind in ("ref_mismatch", "error", "mito"):
+        if kind in kinds:
+            return kind, None, problems
+    return "ok", results[0][1], []
+
+
+def write_sites_vcf(path, records, reference, definitions):
+    """Sorted sites-only VCF with tabix index; returns the number of records written.
+
+    The records keep ID, QUAL, FILTER and INFO of the input; the header has the reference
+    contigs, the INFO/FILTER definitions of the inputs and VC_T_VAF / KV_GENE if used.
+    """
     order = {c: i for i, c in enumerate(reference)}
     # reference order, then position and alleles (needed for tabix and bcftools)
-    records = sorted(records, key=lambda r: (order[r[0]], r[1], r[2], r[3]))
+    records = sorted(records, key=lambda r: (order[r["chrom"]], r["pos"], r["ref"], r["alts"]))
     header = pysam.VariantHeader()
     for name, length in reference.items():
         header.contigs.add(name, length=length)
-    header.info.add("KV_GENE", 1, "String", "Gene of the known variant")
-    header.info.add("KV_LABEL", 1, "String", "Label of the known variant")
-    header.info.add("VC_T_VAF", 1, "Float", "Tumor VAF of the known variant (if given)")
+    # INFO / FILTER definitions of the input VCFs (PASS is predefined)
+    for (kind, name), hrec in definitions.items():
+        if kind == "FILTER" and name == "PASS":
+            continue
+        header.add_record(hrec)
+    # the added tags, only if a record uses them
+    used = {k for r in records for k in r["info"]} | (
+        {"VC_T_VAF"} if any(r["vafs"] for r in records) else set()
+    )
+    for tag, (number, kind, description) in ADDED_INFO.items():
+        if tag in used:
+            header.info.add(tag, number, kind, description)
     seen = set()
     with pysam.VariantFile(path, "wz", header=header) as out:
-        for chrom, pos, ref, alt, gene, label, vaf in records:
+        for r in records:
+            key = (r["chrom"], r["pos"], r["ref"], r["alts"])
             # the same variant listed twice (e.g. in two input files) is written once
-            if (chrom, pos, ref, alt) in seen:
+            if key in seen:
                 continue
-            seen.add((chrom, pos, ref, alt))
-            info = {"KV_GENE": gene.replace(" ", "_"), "KV_LABEL": label.replace(" ", "_")}
-            if vaf is not None:
-                info["VC_T_VAF"] = float(vaf)
+            seen.add(key)
+            info = dict(r["info"])
+            if r["vafs"] is not None:
+                info["VC_T_VAF"] = tuple(None if v is None else float(v) for v in r["vafs"])
             out.write(
-                out.new_record(contig=chrom, start=pos - 1, alleles=(ref, alt), id=label, info=info)
+                out.new_record(
+                    contig=r["chrom"],
+                    start=r["pos"] - 1,
+                    alleles=(r["ref"], *r["alts"]),
+                    id=r["id"],
+                    qual=r["qual"],
+                    filter=r["filter"] or None,
+                    info=info,
+                )
             )
     pysam.tabix_index(path, preset="vcf", force=True)
     return len(seen)
@@ -216,43 +378,46 @@ def prepare(args):
     # the check report; --warn-only (check switched off) turns errors into warnings
     report = Report(args.name or ", ".join(args.input), warn_only=args.warn_only)
 
-    # all variants of all input files of the list
-    known = [v for path in args.input for v in read_known(path, args.vaf_tag)]
+    # all records of all input files of the list, and the header definitions of the VCFs
+    inputs = [(path, read_known(path, args.vaf_tag)) for path in args.input]
+    known = [r for _path, (records, _defs) in inputs for r in records]
+    definitions = merge_definitions([(path, defs) for path, (_records, defs) in inputs])
     if not known:
         sys.exit(f"ERROR: {', '.join(args.input)}: the known-variant list is empty")
 
-    # every variant is checked; usable ones get the reference contig name
+    # every record is checked (all ALTs); usable ones get the reference contig name
     records, counts = [], {"mito": 0, "ref_mismatch": 0, "error": 0}
-    for variant in known:
-        kind, value = check_variant(variant, reference, fasta, args.keep_mito)
+    for record in known:
+        kind, ref_chrom, problems = check_record(record, reference, fasta, args.keep_mito)
         if kind == "ok":
-            records.append((value, *variant[1:]))
+            records.append({**record, "chrom": ref_chrom})
             continue
         counts[kind] += 1
-        # problems are errors (warnings with --warn-only); the variant is not written
-        if kind != "mito":
-            report.error(value)
+        # problems are errors (warnings with --warn-only); the record is not written
+        for problem in problems:
+            report.error(problem)
     n_mito = counts["mito"]
 
     # report: counts and all problems (errors stop the run unless --warn-only)
     report.set("input", ", ".join(args.input))
-    report.set("variants_read", len(known))
-    report.set("variants_kept", len(records))
+    report.set("records_read", len(known))
+    report.set("records_kept", len(records))
     report.set("dropped_mito", n_mito)
     report.set("ref_mismatches", counts["ref_mismatch"])
     if n_mito:
-        report.warnings.append(f"{n_mito} variants on the mitochondrial contig are not compared")
+        report.warnings.append(f"{n_mito} records on the mitochondrial contig are not compared")
     if args.report:
         report.write(args.report)
     report.print_and_exit()
     if not records:
         sys.exit(f"ERROR: {', '.join(args.input)}: no usable known variant is left")
 
-    written = write_sites_vcf(args.output, records, reference)
-    n_vaf = sum(1 for r in records if r[6] is not None)
+    written = write_sites_vcf(args.output, records, reference, definitions)
+    n_vaf = sum(1 for r in records if r["vafs"] is not None)
     print(
-        f"INFO: {', '.join(args.input)}: {written} known variants written "
-        f"({len(records) - written} duplicates removed, {n_vaf} with a VAF)",
+        f"INFO: {', '.join(args.input)}: {written} known-variant records written "
+        f"({len(records) - written} duplicates removed, {n_vaf} with a VAF; ID, QUAL, FILTER "
+        "and INFO kept)",
         file=sys.stderr,
     )
 
@@ -327,22 +492,21 @@ def fmt(value):
 
 
 def read_prepared(path):
-    """[(chrom, pos, ref, alt, gene, label)] of a VCF written by 'prepare' (+ bcftools norm)."""
+    """[(chrom, pos, ref, alt, gene, label)] of a VCF written by 'prepare' (+ bcftools norm).
+
+    label: the ID column ('.' if empty); gene: INFO/KV_GENE (CSV/TSV lists), else INFO/GENE
+    of a VCF list, else '.'.
+    """
     with pysam.VariantFile(path) as vcf:
-        missing = [t for t in ("KV_GENE", "KV_LABEL") if t not in vcf.header.info]
-        if missing:
-            sys.exit(
-                f"ERROR: {path}: INFO/{', INFO/'.join(missing)} not defined; expected the "
-                "output of 'known_variants.py prepare'"
-            )
+        gene_tag = next((t for t in ("KV_GENE", "GENE") if t in vcf.header.info), None)
         known = [
             (
                 rec.chrom,
                 rec.pos,
                 rec.ref,
                 alt,
-                rec.info.get("KV_GENE", "."),
-                rec.info.get("KV_LABEL", "."),
+                str(first_value(rec.info.get(gene_tag)) or ".") if gene_tag else ".",
+                rec.id or ".",
             )
             for rec in vcf
             for alt in rec.alts or ()

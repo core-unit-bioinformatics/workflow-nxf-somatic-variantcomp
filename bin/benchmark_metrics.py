@@ -146,7 +146,11 @@ def read_records(path, what):
             )
         for rec in vcf:
             info = {t: rec.info.get(t) for t in HARMONIZED_TAGS if t in tags}
-            for alt in rec.alts or ():
+            for index, alt in enumerate(rec.alts or ()):
+                # VC_T_VAF is Number=1 (harmonize_vcf.py) or Number=A (known-variant lists)
+                vaf = info.get("VC_T_VAF")
+                if isinstance(vaf, tuple):
+                    vaf = vaf[index] if index < len(vaf) else None
                 records.append(
                     {
                         "chrom": rec.chrom,
@@ -160,7 +164,7 @@ def read_records(path, what):
                             if info.get("VC_LEN") is not None
                             else len(alt) - len(rec.ref)
                         ),
-                        "vaf": None if vaf_unavailable else info.get("VC_T_VAF"),
+                        "vaf": None if vaf_unavailable else vaf,
                         "dp": info.get("VC_T_DP"),
                         "alt_count": info.get("VC_T_ALT"),
                         "filter": ";".join(rec.filter.keys()) or ".",
