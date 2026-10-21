@@ -112,6 +112,19 @@ Notes:
 - The toolkit downloads in Python with an explicit CA bundle (no `curl`), which avoids
   `curl: (77) error adding trust anchors` with conda builds of curl.
 
+## Strict syntax and compilation
+
+```bash
+scripts/check_syntax.py      # before every commit that touches .nf or .config files
+```
+
+It runs `nextflow inspect -format json -profile singularity,test,test_full main.nf`, the
+command `nf-core pipelines download` uses, with the minimum Nextflow version of the manifest
+(`nextflowVersion`, fetched with `NXF_VER`) and with the Nextflow of the dev env, and
+`nextflow lint` of the repository. It fails on any compilation error, lint error or lint
+warning except the accepted `when:` deprecation (required by nf-core module lint).
+`nextflow lint` alone does not catch every compilation error.
+
 ## nf-test
 
 ```bash

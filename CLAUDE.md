@@ -142,6 +142,29 @@ nf-core-style pipelines.
 - Scripts log what they did: which fields were used, how many records were
   read, kept, dropped (with the reason) and written.
 
+### Nextflow strict syntax
+
+- **All Nextflow code follows the strict syntax** (Nextflow language v2, the default
+  parser since 25.10): `nextflow run`, `nextflow inspect` and therefore
+  `nf-core pipelines download` reject code that doesn't compile ("Script compilation
+  failed"). Rules: no Groovy outside the allowed statements (no `import`, classes or
+  top-level code in scripts; helper functions are `def` in a workflow/utils file); `def`
+  for every local variable; lower-case `channel`; no `shell:` blocks or `addParams`;
+  closures with explicit parameters (`{ meta, bed -> ... }`, not `it`); no deprecated
+  operators. See https://www.nextflow.io/docs/latest/strict-syntax.html.
+- **Check with `scripts/check_syntax.py` before every commit that touches `.nf` or
+  `.config` files.** It runs `nextflow inspect -profile singularity,test,test_full` (the
+  command of `nf-core pipelines download`) with the minimum Nextflow version of the
+  manifest and with the current one, and `nextflow lint` of the whole repo. It must
+  pass: no inspect failure, no lint error, no lint warning except the accepted ones.
+  `nextflow lint` alone is not enough: it reported "no errors" for a stray closing brace
+  that broke compilation (commit bcefbcb, fixed in d9973a7).
+- **Accepted lint warning:** "The `when` section is deprecated". nf-core module lint
+  requires `when: task.ext.when == null || task.ext.when` in every module, so it stays
+  until the nf-core template changes. Every other warning is fixed.
+- The reference linter is the newest Nextflow of the dev env (`envs/variantcomp-dev.yaml`);
+  linters of other versions disagree on style warnings (e.g. single named emits).
+
 ### Code style and comments
 
 - **Python, not R.** Scripts live in `bin/`: `#!/usr/bin/env python3`
@@ -314,6 +337,7 @@ nf-core-style pipelines.
 - nf-test shares conda environments via `tests/nextflow.config`
   (`NFT_CONDA_CACHE`).
 - Run before every commit that touches pipeline code:
+  - `scripts/check_syntax.py` (strict syntax: compiles with `nextflow inspect`, lint clean)
   - `nf-core pipelines lint`
   - the relevant `nf-test test`
   - `pytest`
