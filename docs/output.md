@@ -461,7 +461,7 @@ one offline HTML file (plots inline, no external scripts) with these sections:
 The **table browser** `report/tables/index.html` (datavzrd) has searchable, sortable tables
 of: truth variants (default view), metrics per sample, all compared variants, one table per
 discordance class, removed records, preprocessing accounting, region steps, coverage,
-required variants and consistency checks. Every view describes its columns; rows of
+enrichment tests, genes, required variants and consistency checks. Every view describes its columns; rows of
 discordant variants link to their truth variant (column `variant_id` =
 `sample:chrom:pos:ref>alt`).
 

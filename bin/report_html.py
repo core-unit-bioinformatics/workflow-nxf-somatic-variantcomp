@@ -191,6 +191,12 @@ def fmt_int(value):
     return f"{int(value):,}"
 
 
+def fmt_number(value):
+    """A float of a table: whole numbers as integers (counts that pandas turned into floats
+    because of missing values), others with 4 significant digits."""
+    return f"{value:.0f}" if float(value).is_integer() else f"{value:.4g}"
+
+
 def fmt_pct(part, whole, digits=1):
     """part / whole as a percentage string ('NA' if whole is 0)."""
     return f"{100 * part / whole:.{digits}f} %" if whole else "NA"
@@ -239,9 +245,7 @@ def table_html(df, max_rows=None, glossary=True, caption=None):
         parts.append(f"<p class='caption'>{caption}</p>")
     parts.append(
         "<div class='tablewrap'>"
-        + shown.to_html(
-            index=False, na_rep="NA", border=0, classes="data", float_format=lambda x: f"{x:.4g}"
-        )
+        + shown.to_html(index=False, na_rep="NA", border=0, classes="data", float_format=fmt_number)
         + "</div>"
     )
     if max_rows is not None and len(df) > max_rows:
@@ -574,6 +578,19 @@ def datavzrd(args):
         "## Coverage\n\nMean depth and percent of the bases with at least the depth of each "
         "threshold, per alignment, in the common region and in its target region (the genome "
         "for WGS).",
+    )
+    add(
+        "enrichment",
+        read(args.enrichment),
+        "## Enrichment\n\nAre discordant variants (FN, FP, FN+FP) enriched for a feature "
+        "compared with the concordant ones? Fisher's exact test per comparison and feature, "
+        "Benjamini-Hochberg q over all tests.",
+    )
+    add(
+        "genes",
+        read(args.genes),
+        "## Genes\n\nConcordant and discordant variants per comparison and gene (Ensembl "
+        "VEP), with Fisher's exact test of the gene against all other genes.",
     )
     add(
         "required-variants",

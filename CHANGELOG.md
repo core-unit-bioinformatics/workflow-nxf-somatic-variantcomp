@@ -9,7 +9,7 @@ Dates follow ISO 8601 (`YYYY-MM-DD`).
 ### `Added`
 
 - Narrative report `report/variantcomp_report.html` (`bin/report_html.py`, `REPORT_HTML`): Summary (key numbers, overall metrics, recall vs. precision per sample, truth variants found, discordance classes), Introduction, Results (compared region step by step, input variant sets and their filtering, metrics, truth variants, every discordance class explained with its variants, annotation per technology and set, known variants) and Methods (tools, parameters, coverage, consistency checks); offline, inline plots (decision D33)
-- datavzrd table browser `report/tables/` (nf-core `datavzrd`): truth variants, all compared variants, one table per discordance class, removed records, accounting, region steps, coverage, required variants, checks; linked by `variant_id`
+- datavzrd table browser `report/tables/` (nf-core `datavzrd`): truth variants, all compared variants, one table per discordance class, removed records, accounting, region steps, coverage, enrichment, genes, required variants, checks; linked by `variant_id`
 - Variant accounting per VCF (`variant_accounting.py`, `VARIANT_ACCOUNTING`): records kept, removed (with the reason) and added per preprocessing step, every removed record, and checks (`vcf_preprocessed/accounting/`); MultiQC section
 - Region steps (`region_summary.py steps`, `REGION_STEPS`): size of the comparison region after every step (`regions/common_targets.steps.tsv`); MultiQC section
 - Coverage in the common region and the target region of every alignment (`coverage_summary.py`, second mosdepth run on the target BED, `--coverage_thresholds`, default `10,20,30,50,100`): `coverage/coverage.coverage.tsv` and MultiQC General Statistics columns
