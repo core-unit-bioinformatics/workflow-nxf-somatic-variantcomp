@@ -81,7 +81,11 @@ nextflow_workflow {
                 { assert header(workflow.out.normalized, 'S2_wgs').last().endsWith('FORMAT\tS2_wgs_T\tS2_wgs_N') },
                 // bcftools norm logs and harmonization summaries: one per VCF and branch
                 { assert workflow.out.norm_logs.size() == 12 },
-                { assert workflow.out.summaries.size() == 12 }
+                { assert workflow.out.summaries.size() == 12 },
+                // accounting: one table per VCF; every consistency check ok; E08 removed as non-PASS
+                { assert workflow.out.checks.size() == 6 },
+                { assert workflow.out.checks.every { item -> path(item[1]).readLines().drop(1).every { line -> line.endsWith('\tok') } } },
+                { assert path(workflow.out.removed.find { item -> item[0].id == 'S1_wes' }[1]).text.contains('pass_split\tfilter_not_pass\tchr1\t4700') }
             )
         }
     }
@@ -114,7 +118,10 @@ nextflow_workflow {
                 { assert workflow.success },
                 { assert filters.any { f -> f != 'PASS' } },
                 { assert workflow.out.norm_logs.size() == 1 },
-                { assert workflow.out.summaries.size() == 1 }
+                { assert workflow.out.summaries.size() == 1 },
+                // without the PASS split, no record is removed as non-PASS; all checks ok
+                { assert !path(workflow.out.removed[0][1]).text.contains('filter_not_pass') },
+                { assert path(workflow.out.checks[0][1]).readLines().drop(1).every { line -> line.endsWith('\tok') } }
             )
         }
     }

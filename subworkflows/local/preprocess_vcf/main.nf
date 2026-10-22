@@ -23,6 +23,7 @@ include { NORMALIZE_VCF as NORMALIZE_NON_PASS     } from '../normalize_vcf/main'
 include { NORMALIZE_VCF as NORMALIZE_ALL          } from '../normalize_vcf/main'
 include { BCFTOOLS_CONCAT as BCFTOOLS_CONCAT_ALL  } from '../../../modules/nf-core/bcftools/concat/main'
 include { BCFTOOLS_VIEW as BCFTOOLS_VIEW_COMPARE  } from '../../../modules/nf-core/bcftools/view/main'
+include { VARIANT_ACCOUNTING                     } from '../../../modules/local/variant_accounting/main'
 
 workflow PREPROCESS_VCF {
 
@@ -47,6 +48,9 @@ workflow PREPROCESS_VCF {
     def ch_to_compare = channel.empty()
     def ch_norm_logs = channel.empty()
     def ch_summaries = channel.empty()
+    // norm log and harmonization summary of the compared branch (for the accounting)
+    def ch_compared_norm_log = channel.empty()
+    def ch_compared_summary = channel.empty()
     if (filter_pass_only) {
         // 2b. PASS records (compared) and non-PASS records (only looked up by DISCORDANCE)
         BCFTOOLS_VIEW_PASS(ch_selected, [], [], [])
@@ -74,6 +78,8 @@ workflow PREPROCESS_VCF {
         )
         ch_normalized = BCFTOOLS_CONCAT_ALL.out.vcf.join(BCFTOOLS_CONCAT_ALL.out.index)
         ch_to_compare = NORMALIZE_PASS.out.vcf
+        ch_compared_norm_log = NORMALIZE_PASS.out.norm_logs
+        ch_compared_summary = NORMALIZE_PASS.out.summaries
         ch_norm_logs = NORMALIZE_PASS.out.norm_logs.mix(NORMALIZE_NON_PASS.out.norm_logs)
         ch_summaries = NORMALIZE_PASS.out.summaries.mix(NORMALIZE_NON_PASS.out.summaries)
     } else {
@@ -81,6 +87,8 @@ workflow PREPROCESS_VCF {
         NORMALIZE_ALL(ch_selected, ch_vcf_rename, ch_reference, genome_bed)
         ch_normalized = NORMALIZE_ALL.out.vcf
         ch_to_compare = NORMALIZE_ALL.out.vcf
+        ch_compared_norm_log = NORMALIZE_ALL.out.norm_logs
+        ch_compared_summary = NORMALIZE_ALL.out.summaries
         ch_norm_logs = NORMALIZE_ALL.out.norm_logs
         ch_summaries = NORMALIZE_ALL.out.summaries
     }
@@ -95,9 +103,29 @@ workflow PREPROCESS_VCF {
         }
     BCFTOOLS_VIEW_COMPARE(ch_compare_input.vcf, [], ch_compare_input.bed, [])
 
+    // accounting: records kept and removed per step and reason, with consistency checks
+    // (all inputs of one entry joined by meta.id)
+    def by_id = { item -> [item[0].id] + item.drop(1) }
+    VARIANT_ACCOUNTING(
+        ch_vcf.map(by_id)
+            .join(ch_vcf_rename.map(by_id))
+            .join(ch_compared_norm_log.map(by_id))
+            .join(ch_compared_summary.map(by_id))
+            .join(ch_to_compare.map(by_id))
+            .join(BCFTOOLS_VIEW_COMPARE.out.vcf.join(BCFTOOLS_VIEW_COMPARE.out.index).map(by_id))
+            .join(ch_regions.map(by_id))
+            .join(ch_vcf.map { entry -> [entry[0].id, entry[0]] })
+            .map { items -> [items.last()] + items.subList(1, items.size() - 1) },
+        genome_bed,
+        filter_pass_only
+    )
+
     emit:
     normalized = ch_normalized                                                       // channel: [ meta, vcf, tbi ] all normalized records (PASS and non-PASS)
     compare    = BCFTOOLS_VIEW_COMPARE.out.vcf.join(BCFTOOLS_VIEW_COMPARE.out.index) // channel: [ meta, vcf, tbi ] filtered, in region
     norm_logs  = ch_norm_logs                                                        // channel: [ meta, log ] counts of bcftools norm (per branch)
     summaries  = ch_summaries                                                        // channel: [ meta, tsv ] harmonization counts (per branch)
+    accounting = VARIANT_ACCOUNTING.out.accounting                                   // channel: [ meta, tsv ] records kept/removed per step and reason
+    removed    = VARIANT_ACCOUNTING.out.removed                                      // channel: [ meta, tsv ] every removed record with its reason
+    checks     = VARIANT_ACCOUNTING.out.checks                                       // channel: [ meta, tsv ] consistency checks of the preprocessing
 }
