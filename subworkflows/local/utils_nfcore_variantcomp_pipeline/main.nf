@@ -239,6 +239,7 @@ def toolCitationText() {
             "Ensembl VEP (McLaren et al. 2016), MSIsensor-pro (Jia et al. 2020) and the GIAB genome stratifications (Dwarshuis et al. 2024) for the annotation of consequences, repeat context and difficult regions,",
             "GNU Awk, pysam, pandas (McKinney 2010), NumPy (Harris et al. 2020), SciPy (Virtanen et al. 2020) and Matplotlib (Hunter 2007) in the pipeline scripts,",
             "the Benjamini-Hochberg procedure (Benjamini and Hochberg 1995) for multiple-testing correction",
+            "datavzrd (Wiegand et al. 2025) for the table browser",
             "and MultiQC (Ewels et al. 2016) for the report."
         ].join(' ').trim()
 
@@ -260,6 +261,7 @@ def toolBibliographyText() {
             "<li>Virtanen, P., Gommers, R., Oliphant, T. E., et al. (2020). SciPy 1.0: fundamental algorithms for scientific computing in Python. Nature Methods, 17, 261–272. doi: 10.1038/s41592-019-0686-2</li>",
             "<li>Hunter, J. D. (2007). Matplotlib: a 2D graphics environment. Computing in Science & Engineering, 9(3), 90–95. doi: 10.1109/MCSE.2007.55</li>",
             "<li>Benjamini, Y., & Hochberg, Y. (1995). Controlling the false discovery rate: a practical and powerful approach to multiple testing. Journal of the Royal Statistical Society: Series B, 57(1), 289–300. doi: 10.1111/j.2517-6161.1995.tb02031.x</li>",
+            "<li>Wiegand, F., Lähnemann, D., Mölder, F., Uzuner, H., Prinz, A., Schramm, A., & Köster, J. (2025). datavzrd: Rapid programming- and maintenance-free interactive visualization and communication of tabular data. PLOS ONE, 20(7), e0323079. doi: 10.1371/journal.pone.0323079</li>",
             "<li>Ewels, P., Magnusson, M., Lundin, S., & Käller, M. (2016). MultiQC: summarize analysis results for multiple tools and samples in a single report. Bioinformatics, 32(19), 3047–3048. doi: 10.1093/bioinformatics/btw354</li>"
         ].join(' ').trim()
 

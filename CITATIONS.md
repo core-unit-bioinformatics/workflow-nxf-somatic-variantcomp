@@ -52,6 +52,10 @@ is in the [README](README.md#pipeline-summary).
 
   > Free Software Foundation. GNU Awk. https://www.gnu.org/software/gawk/
 
+- [datavzrd](https://github.com/datavzrd/datavzrd) (table browser of the report)
+
+  > Wiegand F, Lähnemann D, Mölder F, Uzuner H, Prinz A, Schramm A, Köster J. datavzrd: Rapid programming- and maintenance-free interactive visualization and communication of tabular data. PLOS ONE. 2025;20(7):e0323079. doi: 10.1371/journal.pone.0323079.
+
 - [MultiQC](https://pubmed.ncbi.nlm.nih.gov/27312411/) (report)
 
   > Ewels P, Magnusson M, Lundin S, Käller M. MultiQC: summarize analysis results for multiple tools and samples in a single report. Bioinformatics. 2016 Oct 1;32(19):3047-8. doi: 10.1093/bioinformatics/btw354. PubMed PMID: 27312411; PubMed Central PMCID: PMC5039924.
