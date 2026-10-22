@@ -28,7 +28,8 @@ line. Missing values are `NA` (numbers) or `.` (names, alleles).
 - [Discordance](#discordance) - why variants differ, with read evidence and annotation
 - [Annotation](#annotation) - VEP consequences and repeat regions
 - [Known variants](#known-variants) - required variants and external truth sets
-- [Report](#report) - enrichment statistics, gene and annotation tables, plots
+- [Report](#report) - the narrative report, the table browser, the consistency checks,
+  enrichment statistics, gene and annotation tables, plots
 - [MultiQC](#multiqc) - the report of all results and step summaries
 - [Pipeline information](#pipeline-information) - run reports and checked sheets
 
@@ -38,13 +39,13 @@ Tools that produce each output folder (citations in [`CITATIONS.md`](../CITATION
 | --- | --- |
 | `input_checks/` | `check_reference.py` (pysam), `known_variants.py` (pysam) |
 | `regions/` | `bedtools sort`, `bedtools multiinter`, `gawk`, `bedtools merge`, `bedtools intersect`, `bedtools subtract`, `region_summary.py` |
-| `coverage/` | `check_reference.py`, `mosdepth`, `mosdepth_callable.py`, `bedtools sort`, `bedtools multiinter`, `bedtools intersect`, `region_summary.py` |
-| `vcf_preprocessed/` | `bcftools view`, `bcftools annotate`, `bcftools reheader`, `bcftools norm`, `harmonize_vcf.py`, `bcftools concat` |
+| `coverage/` | `check_reference.py`, `mosdepth`, `mosdepth_callable.py`, `bedtools sort`, `bedtools multiinter`, `bedtools intersect`, `region_summary.py`, `coverage_summary.py` |
+| `vcf_preprocessed/` | `bcftools view`, `bcftools annotate`, `bcftools reheader`, `bcftools norm`, `harmonize_vcf.py`, `bcftools concat`, `variant_accounting.py` (pysam) |
 | `benchmark/` | `rtg vcfeval`, `bcftools isec`, `benchmark_metrics.py`, `aggregate_metrics.py` |
 | `discordance/` | `bcftools query`, `bcftools mpileup` + `bcftools call`, `bcftools norm`, `classify_discordance.py`, `annotate_variants.py` |
 | `annotation/` | Ensembl VEP, `bcftools +split-vep`, msisensor-pro, `bedtools map`, `bedtools intersect` |
 | `known_variants/` | `known_variants.py`, `bcftools norm`, `bcftools isec`, `rtg vcfeval`, `benchmark_metrics.py`, `known_summary.py` |
-| `report/` | `variantcomp_report.py` (pandas, SciPy, Matplotlib) |
+| `report/` | `variantcomp_report.py` (pandas, SciPy, Matplotlib), `consistency_checks.py`, `report_html.py` (pandas, Matplotlib), datavzrd |
 | `multiqc/` | MultiQC, `mqc_tables.py` |
 
 ### Input checks
@@ -93,6 +94,8 @@ input type are written):
   bases targeted by every technology (WGS counts as genome-wide), intersected with
   `--regions_bed` and minus `--exclude_bed`; sorted, merged.
 - `regions/common_targets.summary.tsv`: size of every target BED and of the common region.
+- `regions/common_targets.steps.tsv`: size of the comparison region after every step of
+  its construction (columns below).
 - `regions/targets/<technology>.bed`: the target BED of each technology after the input
   check (contigs renamed, unknown and mitochondrial contigs removed), sorted; all columns of
   the input BED are kept.
@@ -110,6 +113,23 @@ input type are written):
 | `bp_in_common` | int | bases of the region inside the common region |
 | `fraction_in_common` | float | `bp_in_common / bp` |
 
+`common_targets.steps.tsv` (one row per step, in order: `1_genome` (the compared contigs of
+the reference), `2_targets_intersection` (intersection of all target BEDs; WGS has none and
+doesn't restrict it), `3_regions_bed` (only with `--regions_bed`), `4_exclude_bed` (only with
+`--exclude_bed`); overlapping intervals of a step are merged first):
+
+| Column | Type | Meaning |
+| --- | --- | --- |
+| `step` | int | order of the step |
+| `name` | text | step name (above) |
+| `intervals` | int | intervals after merging |
+| `bp` | int | size of the region after the step |
+| `fraction_of_genome` | float | `bp / bp of 1_genome` |
+| `fraction_of_previous` | float | `bp / bp of the previous step` (`NA` for the first) |
+| `removed_bp` | int | bases removed by the step (`NA` for the first) |
+
+A step can't add bases: `region_summary.py steps` stops if one does.
+
 The run stops if the common region is smaller than `--min_region_bp`.
 
 ### Coverage
@@ -124,6 +144,10 @@ Only with `--callable_regions` (default; needs alignments for every samplesheet 
   `--min_coverage_normal` with `--require_normal_coverage`). The comparison of this sample
   is restricted to it.
 - `coverage/callable_summary.tsv`: one row per sample (columns below).
+- `coverage/coverage.coverage.tsv`: depth of every alignment in the common region and in
+  the target region of its technology (columns below). The same values are columns of the
+  MultiQC General Statistics table (`Depth common`, `Depth target`, `<t>X common`, `<t>X
+  target`; the third threshold is shown, the others can be switched on).
 - `coverage/<sample>/<sample>_<technology>_<tumor|normal>.*`: mosdepth outputs per
   alignment: `*.mosdepth.summary.txt` (mean depth per contig), `*.mosdepth.global.dist.txt`
   and `*.mosdepth.region.dist.txt` (cumulative depth distributions), `*.regions.bed.gz`
@@ -146,6 +170,18 @@ Only with `--callable_regions` (default; needs alignments for every samplesheet 
 
 The run stops if a callable region is smaller than `--min_region_bp`.
 
+`coverage.coverage.tsv` (mosdepth `--thresholds` of `--coverage_thresholds`; a second
+mosdepth run per alignment on the target BED of its technology):
+
+| Column | Type | Meaning |
+| --- | --- | --- |
+| `alignment` | text | `<sample>_<technology>_<tumor\|normal>` |
+| `sample`, `technology`, `role` | text | samplesheet row and `tumor` / `normal` |
+| `region` | text | `common` (common comparison region), `target` (the target BED of the technology) or `genome` (technology without target BED: the whole genome, from mosdepth's global distribution, 2-digit precision) |
+| `bp` | int | size of the region |
+| `mean_depth` | float | mean depth, weighted by interval length |
+| `pct_ge_<t>X` | float | percent of the bases with depth ≥ t, one column per threshold |
+
 ### Preprocessed VCFs
 
 <details markdown="1">
@@ -163,6 +199,15 @@ The run stops if a callable region is smaller than `--min_region_bp`.
 - `vcf_preprocessed/norm_logs/<sample>_<technology>.<branch>.norm.norm.log`: the log of
   `bcftools norm` with the line `Lines total/split/joined/realigned/mismatch_removed/
   dup_removed/skipped`.
+- `vcf_preprocessed/accounting/<sample>_<technology>.accounting.tsv`: records of the input
+  VCF kept, removed and added per step, with the reason (`variant_accounting.py`, columns
+  below).
+- `vcf_preprocessed/accounting/<sample>_<technology>.removed.tsv`: every removed record:
+  `sample`, `technology`, `step_name`, `reason`, `chrom` (contig as in the input),
+  `pos` (1-based), `ref`, `alt`, `filter`.
+- `vcf_preprocessed/accounting/<sample>_<technology>.checks.tsv`: checks that the counts
+  add up (`sample`, `technology`, `check`, `expected`, `observed`, `status` `ok`/`FAIL`);
+  part of the [consistency checks](#report).
 
 </details>
 
@@ -195,6 +240,24 @@ INFO tags added by the harmonization (in `*.normalized.vcf.gz` and `*.compare.vc
 
 A header line `##variantcomp_vaf=unavailable` marks a VCF with too many records without
 VAF (`--max_missing_vaf`): its VAF strata and detection power are `NA`.
+
+`*.accounting.tsv`, one row per step, outcome and reason (the input VCF is read with pysam;
+the steps are reproduced from the step outputs and logs):
+
+| Column | Type | Meaning |
+| --- | --- | --- |
+| `sample`, `technology` | text | samplesheet row |
+| `step`, `step_name` | int, text | 1 `input`, 2 `pass_split`, 3 `contigs`, 4 `gvcf_blocks`, 5 `normalization`, 6 `harmonization`, 7 `filters` |
+| `outcome` | text | `input`, `removed`, `added` (records created by splitting) or `kept` (step 7: the compared records) |
+| `reason` | text | `filter_not_pass` (FILTER not PASS/`.`), `mitochondrial`, `contig_not_compared`, `gvcf_block` (only symbolic `<NON_REF>`/`<*>` ALT), `ref_mismatch`, `duplicate`, `split` (added), `symbolic_allele`, `outside_region`, `vaf_below_min`, `depth_below_min`, `alt_reads_below_min`; `.` for input/kept |
+| `records` | int | records |
+| `snv`, `indel`, `other` | int | records by type (`other`: symbolic or mixed) |
+
+A record failing several filters of step 7 is counted once, under the first reason in the
+order above. Checks (`*.checks.tsv`): the records entering normalization equal the total of
+the `bcftools norm` log; the records written by the harmonization equal the harmonized
+VCF; the compared VCF holds exactly the records passing the filters and the region; input =
+the removed records of steps 2–4 + the records entering normalization.
 
 Keys of `*.harmonize_summary.tsv` (`key`, `value`): `records_read`, `records_written`,
 `records_dropped_symbolic`, `vaf_available` (yes/no), and per sample (prefix `T_`, `N_`):
@@ -379,9 +442,45 @@ Annotation columns of `discordance/variants.annotated.tsv`:
 
 ### Report
 
+The **narrative report** `report/variantcomp_report.html` is the main result for readers:
+one offline HTML file (plots inline, no external scripts) with these sections:
+
+- a banner with the result of the consistency checks;
+- **Summary**: key numbers (samples, technologies, compared region, truth variants), the
+  overall recall/precision/F1, recall vs. precision with one dot per sample, the truth
+  variants found per technology and the discordance classes;
+- **Introduction**: the question, the metrics and the samplesheet;
+- **Results**: compared region (the steps as a flow, plot and tables), input variant sets and
+  their filtering (records removed per step and reason), comparison metrics (by type and
+  VAF, per sample, power-adjusted), truth variants, each discordance class explained with its
+  variants, annotation of truth variants, query calls, FN and FP per technology (consequence
+  group, impact, type, repeat), enrichment and genes, known variants;
+- **Methods**: steps and tool versions, parameters, coverage (plot and table), consistency
+  checks, links to the table browser and the MultiQC report.
+
+The **table browser** `report/tables/index.html` (datavzrd) has searchable, sortable tables
+of: truth variants (default view), metrics per sample, all compared variants, one table per
+discordance class, removed records, preprocessing accounting, region steps, coverage,
+required variants and consistency checks. Every view describes its columns; rows of
+discordant variants link to their truth variant (column `variant_id` =
+`sample:chrom:pos:ref>alt`).
+
 <details markdown="1">
 <summary>Output files</summary>
 
+- `report/variantcomp_report.html`: the narrative report (above).
+- `report/tables/`: the datavzrd table browser (open `index.html`).
+- `report/consistency_checks.tsv`: do the counts of the steps add up? (columns below)
+- `report/variantcomp.truth_variants.tsv`: every compared truth variant per sample:
+  `sample`, `truth`, `chrom`, `pos`, `ref`, `alt`, `found_by` (int: query technologies that
+  found it), `queries` (int: query technologies compared), the annotation of the truth call
+  (`type`, `length`, `truth_vaf`, `truth_dp`, `gene`, `consequence`, `consequence_group`,
+  `impact`, `variant_class`, `in_repeat`, if present) and per query technology
+  `found_<query>` (yes/no) and `class_<query>` (discordance class of a miss, `.` if found).
+- `report/variantcomp.annotation_counts.tsv`: counts per `sample`, `technology`, `set`
+  (`truth_variants`: TP+FN of the truth technology, each variant once; `query_calls`: TP+FP
+  of a query technology; `missed_FN`; `extra_FP`), `annotation` (`type`,
+  `consequence_group`, `impact`, `variant_class`, `in_repeat`), `value` and `count` (int).
 - `report/variantcomp.enrichment.tsv`: are discordant variants different from concordant
   ones? Per comparison and for FN, FP and FN+FP:
 
@@ -407,6 +506,20 @@ Annotation columns of `discordance/variants.annotated.tsv`:
 
 </details>
 
+`consistency_checks.tsv` (`consistency_checks.py check`, at the end of the run):
+
+| Column | Type | Meaning |
+| --- | --- | --- |
+| `category` | text | `accounting` (the checks of every `*.checks.tsv`), `benchmark` (per pair: TP_baseline + FN ≥ compared truth records and TP_call + FP ≥ compared query records, equal unless `rtg vcfeval --decompose` splits complex records; FN and FP rows of the variant table = FN and FP of the metrics), `aggregation` (summed counts = sum over the samples), `discordance` (classes add up to FN / FP; every FN/FP has a known class), `regions` (last region step = common region; callable ≤ common region), `known` (passed + failed = required) |
+| `scope` | text | the sample, VCF or comparison checked |
+| `check` | text | what is checked |
+| `expected`, `observed` | text | the values compared |
+| `status` | text | `ok` or `FAIL` |
+
+**A failed check stops the run** (`CHECKS_GATE`, exit status 1) after the narrative report,
+the table browser and the MultiQC report were written, so the failure can be inspected
+there. A failed check means the results may be wrong: please report it as a bug.
+
 ### MultiQC
 
 <details markdown="1">
@@ -422,8 +535,9 @@ Annotation columns of `discordance/variants.annotated.tsv`:
 The report contains: recall and precision per comparison and per sample, recall by truth
 VAF, the discordance classes, discordance by annotation, the required variants, and one
 table per step summary (input checks, normalization by `bcftools norm`, harmonization,
-comparison region, callable regions), the mosdepth and VEP summaries and the software
-versions.
+comparison region and its steps, variant accounting, callable regions, consistency
+checks), the mosdepth and VEP summaries, coverage in the common and target regions in the
+General Statistics table, and the software versions.
 
 ### Pipeline information
 

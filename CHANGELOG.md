@@ -8,6 +8,13 @@ Dates follow ISO 8601 (`YYYY-MM-DD`).
 
 ### `Added`
 
+- Narrative report `report/variantcomp_report.html` (`bin/report_html.py`, `REPORT_HTML`): Summary (key numbers, overall metrics, recall vs. precision per sample, truth variants found, discordance classes), Introduction, Results (compared region step by step, input variant sets and their filtering, metrics, truth variants, every discordance class explained with its variants, annotation per technology and set, known variants) and Methods (tools, parameters, coverage, consistency checks); offline, inline plots (decision D33)
+- datavzrd table browser `report/tables/` (nf-core `datavzrd`): truth variants, all compared variants, one table per discordance class, removed records, accounting, region steps, coverage, required variants, checks; linked by `variant_id`
+- Variant accounting per VCF (`variant_accounting.py`, `VARIANT_ACCOUNTING`): records kept, removed (with the reason) and added per preprocessing step, every removed record, and checks (`vcf_preprocessed/accounting/`); MultiQC section
+- Region steps (`region_summary.py steps`, `REGION_STEPS`): size of the comparison region after every step (`regions/common_targets.steps.tsv`); MultiQC section
+- Coverage in the common region and the target region of every alignment (`coverage_summary.py`, second mosdepth run on the target BED, `--coverage_thresholds`, default `10,20,30,50,100`): `coverage/coverage.coverage.tsv` and MultiQC General Statistics columns
+- Report tables `variantcomp.truth_variants.tsv` (every truth variant, found / class per query technology) and `variantcomp.annotation_counts.tsv` (annotation per sample, technology and set: truth variants, query calls, FN, FP)
+- Consistency checks at the end of the run (`consistency_checks.py`, `CONSISTENCY_CHECKS`, `report/consistency_checks.tsv`): accounting, metrics vs. variant tables, aggregation, discordance classes, regions, required variants; a failed check stops the run after the reports were written (`CHECKS_GATE`, decision D34)
 - `scripts/check_syntax.py`: strict-syntax check before commits: `nextflow inspect` with the profiles of `nf-core pipelines download` (minimum and current Nextflow), `nextflow lint` without errors or unaccepted warnings
 
 ### `Changed`
@@ -18,6 +25,7 @@ Dates follow ISO 8601 (`YYYY-MM-DD`).
 
 ### `Fixed`
 
+- `region_summary.py`: overlapping intervals of a BED are merged (and counted in the log) instead of stopping the run
 - Known-variant VCFs: `known_variants.py prepare` copied the ID into `INFO/KV_LABEL`; an ID list like `COSM50383;COSM50383` then broke the INFO column and `bcftools norm` failed (`Could not add dummy header for INFO`). The records are now kept as they are (ID, QUAL, FILTER and all INFO fields with their header definitions; multiallelic records are split by `bcftools norm`); only `INFO/VC_T_VAF` (now Number=A) and, for CSV/TSV lists, the ID and `INFO/KV_GENE` are added. `KV_LABEL` is removed: the label is the ID. The check report counts records (`records_read`, `records_kept` instead of `variants_read`, `variants_kept`)
 - The pipeline didn't compile after the GIAB file parameters (stray brace in the utils subworkflow; `nextflow inspect` / `nf-core pipelines download`: "Script compilation failed")
 
