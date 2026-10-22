@@ -17,6 +17,7 @@ include { BEDTOOLS_INTERSECT as BEDTOOLS_INTERSECT_REGIONS } from '../../../modu
 include { BEDTOOLS_SUBTRACT                      } from '../../../modules/nf-core/bedtools/subtract/main'
 include { BEDTOOLS_MERGE as BEDTOOLS_MERGE_COMMON } from '../../../modules/nf-core/bedtools/merge/main'
 include { REGION_SUMMARY                         } from '../../../modules/local/region_summary/main'
+include { REGION_STEPS                           } from '../../../modules/local/region_steps/main'
 
 workflow PREPARE_REGIONS {
 
@@ -69,6 +70,11 @@ workflow PREPARE_REGIONS {
         .filter { _meta, name, _bed -> name != genome_name }
         .map { _meta, name, bed -> [[id: name, role: 'target'], bed] }
 
+    // the region after every step (for the step table): [ name, BED ]; names sort in
+    // step order
+    def ch_steps = genome_bed.map { bed -> ['1_genome', bed] }
+        .mix(BED_INTERSECT_ALL.out.bed.map { _meta, bed -> ['2_targets_intersection', bed] })
+
     // 4. optional restriction and exclusion
     if (use_regions) {
         BEDTOOLS_INTERSECT_REGIONS(
@@ -77,12 +83,14 @@ workflow PREPARE_REGIONS {
             ch_fai
         )
         ch_common = BEDTOOLS_INTERSECT_REGIONS.out.intersect
+        ch_steps = ch_steps.mix(ch_common.map { _meta, bed -> ['3_regions_bed', bed] })
     }
     if (use_exclude) {
         BEDTOOLS_SUBTRACT(
             ch_common.combine(ch_sorted.exclude.map { _meta, bed -> bed }).map { meta, bed, exclude -> [meta, bed, exclude] }
         )
         ch_common = BEDTOOLS_SUBTRACT.out.bed
+        ch_steps = ch_steps.mix(ch_common.map { _meta, bed -> ['4_exclude_bed', bed] })
     }
     // final merge: one name (common_targets.bed) whatever options were used
     BEDTOOLS_MERGE_COMMON(ch_common)
@@ -102,8 +110,17 @@ workflow PREPARE_REGIONS {
         ch_genome_wide
     )
 
+    // 6. bp after every step: genome -> intersection of the targets -> --regions_bed ->
+    //    --exclude_bed
+    REGION_STEPS(
+        ch_steps
+            .toSortedList { a, b -> a[0] <=> b[0] }
+            .map { items -> [[id: 'common_targets'], items.collect { item -> item[0] }, items.collect { item -> item[1] }] }
+    )
+
     emit:
     common_bed  = ch_common_bed          // value channel: path
     summary     = REGION_SUMMARY.out.summary // channel: [ meta, tsv ]
     target_beds = ch_target_beds         // channel: [ meta(id: technology), sorted BED ]
+    steps       = REGION_STEPS.out.steps // channel: [ meta, tsv ] bp of the region after every step
 }

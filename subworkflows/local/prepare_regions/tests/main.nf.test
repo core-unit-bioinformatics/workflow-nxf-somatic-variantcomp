@@ -75,7 +75,10 @@ nextflow_workflow {
         then {
             assertAll(
                 { assert workflow.success },
-                { assert path(workflow.out.common_bed[0]).text == 'chr1\t4000\t4500\nchr1\t4600\t5000\nchr2\t2000\t3000\n' }
+                { assert path(workflow.out.common_bed[0]).text == 'chr1\t4000\t4500\nchr1\t4600\t5000\nchr2\t2000\t3000\n' },
+                // bp after every step: genome, intersection (= panel), --regions_bed, --exclude_bed
+                { assert path(workflow.out.steps[0][1]).readLines().collect { line -> line.tokenize('\t')[1..3].join(':') } == [
+                    'name:intervals:bp', '1_genome:2:50000', '2_targets_intersection:3:7010', '3_regions_bed:2:2000', '4_exclude_bed:3:1900'] }
             )
         }
     }
