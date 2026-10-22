@@ -18,3 +18,5 @@ report/plots/*.png
 known_variants/**/*.vcf.gz
 known_variants/**/*.vcf.gz.tbi
 known_variants/benchmark/**/vcfeval/*
+report/variantcomp_report.html
+report/tables/**

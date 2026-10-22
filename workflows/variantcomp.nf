@@ -16,6 +16,10 @@ include { DISCORDANCE            } from '../subworkflows/local/discordance'
 include { ANNOTATE_VARIANTS      } from '../subworkflows/local/annotate_variants'
 include { VARIANTCOMP_REPORT     } from '../modules/local/variantcomp_report/main'
 include { MQC_TABLES             } from '../modules/local/mqc_tables/main'
+include { CONSISTENCY_CHECKS     } from '../modules/local/consistency_checks/main'
+include { REPORT_HTML            } from '../modules/local/report_html/main'
+include { DATAVZRD               } from '../modules/nf-core/datavzrd/main'
+include { CHECKS_GATE            } from '../modules/local/checks_gate/main'
 include { PREPARE_KNOWN_VARIANTS } from '../subworkflows/local/prepare_known_variants'
 include { KNOWN_VARIANTS         } from '../subworkflows/local/known_variants'
 include { paramsSummaryMap       } from 'plugin/nf-schema'
@@ -123,6 +127,9 @@ workflow VARIANTCOMP {
     //
     // comparison region per samplesheet entry: [ meta, bed ]
     def ch_comparison_regions = ch_samplesheet.map { entry -> entry[0] }.combine(PREPARE_REGIONS.out.common_bed)
+    // tables of the coverage step for the report ([] without --callable_regions)
+    def ch_callable_table = channel.value([])
+    def ch_coverage_table = channel.value([])
     if (params.callable_regions) {
         COVERAGE(
             ch_samplesheet,
@@ -134,9 +141,10 @@ workflow VARIANTCOMP {
         )
         ch_comparison_regions = COVERAGE.out.regions
         ch_multiqc_files = ch_multiqc_files.mix(COVERAGE.out.multiqc_files)
-        COVERAGE.out.callable_summary
+        ch_callable_table = COVERAGE.out.callable_summary
             .map { _meta, tsv -> tsv }
             .collectFile(name: 'callable_summary.tsv', keepHeader: true, skip: 1, sort: { tsv -> tsv.name }, storeDir: "${outdir}/coverage")
+        ch_coverage_table = COVERAGE.out.coverage.map { _meta, tsv -> tsv }
     }
 
     //
@@ -225,6 +233,41 @@ workflow VARIANTCOMP {
     )
     ch_multiqc_files = ch_multiqc_files.mix(VARIANTCOMP_REPORT.out.multiqc.flatten())
 
+    // tables used by the consistency checks and the report (one item each). Lists and
+    // optional tables ([] if missing) are wrapped in a list, so that combine keeps each
+    // as one element
+    ch_callable_table = ch_callable_table.map { tsv -> [tsv] }
+    ch_coverage_table = ch_coverage_table.map { tsv -> [tsv] }
+    def ch_accounting = PREPROCESS_VCF.out.accounting.mix(PREPROCESS_VCF.out.checks)
+        .map { _meta, tsv -> tsv }
+        .toSortedList { a, b -> a.name <=> b.name }
+        .map { files -> [files] }
+    def ch_removed = PREPROCESS_VCF.out.removed
+        .map { _meta, tsv -> tsv }
+        .toSortedList { a, b -> a.name <=> b.name }
+        .map { files -> [files] }
+    def ch_required_summary = KNOWN_VARIANTS.out.required_summary.map { _meta, tsv -> tsv }.ifEmpty([]).map { tsv -> [tsv] }
+    def ch_required_variants = KNOWN_VARIANTS.out.required_variants.map { _meta, tsv -> tsv }.ifEmpty([]).map { tsv -> [tsv] }
+    def ch_known_benchmark = KNOWN_VARIANTS.out.benchmark.map { _meta, tsv -> tsv }.ifEmpty([]).map { tsv -> [tsv] }
+
+    //
+    // MODULE: consistency checks at the end of the run: do the counts of all steps add up
+    // (bin/consistency_checks.py check)? Failed checks are shown in the report; CHECKS_GATE
+    // stops the run after the reports were written
+    //
+    CONSISTENCY_CHECKS(
+        ch_accounting
+            .combine(BENCHMARK.out.per_pair.map { _meta, tsv -> tsv })
+            .combine(BENCHMARK.out.aggregated.map { _meta, tsv -> tsv })
+            .combine(ANNOTATE_VARIANTS.out.annotated.map { _meta, tsv -> tsv })
+            .combine(VARIANTCOMP_REPORT.out.classes.map { _meta, tsv -> tsv })
+            .combine(PREPARE_REGIONS.out.steps.map { _meta, tsv -> tsv })
+            .combine(PREPARE_REGIONS.out.summary.map { _meta, tsv -> tsv })
+            .combine(ch_callable_table)
+            .combine(ch_required_summary)
+            .map { items -> [[id: 'consistency_checks']] + items }
+    )
+
     //
     // MODULE: MultiQC tables of the step summaries (input checks, normalization,
     // harmonization, regions), one section each
@@ -245,7 +288,15 @@ workflow VARIANTCOMP {
             PREPARE_REGIONS.out.summary
                 .map { _meta, tsv -> tsv }
                 .collect()
-                .map { files -> [[id: 'regions', command: 'table', title: 'Comparison region', description: 'Size of every target BED and of the common comparison region.'], files] }
+                .map { files -> [[id: 'regions', command: 'table', title: 'Comparison region', description: 'Size of every target BED and of the common comparison region.'], files] },
+            PREPARE_REGIONS.out.steps
+                .map { _meta, tsv -> [[id: 'region_steps', command: 'table', id_columns: 2, title: 'Comparison region: steps', description: 'bp of the comparison region after every step (genome, intersection of the target BEDs, --regions_bed, --exclude_bed).'], [tsv]] },
+            PREPROCESS_VCF.out.accounting
+                .map { _meta, tsv -> tsv }
+                .collect()
+                .map { files -> [[id: 'accounting', command: 'table', id_columns: 6, title: 'Variant accounting', description: 'Records of every input VCF kept, removed (with the reason) and added per preprocessing step (variant_accounting.py).'], files] },
+            CONSISTENCY_CHECKS.out.checks
+                .map { _meta, tsv -> [[id: 'consistency_checks', command: 'table', id_columns: 3, title: 'Consistency checks', description: 'Do the counts of the steps add up? A failed check stops the run after the reports were written.'], [tsv]] }
         )
     if (params.callable_regions) {
         ch_summary_sections = ch_summary_sections.mix(
@@ -313,7 +364,61 @@ workflow VARIANTCOMP {
             ]
         }
     )
-    emit:multiqc_report = MULTIQC.out.report.map { _meta, report -> [report] }.toList() // channel: /path/to/multiqc_report.html
+
+    //
+    // MODULE: narrative report (Summary, Introduction, Results, Methods) and the tables of
+    // the datavzrd table browser (bin/report_html.py)
+    //
+    // parameters of the run as a table: group, parameter, value
+    def ch_params_table = channel.of(
+        ch_summary_params.collectMany { group, group_params ->
+            group_params.collect { name, value -> "${group}\t${name}\t${value}" }
+        }.join('\n')
+    ).collectFile(name: 'params.tsv', seed: 'group\tparameter\tvalue', newLine: true)
+    REPORT_HTML(
+        BENCHMARK.out.per_pair.map { _meta, tsv -> tsv }
+            .combine(BENCHMARK.out.aggregated.map { _meta, tsv -> tsv })
+            .combine(DISCORDANCE.out.power.map { _meta, tsv -> tsv })
+            .combine(ANNOTATE_VARIANTS.out.annotated.map { _meta, tsv -> tsv })
+            .combine(VARIANTCOMP_REPORT.out.truth_variants.map { _meta, tsv -> tsv })
+            .combine(VARIANTCOMP_REPORT.out.classes.map { _meta, tsv -> tsv })
+            .combine(VARIANTCOMP_REPORT.out.enrichment.map { _meta, tsv -> tsv })
+            .combine(VARIANTCOMP_REPORT.out.genes.map { _meta, tsv -> tsv })
+            .combine(VARIANTCOMP_REPORT.out.annotation_counts.map { _meta, tsv -> tsv })
+            .map { items -> [[id: 'variantcomp']] + items },
+        ch_accounting
+            .combine(ch_removed)
+            .combine(PREPARE_REGIONS.out.steps.map { _meta, tsv -> tsv })
+            .combine(PREPARE_REGIONS.out.summary.map { _meta, tsv -> tsv })
+            .combine(ch_callable_table)
+            .combine(ch_coverage_table),
+        ch_required_summary
+            .combine(ch_required_variants)
+            .combine(ch_known_benchmark),
+        CONSISTENCY_CHECKS.out.checks.map { _meta, tsv -> tsv }
+            .combine(ch_samplesheet_validated)
+            .combine(ch_params_table)
+            .combine(ch_collated_versions)
+    )
+
+    //
+    // MODULE: datavzrd table browser (report/tables/index.html)
+    //
+    DATAVZRD(REPORT_HTML.out.datavzrd)
+
+    //
+    // MODULE: stop the run if a consistency check failed, after all reports were written
+    //
+    CHECKS_GATE(
+        CONSISTENCY_CHECKS.out.checks
+            .combine(REPORT_HTML.out.html.map { _meta, html -> html })
+            .combine(DATAVZRD.out.report.map { _meta, folder -> folder })
+            .combine(MULTIQC.out.report.map { _meta, report -> report })
+            .map { meta, checks, html, tables, multiqc -> [meta, checks, [html, tables, multiqc]] }
+    )
+
+    emit:
+    multiqc_report = MULTIQC.out.report.map { _meta, report -> [report] }.toList() // channel: /path/to/multiqc_report.html
     versions       = ch_versions                 // channel: [ path(versions.yml) ]
 }
 

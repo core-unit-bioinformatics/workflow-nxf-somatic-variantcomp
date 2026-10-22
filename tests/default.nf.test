@@ -58,6 +58,13 @@ nextflow_pipeline {
                 { assert overallCounts("$outputDir/known_variants/benchmark/S1/S1_designed_truth_vs_wgs.metrics.tsv") == ['10', '0', '10', '0'] },
                 { assert overallCounts("$outputDir/known_variants/benchmark/S1/S1_designed_truth_vs_panel.metrics.tsv") == ['8', '2', '8', '1'] },
                 { assert validated.count { line -> line.contains(',wgs,wgs,') && line.contains(',true,') } == 2 },
+                // end-of-run checks: every count adds up; the reports were written
+                { assert path("$outputDir/report/consistency_checks.tsv").readLines().size() > 40 },
+                { assert path("$outputDir/report/consistency_checks.tsv").readLines().drop(1).every { line -> line.endsWith('\tok') } },
+                { assert path("$outputDir/report/variantcomp_report.html").text.contains('consistency checks passed') },
+                { assert path("$outputDir/report/tables/index.html").exists() },
+                // accounting: E08 (non-PASS in wes) is removed in the PASS split
+                { assert path("$outputDir/vcf_preprocessed/accounting/S1_wes.removed.tsv").text.contains('pass_split\tfilter_not_pass\tchr1\t4700') },
                 { assert snapshot(
                     // pipeline versions.yml file for multiqc from which Nextflow version is removed because we test pipelines on multiple Nextflow versions
                     removeNextflowVersion("$outputDir/pipeline_info/variantcomp_software_mqc_versions.yml"),
