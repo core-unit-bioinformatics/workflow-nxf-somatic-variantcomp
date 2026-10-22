@@ -58,14 +58,53 @@ def test_targets_empty_common_region_is_an_error(tmp_path):
     assert "common comparison region is empty" in proc.stderr
 
 
-def test_overlapping_intervals_are_an_error(tmp_path):
-    common = write(tmp_path / "common.bed", "chr1\t100\t200\nchr1\t150\t300\n")
+def test_overlapping_target_intervals_are_merged(tmp_path):
+    # capture-kit BEDs often overlap: the bases are counted once (100-300 = 200 bp)
+    common = write(tmp_path / "common.bed", "chr1\t100\t200\n")
+    wes = write(tmp_path / "wes.bed", "chr1\t150\t300\nchr1\t100\t200\n")
     genome = write(tmp_path / "genome.bed", "chr1\t0\t1000\n")
+    out = tmp_path / "t.tsv"
     proc = run(
-        "targets", "--common", common, "--genome", genome, "--output", str(tmp_path / "t.tsv")
+        "targets",
+        "--common",
+        common,
+        "--genome",
+        genome,
+        "--target",
+        f"wes={wes}",
+        "--output",
+        str(out),
     )
-    assert proc.returncode == 1
-    assert "overlap or are unsorted" in proc.stderr
+    assert proc.returncode == 0, proc.stderr
+    wes_row = next(r for r in rows(out) if r["region"] == "wes")
+    assert (wes_row["intervals"], wes_row["bp"], wes_row["bp_in_common"]) == ("1", "200", "100")
+
+
+def test_steps(tmp_path):
+    genome = write(tmp_path / "genome.bed", "chr1\t0\t1000\nchr2\t0\t1000\n")
+    intersection = write(tmp_path / "i.bed", "chr1\t0\t500\n")
+    regions = write(tmp_path / "r.bed", "chr1\t100\t500\n")
+    out = tmp_path / "steps.tsv"
+    proc = run(
+        "steps",
+        "--step",
+        f"genome={genome}",
+        f"intersection={intersection}",
+        f"regions_bed={regions}",
+        "--output",
+        str(out),
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert [
+        (r["step"], r["name"], r["bp"], r["fraction_of_genome"], r["removed_bp"]) for r in rows(out)
+    ] == [
+        ("1", "genome", "2000", "1.0000", "NA"),
+        ("2", "intersection", "500", "0.2500", "1500"),
+        ("3", "regions_bed", "400", "0.2000", "100"),
+    ]
+    # a step can't add bases
+    proc = run("steps", "--step", f"i={intersection}", f"genome={genome}", "--output", str(out))
+    assert proc.returncode == 1 and "subset of the step before" in proc.stderr
 
 
 def test_callable_summary(tmp_path):
