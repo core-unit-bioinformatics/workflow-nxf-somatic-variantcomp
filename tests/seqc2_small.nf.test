@@ -15,8 +15,9 @@ nextflow_pipeline {
         }
 
         then {
-            // MultiQC decides per run which tables it also exports as plot images: not stable
-            def stable_path = getAllFilesFromDir(params.outdir, relative: true, includeDir: true, ignore: ['pipeline_info/*.{html,json,txt}', 'multiqc/multiqc_plots/**'])
+            // MultiQC decides per run which tables it also exports as plot images: not stable;
+            // datavzrd splits its data into many chunk files (report/tables/index.html is asserted)
+            def stable_path = getAllFilesFromDir(params.outdir, relative: true, includeDir: true, ignore: ['pipeline_info/*.{html,json,txt}', 'multiqc/multiqc_plots/**', 'report/tables/**'])
             def stable_content = getAllFilesFromDir(params.outdir, ignoreFile: 'tests/.nftignore')
             def validated = path("$outputDir/pipeline_info/samplesheet.validated.csv").readLines()
             def annotatedHeader = path("$outputDir/discordance/variants.annotated.tsv").readLines()[0].tokenize('\t')
@@ -34,6 +35,10 @@ nextflow_pipeline {
                 // annotation: VEP (GENCODE chr22 GTF), repeats, GIAB stratifications (--giab_<name>)
                 { assert ['gene', 'consequence_group', 'in_repeat', 'giab_homopolymer', 'giab_tandem_repeat',
                           'giab_segmental_duplication', 'giab_low_mappability', 'giab_all_difficult'].every { c -> c in annotatedHeader } },
+                // end-of-run checks: every count adds up; the reports were written
+                { assert path("$outputDir/report/consistency_checks.tsv").readLines().drop(1).every { line -> line.endsWith('\tok') } },
+                { assert path("$outputDir/report/variantcomp_report.html").text.contains('consistency checks passed') },
+                { assert path("$outputDir/report/tables/index.html").exists() },
                 { assert snapshot(
                     removeNextflowVersion("$outputDir/pipeline_info/variantcomp_software_mqc_versions.yml"),
                     stable_path,
