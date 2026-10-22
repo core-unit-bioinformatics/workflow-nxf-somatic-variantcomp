@@ -76,6 +76,12 @@
                         "git_sha": "6d46786420b4d7bc88eba026eb389c0c5535d120",
                         "installed_by": ["modules"]
                     },
+                    "datavzrd": {
+                        "branch": "master",
+                        "git_sha": "f9002b528cd66d4f0b787a0bd039bb04579a154a",
+                        "installed_by": ["modules"],
+                        "patch": "modules/nf-core/datavzrd/datavzrd.diff"
+                    },
                     "ensemblvep/vep": {
                         "branch": "master",
                         "git_sha": "7047ebe92547d7f029fa6e71d2c893d5fb131938",

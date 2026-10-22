@@ -1,0 +1,23 @@
+Changes in component 'nf-core/datavzrd'
+Changes in 'datavzrd/main.nf':
+--- modules/nf-core/datavzrd/main.nf
++++ modules/nf-core/datavzrd/main.nf
+@@ -12,7 +12,9 @@
+ 
+     output:
+     tuple val(meta), path("${prefix}"), emit: report
+-    tuple val("${task.process}"), val('datavzrd'),  eval("datavzrd --version | sed -e 's/[^0-9.]//g'"), topic: versions, emit: versions_datavzrd
++    // variantcomp patch: not sent to the `versions` topic (like MULTIQC): the input depends
++    // on the collated versions, so emitting to the topic would let the pipeline hang
++    tuple val("${task.process}"), val('datavzrd'),  eval("datavzrd --version | sed -e 's/[^0-9.]//g'"), emit: versions_datavzrd
+ 
+     when:
+     task.ext.when == null || task.ext.when
+
+'modules/nf-core/datavzrd/meta.yml' is unchanged
+'modules/nf-core/datavzrd/environment.yml' is unchanged
+'modules/nf-core/datavzrd/tests/main.nf.test.snap' is unchanged
+'modules/nf-core/datavzrd/tests/main.nf.test' is unchanged
+'modules/nf-core/datavzrd/.conda-lock/linux_arm64-bd-ea056c1eb19e673d_2.txt' is unchanged
+'modules/nf-core/datavzrd/.conda-lock/linux_amd64-bd-58fb85a496607c2e_2.txt' is unchanged
+************************************************************
