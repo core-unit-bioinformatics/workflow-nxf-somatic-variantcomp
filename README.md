@@ -29,12 +29,13 @@ therefore require:
 
 ![Overview metro map of workflow-nxf-somatic-variantcomp](docs/images/variantcomp_metro_map_overview.png)
 
-The overview map shows the seven stages (grey boxes) and the main tool of each step.
-Read it like a metro map: row 1 from left to right, row 2 back from right to left. Each
-coloured line is one input; it runs with the others, leaves them where it is used
-(regions and coverage below row 1, known variants below row 2) and ends at its last
-use. A pill is a step that combines several inputs. Every input is checked against the
-reference in stage 1 before any other work starts.
+The overview map shows the seven stages and the main tool of each step. The VCFs start
+the pipeline on the left; every other file enters in the stage where it is used (target
+BEDs and the known-variant sheet start their own line, files read by a single step such
+as the reference FASTA reach it with a dashed line). The two comparisons are the key
+step in the centre: the benchmark against the truth technology, where the line forks
+into haplotype-aware matching (`rtg vcfeval`) and exact-allele/position matching
+(`bcftools isec`), and the known-variant check below it.
 
 The detailed map below lists every step with its number:
 
