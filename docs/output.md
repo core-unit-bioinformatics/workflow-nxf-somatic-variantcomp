@@ -81,7 +81,7 @@ input type are written):
 | `records_on_unknown_contigs`, `records_on_mito`, `intervals_dropped` | int | dropped records or intervals |
 | `intervals_beyond_contig_end` | int | BED intervals ending after their contig (an error) |
 | `ref_alleles_checked`, `ref_mismatches`, `ref_mismatch_rate` | int, int, float | REF alleles compared with the FASTA; mismatches; their fraction (error above `--max_ref_mismatch`) |
-| `variants_read`, `variants_kept` | int | known-variant lists: variants read and usable |
+| `records_read`, `records_kept` | int | known-variant lists: VCF records / list rows read and usable (a multiallelic record counts once) |
 | `warning`, `error` | text | one row per message |
 
 ### Regions
