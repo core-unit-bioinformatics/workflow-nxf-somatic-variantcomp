@@ -17,7 +17,10 @@
 //
 
 include { RENAME_BED                                } from '../../../modules/local/rename_bed/main'
+include { RENAME_BED as RENAME_TARGET               } from '../../../modules/local/rename_bed/main'
 include { MOSDEPTH                                  } from '../../../modules/nf-core/mosdepth/main'
+include { MOSDEPTH as MOSDEPTH_TARGETS              } from '../../../modules/nf-core/mosdepth/main'
+include { COVERAGE_SUMMARY                          } from '../../../modules/local/coverage_summary/main'
 include { MOSDEPTH_CALLABLE                         } from '../../../modules/local/mosdepth_callable/main'
 include { BED_INTERSECT_ALL                         } from '../bed_intersect_all/main'
 include { BEDTOOLS_INTERSECT as BEDTOOLS_INTERSECT_COMMON } from '../../../modules/nf-core/bedtools/intersect/main'
@@ -31,6 +34,7 @@ workflow COVERAGE {
     ch_reference   // value channel: [ meta, fasta, fai, gzi ]
     common_bed     // value channel: common comparison region (reference contig names; sorted, merged)
     include_normal // boolean: normal alignments must be callable, too
+    ch_target_beds // channel: [ meta(id: technology), sorted target BED ] of the targeted technologies
 
     main:
     def ch_fai = ch_reference.map { meta, _fasta, fai, _gzi -> [meta, fai] }
@@ -62,6 +66,37 @@ workflow COVERAGE {
         ch_alignments.join(RENAME_BED.out.bed),
         ch_reference.map { meta, fasta, _fai, _gzi -> [meta, fasta] },
         ['LOW_COVERAGE', 'CALLABLE']
+    )
+
+    // coverage of each alignment in the target BED of its technology (second mosdepth run,
+    // --thresholds); technologies without target BED (WGS) use the genome of the first run
+    RENAME_TARGET(
+        ch_rename
+            .map { meta, rename -> [meta.technology, meta, rename] }
+            .combine(ch_target_beds.map { meta, bed -> [meta.id, bed] }, by: 0)
+            .map { _technology, meta, rename, bed -> [meta, rename, bed] }
+    )
+    MOSDEPTH_TARGETS(
+        ch_alignments.join(RENAME_TARGET.out.bed),
+        ch_reference.map { meta, fasta, _fai, _gzi -> [meta, fasta] },
+        []
+    )
+
+    // coverage table of all alignments (common region, target region / genome) and the
+    // MultiQC General Statistics columns
+    def ch_alignment_table = ch_alignments
+        .map { meta, _bam, _index -> "${meta.id}\t${meta.sample}\t${meta.technology}\t${meta.role}\n" }
+        .collectFile(name: 'alignments.tsv', seed: "alignment\tsample\ttechnology\trole\n", sort: true)
+    COVERAGE_SUMMARY(
+        ch_alignment_table
+            .combine(
+                MOSDEPTH.out.regions_bed.mix(MOSDEPTH.out.thresholds_bed, MOSDEPTH.out.global_txt, MOSDEPTH.out.summary_txt,
+                    MOSDEPTH_TARGETS.out.regions_bed, MOSDEPTH_TARGETS.out.thresholds_bed)
+                    .map { _meta, file -> file }
+                    .collect()
+                    .map { files -> [files] }
+            )
+            .map { table, files -> [[id: 'coverage'], table, files] }
     )
 
     // 3. callable intervals per alignment (quantized bins: base mode; regions: region mode)
@@ -122,6 +157,8 @@ workflow COVERAGE {
     regions          = ch_regions                             // channel: [ meta, bed ] per samplesheet entry
     callable         = ch_callable                            // channel: [ meta(sample), bed ]
     callable_summary = REGION_SUMMARY_CALLABLE.out.summary    // channel: [ meta(sample), tsv ]
+    coverage         = COVERAGE_SUMMARY.out.coverage          // channel: [ meta, tsv ] coverage per alignment and region
     multiqc_files    = MOSDEPTH.out.global_txt.mix(MOSDEPTH.out.summary_txt, MOSDEPTH.out.regions_txt)
-                           .map { _meta, file -> file }       // channel: path
+                           .map { _meta, file -> file }
+                           .mix(COVERAGE_SUMMARY.out.multiqc)  // channel: path
 }

@@ -35,6 +35,8 @@ nextflow_workflow {
                                           file(base + 'reference/GRCh38.d1.vd1_chr22.fa.gz.fai'), file(base + 'reference/GRCh38.d1.vd1_chr22.fa.gz.gzi')])
                 input[3] = channel.value(file(base + 'bed/S07604624_Covered_human_all_v6_plus_UTR_hg38.bed'))
                 input[4] = true
+                // target BED of the WES technology (WGS: genome-wide)
+                input[5] = channel.of([[id: 'wes', role: 'target'], file(base + 'bed/S07604624_Covered_human_all_v6_plus_UTR_hg38.bed')])
                 """
             }
         }
@@ -50,7 +52,12 @@ nextflow_workflow {
                 // min_coverage: tumor/normal threshold
                 { assert summary[1].startsWith('SEQC2_IL_1\t4\tbase\t10/10\t1987915\t') },
                 // mosdepth summaries for MultiQC: global, summary and regions per alignment
-                { assert workflow.out.multiqc_files.size() == 12 },
+                // mosdepth summaries for MultiQC (12) + the General Statistics coverage columns
+                { assert workflow.out.multiqc_files.size() == 13 },
+                // coverage: common region + target (WES) or genome (WGS) for each of the 4 alignments
+                { assert path(workflow.out.coverage[0][1]).readLines().drop(1).collect { line -> line.tokenize('\t')[0, 4].join(':') } == [
+                    'SEQC2_IL_1_wes_normal:common', 'SEQC2_IL_1_wes_normal:target', 'SEQC2_IL_1_wes_tumor:common', 'SEQC2_IL_1_wes_tumor:target',
+                    'SEQC2_IL_1_wgs_normal:common', 'SEQC2_IL_1_wgs_normal:genome', 'SEQC2_IL_1_wgs_tumor:common', 'SEQC2_IL_1_wgs_tumor:genome'] },
                 { assert snapshot(workflow.out.callable, workflow.out.callable_summary).match() }
             )
         }

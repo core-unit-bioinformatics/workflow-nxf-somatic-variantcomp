@@ -168,6 +168,13 @@
                     "description": "Minimum depth of a normal alignment for a base (or region) to be callable (with --require_normal_coverage).",
                     "fa_icon": "fas fa-layer-group"
                 },
+                "coverage_thresholds": {
+                    "type": "string",
+                    "default": "10,20,30,50,100",
+                    "pattern": "^\\d+(,\\d+)*$",
+                    "description": "Depths for the coverage summary: % of the bases with at least this depth in the common region and in the target region of every alignment (mosdepth --thresholds; report and MultiQC General Statistics).",
+                    "fa_icon": "fas fa-layer-group"
+                },
                 "callable_mode": {
                     "type": "string",
                     "enum": [

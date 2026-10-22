@@ -129,7 +129,8 @@ workflow VARIANTCOMP {
             CHECK_INPUTS.out.bam_rename,
             PREPARE_REFERENCE.out.reference,
             PREPARE_REGIONS.out.common_bed,
-            params.require_normal_coverage
+            params.require_normal_coverage,
+            PREPARE_REGIONS.out.target_beds
         )
         ch_comparison_regions = COVERAGE.out.regions
         ch_multiqc_files = ch_multiqc_files.mix(COVERAGE.out.multiqc_files)
