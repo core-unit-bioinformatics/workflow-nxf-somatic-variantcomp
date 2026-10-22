@@ -300,6 +300,35 @@ nf-core-style pipelines.
 - **Statistics from scipy** (`fisher_exact`, `false_discovery_control`),
   not own implementations.
 
+### Report and end-of-run checks (feedback 2026-10-22, D33/D34)
+
+- **Two reports, two audiences.** MultiQC holds the QC of every step. The narrative report
+  `report/variantcomp_report.html` (`bin/report_html.py`) is for readers: offline, one
+  file, inline SVG plots, no external JavaScript, structured as
+  Summary → Introduction → Results → Methods and ordered by importance. The Summary shows
+  the key plots (recall vs. precision with one dot per sample, truth variants found,
+  discordance classes). Every section starts with text that explains what is shown.
+- **Browsable tables with datavzrd** (nf-core `datavzrd`, `report/tables/`): every
+  compared variant, truth variant, discordance class, removed record, region step,
+  coverage row and check, linked by `variant_id` (`sample:chrom:pos:ref>alt`).
+- **One source of explanations.** Class, reason and column texts live once in
+  `report_html.py` (`CLASS_TEXT`, `REASON_TEXT`, `COLUMN_TEXT`) and are used by both
+  reports; keep them in line with `docs/output.md`.
+- **Every count is traceable.** Each VCF has an accounting table (records kept, removed
+  with the reason, added per step; `variant_accounting.py`) and a table of every removed
+  record; the comparison region has a step table (`region_summary.py steps`); coverage is
+  summarized in the common and in the target region (`coverage_summary.py`, MultiQC
+  General Statistics).
+- **Consistency checks at the end.** `consistency_checks.py check` verifies that the counts
+  of all steps add up. New steps that change counts add their checks there. The report
+  and MultiQC show the table; `CHECKS_GATE` stops the run if a check failed, after the
+  reports were written (so the failure can be inspected). Never weaken a check to make a
+  run pass; find the cause.
+- **No versions topic after the versions are collated.** A process that waits for the
+  collated versions, directly or through another report (MULTIQC, REPORT_HTML, DATAVZRD
+  (patched), CHECKS_GATE), must not emit into the `versions` topic: the topic would stay
+  open and the run would hang.
+
 ## Git and versioning
 
 - Branches:
