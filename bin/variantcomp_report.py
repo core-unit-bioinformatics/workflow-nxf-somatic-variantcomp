@@ -20,6 +20,16 @@ Outputs (prefix "variantcomp"):
                              rate, Fisher's exact test of discordant vs. concordant
                              in the gene vs. all other genes, BH q
   <prefix>.classes.tsv       per comparison: counts of discordance classes
+  <prefix>.truth_variants.tsv  every compared truth variant per sample (chrom, pos [1-based],
+                             ref, alt), found_by (number of query technologies that found
+                             it), queries, its annotation (type, length, truth VAF/depth,
+                             gene, consequence, impact, variant class, repeat) and per query
+                             technology found_<query> (yes/no) and class_<query> (class
+                             of a miss, '.' if found)
+  <prefix>.annotation_counts.tsv  annotation counts per sample, technology and set
+                             (truth_variants, query_calls, missed_FN, extra_FP): sample,
+                             technology, set, annotation (type, consequence_group, impact,
+                             variant_class, in_repeat), value, count
   <prefix>.strata.tsv        per comparison, annotation and value (consequence_group,
                              impact, variant_class, in_repeat, every stratification):
                              TP, FN, FP, recall, precision and discordance rate
@@ -356,6 +366,86 @@ def plot_strata(strata, outdir):
     plt.close(fig)
 
 
+# annotation columns counted per sample, technology and variant set (if present)
+ANNOTATION_COLUMNS = ["type", "consequence_group", "impact", "variant_class", "in_repeat"]
+# columns of a truth variant kept in the truth table (if present)
+TRUTH_INFO = [
+    "type",
+    "length",
+    "truth_vaf",
+    "truth_dp",
+    "gene",
+    "consequence",
+    "consequence_group",
+    "impact",
+    "variant_class",
+    "in_repeat",
+]
+
+
+def truth_variants(df):
+    """Every compared truth variant per sample: annotation and, per query technology,
+    whether it was found (TP) or missed (FN) and the class of a miss.
+
+    One row per sample, truth technology and variant (chrom, pos, ref, alt); columns
+    found_<query> (yes/no) and class_<query> (discordance class of an FN, '.' if found).
+    """
+    truth = df[df["status"].isin(["TP", "FN"])].copy()
+    if truth.empty:
+        return pd.DataFrame()
+    keys = ["sample", "truth", "chrom", "pos", "ref", "alt"]
+    info = [c for c in TRUTH_INFO if c in truth.columns]
+    table = truth.drop_duplicates(keys)[keys + info].set_index(keys)
+    for query, rows in truth.groupby("query"):
+        rows = rows.drop_duplicates(keys).set_index(keys)
+        table[f"found_{query}"] = rows["status"].map({"TP": "yes", "FN": "no"})
+        table[f"class_{query}"] = rows["class"].where(rows["status"] == "FN", ".")
+    table = table.reset_index()
+    # how many query technologies found the variant
+    found = [c for c in table.columns if c.startswith("found_")]
+    table.insert(len(keys), "found_by", (table[found] == "yes").sum(axis=1))
+    table.insert(len(keys) + 1, "queries", len(found))
+    return table.sort_values(["sample", "chrom", "pos", "ref", "alt"])
+
+
+def annotation_counts(df):
+    """Annotation counts per sample, technology and variant set.
+
+    Sets: truth_variants (TP + FN of the truth technology, each variant once),
+    query_calls (TP + FP of a query technology), missed_FN and extra_FP (the discordant
+    variants of a query technology). Long format: sample, technology, set, annotation,
+    value, count.
+    """
+    columns = [c for c in ANNOTATION_COLUMNS if c in df.columns]
+    keys = ["sample", "chrom", "pos", "ref", "alt"]
+    sets = []
+    truth = df[df["status"].isin(["TP", "FN"])].drop_duplicates(keys + ["truth"])
+    sets.append(truth.assign(technology=truth["truth"], set="truth_variants"))
+    for status_set, statuses in (
+        ("query_calls", ["TP", "FP"]),
+        ("missed_FN", ["FN"]),
+        ("extra_FP", ["FP"]),
+    ):
+        rows = df[df["status"].isin(statuses)]
+        sets.append(rows.assign(technology=rows["query"], set=status_set))
+    frames = []
+    for rows in sets:
+        for col in columns:
+            counts = (
+                rows.assign(value=rows[col].fillna("NA").astype(str))
+                .groupby(["sample", "technology", "set", "value"])
+                .size()
+                .reset_index(name="count")
+            )
+            frames.append(counts.assign(annotation=col))
+    if not frames:
+        return pd.DataFrame(columns=["sample", "technology", "set", "annotation", "value", "count"])
+    out = pd.concat(frames, ignore_index=True)
+    return out[["sample", "technology", "set", "annotation", "value", "count"]].sort_values(
+        ["sample", "technology", "set", "annotation", "value"]
+    )
+
+
 def class_summary(df):
     """Counts of the discordance classes per comparison and status (FN, FP)."""
     disc = df[df["status"] != "TP"]
@@ -655,6 +745,14 @@ def main():
         f"{args.prefix}.genes.tsv", sep="\t", index=False, na_rep="NA", float_format="%.4g"
     )
     classes.to_csv(f"{args.prefix}.classes.tsv", sep="\t", index=False)
+    # truth variants found/missed per query technology; annotation per sample and set
+    truth_table = truth_variants(variants)
+    truth_table.to_csv(
+        f"{args.prefix}.truth_variants.tsv", sep="\t", index=False, na_rep="NA", float_format="%.4g"
+    )
+    annotation_counts(variants).to_csv(
+        f"{args.prefix}.annotation_counts.tsv", sep="\t", index=False
+    )
     write_mqc(args.prefix, metrics, per_pair, power, classes)
 
     plots = Path("plots")

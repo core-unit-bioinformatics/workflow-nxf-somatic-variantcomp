@@ -104,3 +104,66 @@ def test_strata_summary_counts_per_value():
 def test_feature_flags_include_consequence_and_impact():
     flags = report.feature_flags(annotated(), 0.1)
     assert {"non_synonymous", "synonymous", "high_or_moderate_impact", "in_repeat"} <= set(flags)
+
+
+def comparison_rows():
+    """Two queries (wes, panel) against wgs for one sample: v1 found by both, v2 missed by
+    panel, one FP of wes."""
+    base = {
+        "sample": "S1",
+        "truth": "wgs",
+        "chrom": "chr1",
+        "ref": "A",
+        "alt": "C",
+        "type": "SNV",
+        "consequence_group": "non_synonymous",
+        "impact": "MODERATE",
+        "variant_class": "SNV",
+        "in_repeat": "no",
+        "truth_vaf": 0.3,
+    }
+    rows = [
+        {**base, "query": "wes", "pos": 100, "status": "TP", "class": "concordant"},
+        {**base, "query": "panel", "pos": 100, "status": "TP", "class": "concordant"},
+        {**base, "query": "wes", "pos": 200, "status": "TP", "class": "concordant"},
+        {**base, "query": "panel", "pos": 200, "status": "FN", "class": "absent"},
+        {
+            **base,
+            "query": "wes",
+            "pos": 300,
+            "status": "FP",
+            "class": "no_evidence",
+            "truth_vaf": None,
+        },
+    ]
+    return pd.DataFrame(rows)
+
+
+def test_truth_variants_found_per_query():
+    table = report.truth_variants(comparison_rows())
+    assert list(table["pos"]) == [100, 200]
+    v2 = table[table["pos"] == 200].iloc[0]
+    assert (
+        v2["found_by"],
+        v2["queries"],
+        v2["found_wes"],
+        v2["found_panel"],
+        v2["class_panel"],
+        v2["class_wes"],
+    ) == (1, 2, "yes", "no", "absent", ".")
+
+
+def test_annotation_counts_per_set():
+    counts = report.annotation_counts(comparison_rows())
+
+    def get(tech, set_):
+        rows = counts[(counts["technology"] == tech) & (counts["set"] == set_)]
+        return int(rows[rows["annotation"] == "type"]["count"].sum())
+
+    # truth variants: each once (2); wes calls: 2 TP + 1 FP; panel misses 1; wes has 1 FP
+    assert (
+        get("wgs", "truth_variants"),
+        get("wes", "query_calls"),
+        get("panel", "missed_FN"),
+        get("wes", "extra_FP"),
+    ) == (2, 3, 1, 1)
