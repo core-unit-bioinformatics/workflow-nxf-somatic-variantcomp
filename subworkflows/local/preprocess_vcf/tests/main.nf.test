@@ -125,4 +125,63 @@ nextflow_workflow {
             )
         }
     }
+
+    test("synthetic - overlapping alleles: atomized complex call and spanning deletion") {
+
+        when {
+            workflow {
+                """
+                def base = params.pipelines_testdata_base_path + 'synthetic/'
+                def genome = file("${outputDir}/genome.bed")
+                genome.parent.mkdirs()
+                genome.text = 'chr1\\t0\\t30000\\nchr2\\t0\\t20000\\n'
+                def no_rename = file("${outputDir}/none.rename_chrs.tsv")
+                no_rename.text = ''
+                // DRAGEN-like VCF (plain text, no index; bcftools view -s needs the contig lines) with
+                // G01: complex call CG>CTGTATAAGAGGT (insertion + SNV at chr1:4806); bcftools norm
+                //      --atomize writes 'G GGTATAAGAGGT,*' and 'G T,*' with the default --atom-overlaps '*'
+                // G02: deletion chr2:2612 CTGA>C spanning chr2:2614 G>A,* ('*': the deletion allele)
+                def vcf = file("${outputDir}/S3_wes.vcf")
+                vcf.text = [
+                    '##fileformat=VCFv4.2',
+                    '##FILTER=<ID=PASS,Description="All filters passed">',
+                    '##contig=<ID=chr1,length=30000>',
+                    '##contig=<ID=chr2,length=20000>',
+                    '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">',
+                    '##FORMAT=<ID=AD,Number=R,Type=Integer,Description="Allelic depths">',
+                    '##FORMAT=<ID=AF,Number=A,Type=Float,Description="Allele fractions">',
+                    '##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Read depth">',
+                    ['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO', 'FORMAT', 'S3_wes_T', 'S3_wes_N'].join('\\t'),
+                    ['chr1', '4805', '.', 'CG', 'CTGTATAAGAGGT', '.', 'PASS', '.', 'GT:AD:AF:DP', '0/1:140,60:0.300:200', '0/0:200,0:0.000:200'].join('\\t'),
+                    ['chr2', '2612', '.', 'CTGA', 'C', '.', 'PASS', '.', 'GT:AD:AF:DP', '0/1:140,60:0.300:200', '0/0:200,0:0.000:200'].join('\\t'),
+                    ['chr2', '2614', '.', 'G', 'A,*', '.', 'PASS', '.', 'GT:AD:AF:DP', '1/2:110,30,60:0.150,0.300:200', '0/0:200,0,0:0.000,0.000:200'].join('\\t'),
+                ].join('\\n') + '\\n'
+                def meta = [id: 'S3_wes', sample: 'S3', technology: 'wes', tumor_id: 'S3_wes_T', normal_id: 'S3_wes_N']
+                input[0] = channel.of([meta, vcf, [], [], [], [], [], []])
+                input[1] = channel.of([meta, no_rename])
+                input[2] = channel.value([[id: 'synthetic'], file(base + 'reference/synthetic.fa'), file(base + 'reference/synthetic.fa.fai'), []])
+                input[3] = channel.value(genome)
+                input[4] = channel.of([meta, file(base + 'bed/panel.bed')])
+                input[5] = true
+                """
+            }
+        }
+
+        then {
+            def records = path(workflow.out.compare[0][1]).linesGzip.findAll { line -> !line.startsWith('#') }.collect { line -> line.tokenize('\t')[0..4].join(':') }
+            def summary = path(workflow.out.summaries.find { item -> item[1].toString().contains('.pass.') }[1]).readLines()
+            def accounting = path(workflow.out.accounting[0][1]).readLines()
+            assertAll(
+                { assert workflow.success },
+                // G01 atomized into one-ALT records; G02 deletion and SNV kept, its 'G>*' half dropped
+                { assert records == [
+                    'chr1:4806:.:G:GGTATAAGAGGT', 'chr1:4806:.:G:T', 'chr2:2612:.:CTGA:C', 'chr2:2614:.:G:A'] },
+                { assert summary.contains('records_dropped_overlap\t1') },
+                { assert summary.contains('records_dropped_symbolic\t0') },
+                // the dropped record is accounted for in step 6, and every check is ok
+                { assert accounting.any { line -> line.contains('\tharmonization\tremoved\toverlap_allele\t1\t') } },
+                { assert path(workflow.out.checks[0][1]).readLines().drop(1).every { line -> line.endsWith('\tok') } }
+            )
+        }
+    }
 }

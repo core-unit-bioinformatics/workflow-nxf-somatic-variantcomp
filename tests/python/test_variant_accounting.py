@@ -26,7 +26,14 @@ def vcf(path, records, c1="chr1", mt="chrM"):
     return path
 
 
-def run_accounting(tmp_path, compare_records):
+SUMMARY = (
+    "key\tvalue\nrecords_read\t3\nrecords_written\t3\nrecords_dropped_symbolic\t0\n"
+    "records_dropped_overlap\t0\n"
+)
+NORM_LOG = "Lines   total/split/joined/realigned/mismatch_removed/dup_removed/skipped:\t{}\n"
+
+
+def run_accounting(tmp_path, compare_records, summary=SUMMARY, norm="3/0/0/0/0/0/0"):
     """Run the script on a small case; return (exit code, accounting, removed, checks)."""
     # input: 1 PASS SNV, 1 non-PASS, 1 on MT, 1 gVCF block, 1 low-VAF SNV, 1 outside region
     vcf(
@@ -44,12 +51,8 @@ def run_accounting(tmp_path, compare_records):
     )
     (tmp_path / "rename.tsv").write_text("1\tchr1\nMT\tchrM\n")
     (tmp_path / "genome.bed").write_text("chr1\t0\t1000\n")
-    (tmp_path / "norm.log").write_text(
-        "Lines   total/split/joined/realigned/mismatch_removed/dup_removed/skipped:\t3/0/0/0/0/0/0\n"
-    )
-    (tmp_path / "summary.tsv").write_text(
-        "key\tvalue\nrecords_read\t3\nrecords_written\t3\nrecords_dropped_symbolic\t0\n"
-    )
+    (tmp_path / "norm.log").write_text(NORM_LOG.format(norm))
+    (tmp_path / "summary.tsv").write_text(summary)
     harmonized = [
         "chr1\t100\t.\tA\tC\t.\tPASS\tVC_T_VAF=0.3;VC_T_DP=50;VC_T_ALT=15;VC_TYPE=SNV",
         "chr1\t130\t.\tA\tC\t.\tPASS\tVC_T_VAF=0.01;VC_T_DP=50;VC_T_ALT=1;VC_TYPE=SNV",
@@ -94,6 +97,8 @@ def run_accounting(tmp_path, compare_records):
 
     def read(name):
         """Rows (without header) of an output table."""
+        if result.returncode:
+            return []
         lines = (tmp_path / f"out.{name}.tsv").read_text().splitlines()[1:]
         return [line.split("\t") for line in lines]
 
@@ -133,3 +138,28 @@ def test_compare_vcf_that_does_not_match_the_filters_fails_a_check(tmp_path):
     assert result.returncode == 0
     failed = [c[2] for c in checks if c[5] == "FAIL"]
     assert "compared VCF = harmonized records passing the filters and region" in failed
+
+
+def test_overlap_alleles_are_counted_in_step_6(tmp_path):
+    # bcftools norm split one record into two (4 out of 3); harmonize dropped the 'REF>*' half
+    summary = (
+        "key\tvalue\nrecords_read\t4\nrecords_written\t3\nrecords_dropped_symbolic\t0\n"
+        "records_dropped_overlap\t1\n"
+    )
+    compare = ["chr1\t100\t.\tA\tC\t.\tPASS\tVC_T_VAF=0.3;VC_T_DP=50;VC_T_ALT=15;VC_TYPE=SNV"]
+    result, accounting, _removed, checks = run_accounting(tmp_path, compare, summary)
+    assert result.returncode == 0, result.stderr
+    reasons = {(r[3], r[5]): int(r[6]) for r in accounting}
+    assert reasons[("normalization", "split")] == 1
+    assert reasons[("harmonization", "overlap_allele")] == 1
+    assert reasons[("harmonization", "symbolic_allele")] == 0
+    assert all(c[5] == "ok" for c in checks), checks
+
+
+def test_summary_without_a_required_key_stops(tmp_path):
+    # a summary of an older harmonize_vcf.py (no records_dropped_overlap)
+    summary = "key\tvalue\nrecords_read\t3\nrecords_written\t3\nrecords_dropped_symbolic\t0\n"
+    compare = ["chr1\t100\t.\tA\tC\t.\tPASS\tVC_T_VAF=0.3;VC_T_DP=50;VC_T_ALT=15;VC_TYPE=SNV"]
+    result, _accounting, _removed, _checks = run_accounting(tmp_path, compare, summary)
+    assert result.returncode == 1
+    assert "keys records_dropped_overlap missing" in result.stderr

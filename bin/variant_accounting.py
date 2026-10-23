@@ -10,7 +10,7 @@ The steps follow the normalization chain of PREPROCESS_VCF (docs/output.md):
                                                                   --genome-bed
   4     gvcf_blocks    gvcf_block (only ALT <NON_REF> or <*>)     --input-vcf
   5     normalization  ref_mismatch, duplicate; added: split      --norm-log (+ harmonize)
-  6     harmonization  symbolic_allele                            --harmonize-summary
+  6     harmonization  symbolic_allele, overlap_allele            --harmonize-summary
   7     filters        outside_region, vaf_below_min,             --harmonized + --regions +
                        depth_below_min, alt_reads_below_min        thresholds; --compare
 
@@ -62,6 +62,13 @@ NORM_LINE = re.compile(
     r"total/split/joined/realigned/mismatch_removed/dup_removed/skipped:\s*([\d/]+)"
 )
 GVCF_ALTS = {"<NON_REF>", "<*>"}
+# keys of the harmonize_vcf.py summary used for steps 5-6
+SUMMARY_KEYS = (
+    "records_read",
+    "records_written",
+    "records_dropped_symbolic",
+    "records_dropped_overlap",
+)
 TYPE_GROUP = {"SNV": "snv", "MNV": "snv", "INS": "indel", "DEL": "indel", "COMPLEX": "indel"}
 
 
@@ -112,7 +119,15 @@ def read_summary(path):
     lines = Path(path).read_text().splitlines()
     if not lines or lines[0].split("\t") != ["key", "value"]:
         sys.exit(f"ERROR: {path}: expected a summary with the header 'key value'")
-    return dict(line.split("\t", 1) for line in lines[1:] if "\t" in line)
+    summary = dict(line.split("\t", 1) for line in lines[1:] if "\t" in line)
+    # every count used by steps 5-6 must be present (summaries of harmonize_vcf.py)
+    missing = [key for key in SUMMARY_KEYS if key not in summary]
+    if missing:
+        sys.exit(
+            f"ERROR: {path}: keys {', '.join(missing)} missing (found: {', '.join(summary)}); "
+            "write the summary with the harmonize_vcf.py of this pipeline version"
+        )
+    return summary
 
 
 class Counts:
@@ -178,14 +193,12 @@ def classify_normalization(args, counts, entering, checks):
     counts.add(5, "normalization", "removed", "ref_mismatch", "all", norm["mismatch_removed"])
     counts.add(5, "normalization", "removed", "duplicate", "all", norm["dup_removed"])
     counts.add(5, "normalization", "added", "split", "all", added)
-    counts.add(
-        6,
-        "harmonization",
-        "removed",
-        "symbolic_allele",
-        "all",
-        int(summary["records_dropped_symbolic"]),
-    )
+    # step 6: records of harmonize_vcf.py with a symbolic or an overlapping ('*') ALT
+    for reason, key in (
+        ("symbolic_allele", "records_dropped_symbolic"),
+        ("overlap_allele", "records_dropped_overlap"),
+    ):
+        counts.add(6, "harmonization", "removed", reason, "all", int(summary[key]))
     checks.append(
         ("records entering bcftools norm = records left after steps 1-4", entering, norm["total"])
     )

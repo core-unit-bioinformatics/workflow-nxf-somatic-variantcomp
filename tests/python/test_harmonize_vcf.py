@@ -73,10 +73,40 @@ def test_tags_gt_and_symbolic(tmp_path):
     assert list(second.filter.keys()) == ["weak_evidence"]
     assert third.info["VC_T_VAF"] == pytest.approx(0.25)
     assert third.info["VC_T_ALT"] == 10
-    assert "3 written, 1 dropped (symbolic ALT)" in result.stderr
+    assert "3 written, 1 dropped (symbolic ALT), 0 dropped (overlapping allele *)" in result.stderr
     # per-record source of the tumor values
     # auto: FORMAT/AF where present (third record), else the allelic depths
     assert [r.info.get("VC_T_SRC") for r in recs] == ["AD", "AD", "AF"]
+
+
+def test_overlapping_allele_is_dropped_and_counted(tmp_path):
+    # 'A>*' halves of split records (a spanning deletion of the caller, or of an atomized
+    # complex call): no sequence change of their own, AD of '*' may be missing
+    body = (
+        "chr1\t10\t.\tACGTA\tA\t.\tPASS\t.\tGT:AD\t0/1:20,10\t0/0:30,0\n"
+        "chr1\t13\t.\tT\tTGTATAAGAGG\t.\tPASS\t.\tGT:AD\t0/1:20,5\t0/0:30,0\n"
+        "chr1\t13\t.\tT\t*\t.\tPASS\t.\tGT:AD\t0/1:20,10\t0/0:30,0\n"
+        "chr1\t20\t.\tG\t*\t.\tPASS\t.\tGT:AD\t0/1:5,.\t0/0:9,.\n"
+    )
+    summary = tmp_path / "summary.tsv"
+    result, out = run(tmp_path, body, "--tumor", "T", "--normal", "N", "--summary", str(summary))
+    assert result.returncode == 0, result.stderr
+    recs = list(pysam.VariantFile(str(out)))
+    assert [(r.pos, r.alts[0]) for r in recs] == [(10, "A"), (13, "TGTATAAGAGG")]
+    assert "2 written, 0 dropped (symbolic ALT), 2 dropped (overlapping allele *)" in result.stderr
+    values = dict(line.split("\t") for line in summary.read_text().splitlines()[1:])
+    assert values["records_dropped_overlap"] == "2"
+    assert values["records_dropped_symbolic"] == "0"
+    # the '*' records don't count as records without VAF
+    assert values["vaf_available"] == "yes"
+
+
+def test_unsplit_overlapping_allele_fails(tmp_path):
+    # bcftools norm --atomize with the default --atom-overlaps '*' writes such records
+    body = "chr1\t13\t.\tT\tTGTATAAGAGG,*\t.\tPASS\t.\tGT:AD\t1/2:20,5,10\t0/0:30,0,0\n"
+    result, _ = run(tmp_path, body, "--tumor", "T", "--normal", "N")
+    assert result.returncode == 1
+    assert "chr1:13 T>TGTATAAGAGG,*: 2 ALT alleles; split multiallelic" in result.stderr
 
 
 def test_summary_counts_sources(tmp_path):

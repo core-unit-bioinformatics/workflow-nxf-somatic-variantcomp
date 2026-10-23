@@ -113,6 +113,7 @@ REASON_TEXT = {
     "duplicate": "exact duplicate after normalization (bcftools norm --rm-dup exact)",
     "split": "added: a multiallelic record split into one record per ALT, MNVs atomized",
     "symbolic_allele": "symbolic ALT allele (<DEL>, <*>, ...) left after splitting",
+    "overlap_allele": "overlapping allele '*' left after splitting: the position is covered by a variant of another record (e.g. a spanning deletion), not a variant of its own",
     "outside_region": "outside the comparison region (common targets / callable bases)",
     "vaf_below_min": "tumor VAF below --min_vaf (or no VAF)",
     "depth_below_min": "tumor depth below --min_depth",

@@ -88,7 +88,29 @@ naming the file and record otherwise.
 
 gVCF reference blocks (`<NON_REF>`, `<*>` as only ALT) are removed; symbolic structural
 variant alleles (`<DEL>`, ...) are dropped and counted. Multiallelic records are split,
-MNVs atomized and indels left-aligned before matching.
+MNVs and complex calls atomized and indels left-aligned before matching.
+
+#### Overlapping alleles
+
+The overlapping allele `*` (VCF 4.2+) marks a haplotype on which the position is covered by
+a variant of another record, e.g. a deletion that starts upstream (spanning deletion). It
+is no sequence change of its own and has no VAF. Two sources are handled:
+
+- **`*` in the input** (e.g. `G A,*` inside a deletion): `bcftools norm -m-any` splits the
+  record into `G>A` and `G>*`; `harmonize_vcf.py` drops `G>*` and counts it
+  (`records_dropped_overlap`, accounting reason `overlap_allele`). The deletion itself is
+  a record of its own and is compared.
+- **`*` created by atomizing**: `bcftools norm` atomizes after splitting. A complex call
+  such as `CG>CTGTATAAGAGGT` (insertion + SNV at the same base) becomes two overlapping
+  records, and with the bcftools default `--atom-overlaps '*'` each would get a second
+  ALT `*` (`G GGTATAAGAGGT,*` and `G T,*`), which the harmonization rejects as unsplit.
+  The pipeline sets `--atom-overlaps .` (`conf/modules/preprocess_vcf.config`, and for
+  known-variant lists `conf/modules/known_variants.config`), so the records are
+  `G>GGTATAAGAGGT` and `G>T`, one ALT each. One complex call therefore becomes two
+  compared records (counted as `split` in the accounting).
+
+Tested with synthetic DRAGEN-like VCFs (`subworkflows/local/preprocess_vcf/tests`, case
+"overlapping alleles") and bcftools 1.24 (dev env; the pipeline module uses 1.23.1).
 
 ### Tested inputs
 

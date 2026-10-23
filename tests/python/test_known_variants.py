@@ -317,6 +317,8 @@ def test_prepare_vcf_keeps_fields_and_survives_bcftools_norm(tmp_path, ref):
             "--multiallelics",
             "-any",
             "--atomize",
+            "--atom-overlaps",
+            ".",
             "--check-ref",
             "x",
             "--rm-dup",

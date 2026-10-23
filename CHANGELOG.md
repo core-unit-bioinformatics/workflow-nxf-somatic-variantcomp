@@ -26,6 +26,8 @@ Dates follow ISO 8601 (`YYYY-MM-DD`).
 
 ### `Fixed`
 
+- Normalization: `bcftools norm --atomize` (step 6) wrote records with two ALTs (e.g. `G GGTATAAGAGGT,*` from a DRAGEN complex insertion + SNV call), because it atomizes after splitting and marks the overlapping part with `*` by default; `HARMONIZE_VCF` then stopped (`2 ALT alleles; split multiallelic records first`). `--atom-overlaps .` now keeps one ALT per atomized record, for calls and known-variant lists (decision D35)
+- `harmonize_vcf.py`: records whose ALT is the overlapping allele `*` (left as `REF>*` after splitting, e.g. inside a spanning deletion) were kept and typed as SNV/COMPLEX; they are now dropped and counted (`records_dropped_overlap` in the harmonization summary, reason `overlap_allele` in step 6 of the variant accounting and the reports)
 - `region_summary.py`: overlapping intervals of a BED are merged (and counted in the log) instead of stopping the run
 - Known-variant VCFs: `known_variants.py prepare` copied the ID into `INFO/KV_LABEL`; an ID list like `COSM50383;COSM50383` then broke the INFO column and `bcftools norm` failed (`Could not add dummy header for INFO`). The records are now kept as they are (ID, QUAL, FILTER and all INFO fields with their header definitions; multiallelic records are split by `bcftools norm`); only `INFO/VC_T_VAF` (now Number=A) and, for CSV/TSV lists, the ID and `INFO/KV_GENE` are added. `KV_LABEL` is removed: the label is the ID. The check report counts records (`records_read`, `records_kept` instead of `variants_read`, `variants_kept`)
 - The pipeline didn't compile after the GIAB file parameters (stray brace in the utils subworkflow; `nextflow inspect` / `nf-core pipelines download`: "Script compilation failed")

@@ -221,9 +221,12 @@ Every VCF goes through the same steps (see CLAUDE.md, "Normalization chain"):
 4. Records on other contigs (and on the mitochondrial contig) and pure gVCF reference blocks
    removed.
 5. Contig header lines rewritten from the reference `.fai`.
-6. `bcftools norm`: multiallelic records split, indels left-aligned, MNVs atomized into
-   SNVs, records with a REF mismatch removed, duplicates removed.
-7. Harmonization (`harmonize_vcf.py`, see [usage](usage.md#harmonization-of-vaf-depth-and-alt-reads)).
+6. `bcftools norm`: multiallelic records split, indels left-aligned, MNVs and complex
+   calls atomized (`--atom-overlaps .`: one ALT per atomized record, see
+   [usage](usage.md#overlapping-alleles)), records with a REF mismatch removed, duplicates
+   removed.
+7. Harmonization (`harmonize_vcf.py`, see [usage](usage.md#harmonization-of-vaf-depth-and-alt-reads));
+   records with a symbolic ALT or the overlapping allele `*` are dropped and counted.
 8. Uniform filters (`--min_vaf`, `--min_depth`, `--min_alt_reads`) and restriction to the
    comparison region (records overlapping it are kept).
 
@@ -249,7 +252,7 @@ the steps are reproduced from the step outputs and logs):
 | `sample`, `technology` | text | samplesheet row |
 | `step`, `step_name` | int, text | 1 `input`, 2 `pass_split`, 3 `contigs`, 4 `gvcf_blocks`, 5 `normalization`, 6 `harmonization`, 7 `filters` |
 | `outcome` | text | `input`, `removed`, `added` (records created by splitting) or `kept` (step 7: the compared records) |
-| `reason` | text | `filter_not_pass` (FILTER not PASS/`.`), `mitochondrial`, `contig_not_compared`, `gvcf_block` (only symbolic `<NON_REF>`/`<*>` ALT), `ref_mismatch`, `duplicate`, `split` (added), `symbolic_allele`, `outside_region`, `vaf_below_min`, `depth_below_min`, `alt_reads_below_min`; `.` for input/kept |
+| `reason` | text | `filter_not_pass` (FILTER not PASS/`.`), `mitochondrial`, `contig_not_compared`, `gvcf_block` (only symbolic `<NON_REF>`/`<*>` ALT), `ref_mismatch`, `duplicate`, `split` (added), `symbolic_allele`, `overlap_allele` (ALT `*` left after splitting: the position is covered by a variant of another record, e.g. a spanning deletion), `outside_region`, `vaf_below_min`, `depth_below_min`, `alt_reads_below_min`; `.` for input/kept |
 | `records` | int | records |
 | `snv`, `indel`, `other` | int | records by type (`other`: symbolic or mixed) |
 
@@ -260,7 +263,7 @@ VCF; the compared VCF holds exactly the records passing the filters and the regi
 the removed records of steps 2–4 + the records entering normalization.
 
 Keys of `*.harmonize_summary.tsv` (`key`, `value`): `records_read`, `records_written`,
-`records_dropped_symbolic`, `vaf_available` (yes/no), and per sample (prefix `T_`, `N_`):
+`records_dropped_symbolic`, `records_dropped_overlap` (ALT `*`), `vaf_available` (yes/no), and per sample (prefix `T_`, `N_`):
 `source_AF`, `source_AD`, `source_zero_depth` (AD 0,0: no reads), `source_none` (no
 VAF), `depth_DP`, `depth_AD_sum`, `depth_none`, `af_nan` (FORMAT/AF was NaN).
 

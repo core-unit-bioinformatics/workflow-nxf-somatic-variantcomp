@@ -32,7 +32,8 @@ VAF source per sample (--vaf-source; pipeline param --vaf_source)
 Checks (an error stops the script with exit status 1)
   - sample names and order are exactly --tumor [--normal];
   - neither FORMAT/AF nor FORMAT/AD in the header;
-  - a record with more than one ALT (the input must be split with bcftools norm);
+  - a record with more than one ALT (the input must be split with bcftools norm; in the
+    pipeline `--atom-overlaps .` keeps `--atomize` from adding `*` ALTs after the split);
   - AD with other than 2 values after splitting, negative AD or DP, AF outside [0, 1]
     (NaN, written by some callers when AF is undefined, counts as missing).
   If more than --max-missing-vaf of the tumor records have no VAF (zero_depth records are
@@ -41,14 +42,17 @@ Checks (an error stops the script with exit status 1)
   reported as NA by the following steps.
 
 Records whose ALT is a symbolic allele (<NON_REF>, <*>, <DEL>, ...) are dropped and
-counted. The tumor GT is set to 0/1 and the normal GT to 0/0 (every record is a somatic
+counted (records_dropped_symbolic). Records whose ALT is the overlapping allele `*`
+(VCF 4.2+: the position is covered by a variant of another record, e.g. a spanning
+deletion; left as `REF>*` by splitting) are no sequence change of their own; they are
+dropped and counted (records_dropped_overlap). The tumor GT is set to 0/1 and the normal GT to 0/0 (every record is a somatic
 call of the tumor; callers fill GT differently). FILTER, ID, QUAL, INFO and all other
 FORMAT fields are copied unchanged.
 
 OUTPUT
   --output    the harmonized VCF (bgzipped; --index writes a .tbi)
   --summary   two columns with header `key value`: records_read, records_written,
-              records_dropped_symbolic, vaf_available (yes/no), and per sample
+              records_dropped_symbolic, records_dropped_overlap, vaf_available (yes/no), and per sample
               (prefix T_ / N_) source_AF, source_AD, source_zero_depth, source_none,
               depth_DP, depth_AD_sum, depth_none, af_nan
 
@@ -203,8 +207,12 @@ def where(path, rec):
     return f"{path}: {rec.chrom}:{rec.pos} {rec.ref}>{','.join(rec.alts or ('.',))}"
 
 
+# reasons of check_record() for records that are not written, with their summary key
+DROP_KEYS = {"symbolic": "records_dropped_symbolic", "overlap": "records_dropped_overlap"}
+
+
 def check_record(path, rec):
-    """True if the record is written; False for symbolic ALT; error for unsplit records."""
+    """None if the record is written, else the drop reason (DROP_KEYS); error for unsplit records."""
     # the input must be split: exactly one ALT allele per record
     if len(rec.alts or ()) != 1:
         sys.exit(
@@ -212,7 +220,12 @@ def check_record(path, rec):
             "records first (bcftools norm -m-any)"
         )
     # symbolic alleles (<NON_REF>, <*>, <DEL>, ...) are not sequence variants
-    return not rec.alts[0].startswith("<")
+    if rec.alts[0].startswith("<"):
+        return "symbolic"
+    # the overlapping allele '*' only marks a variant of another record at this position
+    if rec.alts[0] == "*":
+        return "overlap"
+    return None
 
 
 def count_tumor_vaf(args):
@@ -220,7 +233,8 @@ def count_tumor_vaf(args):
     written = missing = 0
     with open_input(args.input, args.tumor, args.normal) as vcf:
         for rec in vcf:
-            if not check_record(args.input, rec):
+            # dropped records (symbolic or '*' ALT) don't count for the VAF availability
+            if check_record(args.input, rec):
                 continue
             written += 1
             try:
@@ -305,7 +319,7 @@ def write_summary(path, counts, roles, vaf_available):
     """The key<TAB>value summary (see the module doc)."""
     with open(path, "w") as fh:
         fh.write("key\tvalue\n")
-        for key in ("records_read", "records_written", "records_dropped_symbolic"):
+        for key in ("records_read", "records_written", *DROP_KEYS.values()):
             fh.write(f"{key}\t{counts[key]}\n")
         fh.write(f"vaf_available\t{'yes' if vaf_available else 'no'}\n")
         for role, _name in roles:
@@ -317,7 +331,8 @@ def log_summary(args, counts, roles, skipped_format):
     print(
         f"INFO: {args.input}: {counts['records_read']} records read, "
         f"{counts['records_written']} written, {counts['records_dropped_symbolic']} dropped "
-        f"(symbolic ALT); VAF source mode '{args.vaf_source}'",
+        f"(symbolic ALT), {counts['records_dropped_overlap']} dropped (overlapping allele *); "
+        f"VAF source mode '{args.vaf_source}'",
         file=sys.stderr,
     )
     for role, name in roles:
@@ -394,8 +409,10 @@ def main():
         with pysam.VariantFile(args.output, "wz", header=header) as vcf_out:
             for rec in vcf_in:
                 counts["records_read"] += 1
-                if not check_record(args.input, rec):
-                    counts["records_dropped_symbolic"] += 1
+                # records with a symbolic or '*' ALT are counted by reason and not written
+                reason = check_record(args.input, rec)
+                if reason:
+                    counts[DROP_KEYS[reason]] += 1
                     continue
                 new = copy_record(vcf_out, rec, samples, skipped_format)
                 harmonize_record(args, rec, new, roles, counts)
