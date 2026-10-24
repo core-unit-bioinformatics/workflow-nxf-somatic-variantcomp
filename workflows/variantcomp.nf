@@ -98,23 +98,26 @@ workflow VARIANTCOMP {
         known_variants
     )
 
+    // samplesheet entries released when all checks passed: every following step starts
+    // only after that
+    def ch_checked = ch_entries
+        .combine(ch_samplesheet_validated)
+        .combine(CHECK_INPUTS.out.done)
+        .map { entry -> entry[0..-3] }
+
     //
-    // SUBWORKFLOW: alignment indices (created where missing); this and every following
-    // step starts only after all checks passed
+    // SUBWORKFLOW: alignment indices (created where missing). Only the steps that read
+    // alignments (COVERAGE, DISCORDANCE) wait for it; the others use the checked entries,
+    // so that VCF normalization and the regions don't wait for samtools index
     //
-    PREPARE_ALIGNMENTS(
-        ch_entries
-            .combine(ch_samplesheet_validated)
-            .combine(CHECK_INPUTS.out.done)
-            .map { entry -> entry[0..-3] }
-    )
+    PREPARE_ALIGNMENTS(ch_checked)
     def ch_samplesheet = PREPARE_ALIGNMENTS.out.samplesheet
 
     //
     // SUBWORKFLOW: harmonize target BEDs and build the common comparison region
     //
     PREPARE_REGIONS(
-        ch_samplesheet,
+        ch_checked,
         PREPARE_REFERENCE.out.reference,
         PREPARE_REFERENCE.out.genome_bed,
         CHECK_INPUTS.out.beds,
@@ -127,7 +130,7 @@ workflow VARIANTCOMP {
     // every entry is compared in the common region
     //
     // comparison region per samplesheet entry: [ meta, bed ]
-    def ch_comparison_regions = ch_samplesheet.map { entry -> entry[0] }.combine(PREPARE_REGIONS.out.common_bed)
+    def ch_comparison_regions = ch_checked.map { entry -> entry[0] }.combine(PREPARE_REGIONS.out.common_bed)
     // tables of the coverage step for the report ([] without --callable_regions)
     def ch_callable_table = channel.value([])
     def ch_coverage_table = channel.value([])
@@ -152,7 +155,7 @@ workflow VARIANTCOMP {
     // SUBWORKFLOW: normalization, harmonization and uniform filtering
     //
     PREPROCESS_VCF(
-        ch_samplesheet,
+        ch_checked,
         CHECK_INPUTS.out.vcf_rename,
         PREPARE_REFERENCE.out.reference,
         PREPARE_REFERENCE.out.genome_bed,
@@ -175,7 +178,7 @@ workflow VARIANTCOMP {
     //
     PREPARE_KNOWN_VARIANTS(
         CHECK_INPUTS.out.known_lists.combine(CHECK_INPUTS.out.done).map { entry -> entry[0..-2] },
-        ch_samplesheet,
+        ch_checked,
         PREPARE_REFERENCE.out.reference
     )
 
