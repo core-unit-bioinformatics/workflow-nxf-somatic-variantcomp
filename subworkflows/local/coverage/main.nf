@@ -7,7 +7,7 @@
 //  2. mosdepth per alignment (--quantize: LOW_COVERAGE / CALLABLE bins; --by: mean depth
 //     per common-region interval)
 //  3. callable intervals per alignment (mosdepth_callable.py: label or mean-depth
-//     threshold, contigs renamed to the reference)
+//     threshold, contigs renamed to the reference, clipped to the common region)
 //  4. per sample: intersection of the callable intervals of all its alignments
 //     (BED_INTERSECT_ALL), restricted to the common region (bedtools intersect -sorted)
 //  5. summary per sample (region_summary.py)
@@ -99,12 +99,15 @@ workflow COVERAGE {
             .map { table, files -> [[id: 'coverage'], table, files] }
     )
 
-    // 3. callable intervals per alignment (quantized bins: base mode; regions: region mode)
+    // 3. callable intervals per alignment (quantized bins: base mode; regions: region mode),
+    //    clipped to the common region: the intersection below is restricted to it anyway, and
+    //    the whole-genome bins of WGS alignments would make sort / multiinter slow
     MOSDEPTH_CALLABLE(
         MOSDEPTH.out.quantized_bed
             .join(MOSDEPTH.out.regions_bed)
             .join(ch_rename),
-        ch_fai
+        ch_fai,
+        common_bed
     )
 
     // samples with a tumor alignment for every technology

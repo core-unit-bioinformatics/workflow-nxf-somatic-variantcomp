@@ -89,3 +89,78 @@ def test_empty_mosdepth_output_is_an_error(tmp_path):
     proc, _ = run(tmp_path, "base", "", REGIONS)
     assert proc.returncode == 1
     assert "no intervals" in proc.stderr
+
+
+def test_clip_keeps_only_the_parts_inside_the_clip_region(tmp_path):
+    # clip BED unsorted, with overlapping and adjacent intervals (merged by the script):
+    # chr1 50-150 + 140-160 -> 50-160, 300-350 + 350-380 -> 300-380; chr2 is not in it
+    (tmp_path / "clip.bed").write_text(
+        "chr1\t300\t350\nchr1\t50\t150\nchr1\t140\t160\nchr1\t350\t380\n"
+    )
+    proc, lines = run(
+        tmp_path,
+        "base",
+        QUANTIZED,
+        REGIONS,
+        rename="1\tchr1\n2\tchr2\n",
+        extra=["--clip", str(tmp_path / "clip.bed")],
+    )
+    assert proc.returncode == 0, proc.stderr
+    # callable chr1 100-400 is cut into its parts inside the clip region; chr2 0-50 dropped
+    assert lines == ["chr1\t100\t160", "chr1\t300\t380"]
+    assert (
+        "1 callable intervals outside the clip region dropped; 2 intervals written" in proc.stderr
+    )
+
+
+def test_clip_gives_the_same_intersection_as_clipping_afterwards(tmp_path):
+    # (C1 n C2) n K == (C1 n K) n (C2 n K), checked base by base on random intervals
+    import random
+
+    sys.path.insert(0, str(SCRIPT.parent))
+    from mosdepth_callable import clip_interval, read_clip_region
+
+    rng = random.Random(7)
+
+    def random_bed(n):
+        """n random intervals on chr1 (0-1000), as a set of covered bases and a list."""
+        intervals = []
+        for _ in range(n):
+            start = rng.randrange(0, 990)
+            intervals.append((start, start + rng.randrange(1, 60)))
+        return {b for s, e in intervals for b in range(s, e)}, intervals
+
+    k_bases, k_intervals = random_bed(15)
+    clip_bed = tmp_path / "k.bed"
+    clip_bed.write_text("".join(f"chr1\t{s}\t{e}\n" for s, e in k_intervals))
+
+    region = read_clip_region(clip_bed)
+    for _ in range(20):
+        c1_bases, c1 = random_bed(30)
+        c2_bases, c2 = random_bed(30)
+        clipped = [
+            {
+                b
+                for s, e in bed
+                for ps, pe in clip_interval("chr1", s, e, region)
+                for b in range(ps, pe)
+            }
+            for bed in (c1, c2)
+        ]
+        assert clipped[0] & clipped[1] == (c1_bases & c2_bases) & k_bases
+
+
+def test_region_mode_with_clip(tmp_path):
+    # region mode: the regions of mosdepth --by already lie inside the common region; the
+    # clip keeps them unchanged
+    (tmp_path / "clip.bed").write_text("chr1\t0\t200\nchr1\t300\t400\n")
+    proc, lines = run(
+        tmp_path,
+        "region",
+        QUANTIZED,
+        REGIONS,
+        rename="1\tchr1\n",
+        extra=["--min-coverage", "10", "--clip", str(tmp_path / "clip.bed")],
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert lines == ["chr1\t0\t200"]
