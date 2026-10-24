@@ -142,7 +142,9 @@ Only with `--callable_regions` (default; needs alignments for every samplesheet 
 - `coverage/<sample>.callable.bed`: BED3 of the bases of the common region callable in all
   alignments of the sample (tumor depth ≥ `--min_coverage_tumor`, normal depth ≥
   `--min_coverage_normal` with `--require_normal_coverage`). The comparison of this sample
-  is restricted to it.
+  is restricted to it. Built from the callable bins of every alignment clipped to the
+  common region (`mosdepth_callable.py --clip`), intersected with `bedtools multiinter` and
+  merged (see [usage](usage.md#coverage-and-callable-regions)).
 - `coverage/callable_summary.tsv`: one row per sample (columns below).
 - `coverage/coverage.coverage.tsv`: depth of every alignment in the common region and in
   the target region of its technology (columns below). The same values are columns of the

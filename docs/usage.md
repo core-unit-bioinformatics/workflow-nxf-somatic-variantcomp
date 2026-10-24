@@ -245,6 +245,24 @@ to the bases that are callable in all its alignments. Every row then needs a `tu
   `--amplicon_keep_duplicates` (default `true`), where all reads of an amplicon look like
   duplicates.
 
+How the callable region of a sample is built, step by step:
+
+1. `mosdepth` per alignment: `--quantize 0:<min>:` writes `LOW_COVERAGE` / `CALLABLE` bins
+   for the whole genome (mosdepth always reads the whole alignment), `--by` the mean depth
+   of every common-region interval.
+2. `mosdepth_callable.py` per alignment keeps the callable bins (base mode) or intervals
+   (region mode), renames the contigs to the reference and **clips them to the common
+   region**. The callable region is restricted to the common region in step 4 anyway, so
+   this doesn't change the result, but the following steps then work on the common region
+   instead of millions of whole-genome bins of a WGS alignment.
+3. `bedtools sort`, `bedtools multiinter`, `gawk` (intervals covered by all alignments of
+   the sample) and `bedtools merge`.
+4. `bedtools intersect -sorted` with the common region.
+
+Resources: both mosdepth runs request 4 CPUs (mosdepth uses threads only for BAM/CRAM
+decompression; its authors recommend at most 4) and 8 GB memory (doubled on a retry after
+a memory kill); set `process.withName` in your own config to change them.
+
 | Parameter | Default | Description |
 | --- | --- | --- |
 | `--callable_regions` | `true` | Restrict the comparison to callable bases (needs BAMs). |
