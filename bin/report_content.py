@@ -423,6 +423,82 @@ def html_table(df, link=None, link_text=None, total=None, classes="table table-s
     return out
 
 
+# Venn geometry (SVG units, viewBox 360 x 265): circle centres and the positions of the
+# region counts, keyed by membership (True = in the circle of that reason)
+VENN_LAYOUT = {
+    1: {"centres": [(180, 150)], "regions": {(True,): (180, 150)}},
+    2: {
+        "centres": [(140, 150), (220, 150)],
+        "regions": {(True, False): (105, 150), (False, True): (255, 150), (True, True): (180, 150)},
+    },
+    3: {
+        "centres": [(135, 120), (225, 120), (180, 195)],
+        "regions": {
+            (True, False, False): (100, 105),
+            (False, True, False): (260, 105),
+            (False, False, True): (180, 245),
+            (True, True, False): (180, 95),
+            (True, False, True): (130, 180),
+            (False, True, True): (230, 180),
+            (True, True, True): (180, 150),
+        },
+    },
+}
+
+
+def venn_svg(reasons, title):
+    """An SVG Venn diagram of the (at most) three most frequent discordance reasons of a
+    set of variants. reasons: the column reasons (comma-separated per variant). Every
+    region shows the number of variants with exactly these of the shown reasons; variants
+    with none of them are counted below. '' if there are no variants."""
+    sets = [set(str(r).split(",")) for r in reasons if str(r) not in ("", "nan", "NA")]
+    if not sets:
+        return ""
+    # the three most frequent reasons (number of variants each applies to)
+    freq = pd.Series([r for s in sets for r in s]).value_counts()
+    top = freq.index[:3].tolist()
+    layout = VENN_LAYOUT[len(top)]
+    # number of variants per membership pattern of the shown reasons
+    counts = {}
+    for s in sets:
+        key = tuple(r in s for r in top)
+        counts[key] = counts.get(key, 0) + 1
+    radius = 82
+    parts = [
+        f"<svg viewBox='0 25 360 265' width='340' role='img' aria-label='{esc(title)}' "
+        "style='font-family: inherit'>"
+    ]
+    for (cx, cy), reason in zip(layout["centres"], top, strict=True):
+        color = CLASS_COLOR.get(reason, "#888888")
+        parts.append(
+            f"<circle cx='{cx}' cy='{cy}' r='{radius}' fill='{color}' fill-opacity='0.3' "
+            f"stroke='{color}' stroke-width='2'><title>{esc(reason)}: {freq[reason]} variants"
+            "</title></circle>"
+        )
+    for key, (x, y) in layout["regions"].items():
+        n = counts.get(key, 0)
+        names = " + ".join(r for r, inside in zip(top, key, strict=True) if inside)
+        parts.append(
+            f"<text x='{x}' y='{y + 6}' text-anchor='middle' font-size='18' font-weight='700' "
+            f"fill='currentColor'>{n}<title>{esc(names)}: {n} variants</title></text>"
+        )
+    other = counts.get(tuple(False for _ in top), 0)
+    parts.append("</svg>")
+    # legend under the diagram (long reason names do not fit into the SVG)
+    legend = "".join(
+        f"<div><span class='vc-dot' style='background:{CLASS_COLOR.get(r, '#888888')}'></span>"
+        f"{esc(CLASS_LABEL.get(r, r))} <code>{esc(r)}</code>: {freq[r]}</div>"
+        for r in top
+    )
+    return (
+        f"<div class='vc-venn'><div class='vc-group'>{esc(title)}: {len(sets)} variants</div>"
+        + "".join(parts)
+        + f"<div class='vc-legend'>{legend}</div>"
+        + (f"<div class='vc-note'>{other} with none of these reasons</div>" if other else "")
+        + "</div>"
+    )
+
+
 def badge(text, color):
     """A coloured label (HTML)."""
     return f"<span class='vc-badge' style='background:{color}'>{esc(text)}</span>"
@@ -456,6 +532,10 @@ CSS = """
 .vc-matrix td.fail { background: rgba(225,87,89,0.3); font-weight: 600; }
 .vc-plot-buttons .btn { margin: 0 4px 4px 0; }
 .vc-hidden { display: none; }
+.vc-venns { display: flex; flex-wrap: wrap; gap: 24px; margin: 6px 0; }
+.vc-venn svg { max-width: 100%; height: auto; }
+.vc-legend { font-size: 13px; } .vc-legend code { font-size: 11px; }
+.vc-dot { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 6px; opacity: 0.8; }
 /* the MultiQC welcome banner (tutorial video) is not needed in this report */
 #mqc_welcome { display: none !important; }
 </style>
@@ -1597,6 +1677,21 @@ def section_characterization(mqc, d, fdr):
                 if s in combos.columns
             ]
             parts.append("<div class='vc-group'>Variants with several reasons</div>")
+            # Venn diagrams of the three most frequent reasons, FN and FP side by side
+            venns = [
+                venn_svg(disc[disc["status"] == s]["reasons"], f"{sets[s][0]}")
+                for s in ("FN", "FP")
+            ]
+            parts.append(
+                "<div class='vc-venns'>"
+                + "".join(v for v in venns if v)
+                + "</div><p class='vc-note'>Venn diagrams of the three most frequent reasons "
+                "of the variants found in one technology only: a variant counts in every "
+                "circle whose reason applies to it (column reasons), so the overlaps are the "
+                "variants with several reasons. Some reasons exclude each other (e.g. "
+                "subthreshold_evidence and no_evidence). Hover a number for the reasons; "
+                "variants with none of the three reasons are counted below the diagram.</p>"
+            )
             parts.append(
                 mqc.plot(
                     [
@@ -2648,7 +2743,8 @@ def write_datavzrd(args, d):
         fh.write(MULTIQC_PAGE_JS % mq)
     config = {
         "name": "variantcomp: variant tables",
-        "default-view": "truth-variants" if "truth-variants" in views else next(iter(views)),
+        # the first page is the MultiQC report; the tables are in the menu
+        "default-view": "multiqc-report",
         "datasets": datasets,
         "views": views,
     }

@@ -251,7 +251,7 @@ def test_datavzrd_tables_and_links(tmp_path):
     result = run(tmp_path, *inputs(tmp_path), "--datavzrd", "dv")
     assert result.returncode == 0, result.stderr
     config = json.loads((tmp_path / "dv" / "datavzrd.yaml").read_text())
-    assert config["default-view"] == "truth-variants"
+    assert config["default-view"] == "multiqc-report"
     views = config["views"]
     # the MultiQC report as a page of the table browser
     assert views["multiqc-report"]["render-html"] == {"script-path": "multiqc_page.js"}
@@ -316,3 +316,13 @@ def test_html_table_shows_at_most_max_rows():
 def test_needs_an_output(tmp_path):
     result = run(tmp_path, *inputs(tmp_path))
     assert result.returncode == 1 and "nothing to write" in result.stderr
+
+
+def test_venn_counts_every_membership_pattern():
+    reasons = ["a", "a,b", "a,b,c", "b", "c", "d", "a,b"]
+    svg = report_content.venn_svg(reasons, "FN")
+    # top three: a (4), b (4), c (2); 'd' has none of them
+    assert "7 variants" in svg and "1 with none of these reasons" in svg
+    assert "<title>a + b: 2 variants</title>" in svg
+    assert "<title>a + b + c: 1 variants</title>" in svg
+    assert report_content.venn_svg([], "FP") == ""
