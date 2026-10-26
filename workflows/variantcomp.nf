@@ -17,9 +17,10 @@ include { ANNOTATE_VARIANTS      } from '../subworkflows/local/annotate_variants
 include { VARIANTCOMP_REPORT     } from '../modules/local/variantcomp_report/main'
 include { MQC_TABLES             } from '../modules/local/mqc_tables/main'
 include { CONSISTENCY_CHECKS     } from '../modules/local/consistency_checks/main'
-include { REPORT_HTML            } from '../modules/local/report_html/main'
+include { REPORT_CONTENT         } from '../modules/local/report_content/main'
 include { DATAVZRD               } from '../modules/nf-core/datavzrd/main'
 include { CHECKS_GATE            } from '../modules/local/checks_gate/main'
+include { REPORT_BUNDLE          } from '../modules/local/report_bundle/main'
 include { PREPARE_KNOWN_VARIANTS } from '../subworkflows/local/prepare_known_variants'
 include { KNOWN_VARIANTS         } from '../subworkflows/local/known_variants'
 include { paramsSummaryMap       } from 'plugin/nf-schema'
@@ -202,7 +203,7 @@ workflow VARIANTCOMP {
         DISCORDANCE.out.evidence,
         BENCHMARK.out.sdf
     )
-    ch_multiqc_files = ch_multiqc_files.mix(KNOWN_VARIANTS.out.multiqc)
+    // the required variants are shown by REPORT_CONTENT (section Known variants)
 
     //
     // SUBWORKFLOW: VEP consequences, repeat regions and stratifications of every
@@ -222,7 +223,7 @@ workflow VARIANTCOMP {
     ch_multiqc_files = ch_multiqc_files.mix(ANNOTATE_VARIANTS.out.multiqc)
 
     //
-    // MODULE: statistics (enrichment, genes, classes), plots and MultiQC sections
+    // MODULE: statistics (enrichment, genes, classes, truth variants) and plots
     //
     VARIANTCOMP_REPORT(
         BENCHMARK.out.aggregated.map { _meta, tsv -> tsv }
@@ -231,7 +232,6 @@ workflow VARIANTCOMP {
             .combine(ANNOTATE_VARIANTS.out.annotated.map { _meta, tsv -> tsv })
             .map { metrics, per_pair, power, variants -> [[id: 'variantcomp'], metrics, per_pair, power, variants] }
     )
-    ch_multiqc_files = ch_multiqc_files.mix(VARIANTCOMP_REPORT.out.multiqc.flatten())
 
     // tables used by the consistency checks and the report (one item each). Lists and
     // optional tables ([] if missing) are wrapped in a list, so that combine keeps each
@@ -249,6 +249,7 @@ workflow VARIANTCOMP {
     def ch_required_summary = KNOWN_VARIANTS.out.required_summary.map { _meta, tsv -> tsv }.ifEmpty([]).map { tsv -> [tsv] }
     def ch_required_variants = KNOWN_VARIANTS.out.required_variants.map { _meta, tsv -> tsv }.ifEmpty([]).map { tsv -> [tsv] }
     def ch_known_benchmark = KNOWN_VARIANTS.out.benchmark.map { _meta, tsv -> tsv }.ifEmpty([]).map { tsv -> [tsv] }
+    def ch_known_benchmark_per_pair = KNOWN_VARIANTS.out.benchmark_per_pair.map { _meta, tsv -> tsv }.ifEmpty([]).map { tsv -> [tsv] }
 
     //
     // MODULE: consistency checks at the end of the run: do the counts of all steps add up
@@ -270,7 +271,8 @@ workflow VARIANTCOMP {
 
     //
     // MODULE: MultiQC tables of the step summaries (input checks, normalization,
-    // harmonization, regions), one section each
+    // harmonization), one section each; regions, accounting, callable regions and the
+    // consistency checks are sections of REPORT_CONTENT
     //
     def ch_summary_sections = CHECK_INPUTS.out.reports
         .map { _meta, tsv -> tsv }
@@ -284,30 +286,48 @@ workflow VARIANTCOMP {
             PREPROCESS_VCF.out.summaries
                 .map { _meta, tsv -> tsv }
                 .collect()
-                .map { files -> [[id: 'harmonization', command: 'key-value', title: 'Harmonization (VAF, depth, alt reads)', description: 'Source of the VAF (FORMAT/AF or AD), depth and dropped records per VCF and branch (harmonize_vcf.py).'], files] },
-            PREPARE_REGIONS.out.summary
-                .map { _meta, tsv -> tsv }
-                .collect()
-                .map { files -> [[id: 'regions', command: 'table', title: 'Comparison region', description: 'Size of every target BED and of the common comparison region.'], files] },
-            PREPARE_REGIONS.out.steps
-                .map { _meta, tsv -> [[id: 'region_steps', command: 'table', id_columns: 2, title: 'Comparison region: steps', description: 'bp of the comparison region after every step (genome, intersection of the target BEDs, --regions_bed, --exclude_bed).'], [tsv]] },
-            PREPROCESS_VCF.out.accounting
-                .map { _meta, tsv -> tsv }
-                .collect()
-                .map { files -> [[id: 'accounting', command: 'table', id_columns: 6, title: 'Variant accounting', description: 'Records of every input VCF kept, removed (with the reason) and added per preprocessing step (variant_accounting.py).'], files] },
-            CONSISTENCY_CHECKS.out.checks
-                .map { _meta, tsv -> [[id: 'consistency_checks', command: 'table', id_columns: 3, title: 'Consistency checks', description: 'Do the counts of the steps add up? A failed check stops the run after the reports were written.'], [tsv]] }
+                .map { files -> [[id: 'harmonization', command: 'key-value', title: 'Harmonization (VAF, depth, alt reads)', description: 'Source of the VAF (FORMAT/AF or AD), depth and dropped records per VCF and branch (harmonize_vcf.py).'], files] }
         )
-    if (params.callable_regions) {
-        ch_summary_sections = ch_summary_sections.mix(
-            COVERAGE.out.callable_summary
-                .map { _meta, tsv -> tsv }
-                .collect()
-                .map { files -> [[id: 'callable', command: 'table', title: 'Callable regions', description: 'Bases of the common region callable in all alignments of a sample.'], files] }
-        )
-    }
     MQC_TABLES(ch_summary_sections)
     ch_multiqc_files = ch_multiqc_files.mix(MQC_TABLES.out.multiqc)
+
+    //
+    // MODULE: content of the report: the variantcomp sections of the MultiQC report and
+    // the tables of the datavzrd table browser (bin/report_content.py)
+    //
+    // parameters of the run as a table: group, parameter, value
+    def ch_summary_params = paramsSummaryMap(workflow, parameters_schema: "nextflow_schema.json")
+    def ch_params_table = channel.of(
+        ch_summary_params.collectMany { group, group_params ->
+            group_params.collect { name, value -> "${group}\t${name}\t${value}" }
+        }.join('\n')
+    ).collectFile(name: 'params.tsv', seed: 'group\tparameter\tvalue', newLine: true)
+    REPORT_CONTENT(
+        BENCHMARK.out.per_pair.map { _meta, tsv -> tsv }
+            .combine(BENCHMARK.out.aggregated.map { _meta, tsv -> tsv })
+            .combine(DISCORDANCE.out.power.map { _meta, tsv -> tsv })
+            .combine(ANNOTATE_VARIANTS.out.annotated.map { _meta, tsv -> tsv })
+            .combine(VARIANTCOMP_REPORT.out.truth_variants.map { _meta, tsv -> tsv })
+            .combine(VARIANTCOMP_REPORT.out.classes.map { _meta, tsv -> tsv })
+            .combine(VARIANTCOMP_REPORT.out.enrichment.map { _meta, tsv -> tsv })
+            .combine(VARIANTCOMP_REPORT.out.genes.map { _meta, tsv -> tsv })
+            .combine(VARIANTCOMP_REPORT.out.annotation_counts.map { _meta, tsv -> tsv })
+            .map { items -> [[id: 'variantcomp']] + items },
+        ch_accounting
+            .combine(ch_removed)
+            .combine(PREPARE_REGIONS.out.steps.map { _meta, tsv -> tsv })
+            .combine(PREPARE_REGIONS.out.summary.map { _meta, tsv -> tsv })
+            .combine(ch_callable_table)
+            .combine(ch_coverage_table),
+        ch_required_summary
+            .combine(ch_required_variants)
+            .combine(ch_known_benchmark)
+            .combine(ch_known_benchmark_per_pair),
+        CONSISTENCY_CHECKS.out.checks.map { _meta, tsv -> tsv }
+            .combine(ch_samplesheet_validated)
+            .combine(ch_params_table)
+    )
+    ch_multiqc_files = ch_multiqc_files.mix(REPORT_CONTENT.out.multiqc.map { _meta, files -> files }.flatten())
 
     //
     // Collate and save software versions
@@ -342,7 +362,6 @@ workflow VARIANTCOMP {
     // MODULE: MultiQC
     //
     ch_multiqc_files = ch_multiqc_files.mix(ch_collated_versions)
-    def ch_summary_params = paramsSummaryMap(workflow, parameters_schema: "nextflow_schema.json")
     def ch_workflow_summary = channel.value(paramsSummaryMultiqc(ch_summary_params))
     ch_multiqc_files = ch_multiqc_files.mix(ch_workflow_summary.collectFile(name: 'workflow_summary_mqc.yaml'))
     def ch_multiqc_custom_methods_description = multiqc_methods_description
@@ -366,55 +385,29 @@ workflow VARIANTCOMP {
     )
 
     //
-    // MODULE: narrative report (Summary, Introduction, Results, Methods) and the tables of
-    // the datavzrd table browser (bin/report_html.py)
-    //
-    // parameters of the run as a table: group, parameter, value
-    def ch_params_table = channel.of(
-        ch_summary_params.collectMany { group, group_params ->
-            group_params.collect { name, value -> "${group}\t${name}\t${value}" }
-        }.join('\n')
-    ).collectFile(name: 'params.tsv', seed: 'group\tparameter\tvalue', newLine: true)
-    REPORT_HTML(
-        BENCHMARK.out.per_pair.map { _meta, tsv -> tsv }
-            .combine(BENCHMARK.out.aggregated.map { _meta, tsv -> tsv })
-            .combine(DISCORDANCE.out.power.map { _meta, tsv -> tsv })
-            .combine(ANNOTATE_VARIANTS.out.annotated.map { _meta, tsv -> tsv })
-            .combine(VARIANTCOMP_REPORT.out.truth_variants.map { _meta, tsv -> tsv })
-            .combine(VARIANTCOMP_REPORT.out.classes.map { _meta, tsv -> tsv })
-            .combine(VARIANTCOMP_REPORT.out.enrichment.map { _meta, tsv -> tsv })
-            .combine(VARIANTCOMP_REPORT.out.genes.map { _meta, tsv -> tsv })
-            .combine(VARIANTCOMP_REPORT.out.annotation_counts.map { _meta, tsv -> tsv })
-            .map { items -> [[id: 'variantcomp']] + items },
-        ch_accounting
-            .combine(ch_removed)
-            .combine(PREPARE_REGIONS.out.steps.map { _meta, tsv -> tsv })
-            .combine(PREPARE_REGIONS.out.summary.map { _meta, tsv -> tsv })
-            .combine(ch_callable_table)
-            .combine(ch_coverage_table),
-        ch_required_summary
-            .combine(ch_required_variants)
-            .combine(ch_known_benchmark),
-        CONSISTENCY_CHECKS.out.checks.map { _meta, tsv -> tsv }
-            .combine(ch_samplesheet_validated)
-            .combine(ch_params_table)
-            .combine(ch_collated_versions)
-    )
-
-    //
     // MODULE: datavzrd table browser (report/tables/index.html)
     //
-    DATAVZRD(REPORT_HTML.out.datavzrd)
+    DATAVZRD(REPORT_CONTENT.out.datavzrd)
+
+    //
+    // MODULE: one zip with the MultiQC report and the table browser, to send or archive
+    // (report/variantcomp_report.zip)
+    //
+    REPORT_BUNDLE(
+        MULTIQC.out.report.map { _meta, report -> report }
+            .combine(DATAVZRD.out.report.map { _meta, folder -> folder })
+            .map { report, folder -> [[id: 'variantcomp'], report, folder] }
+    )
 
     //
     // MODULE: stop the run if a consistency check failed, after all reports were written
     //
     CHECKS_GATE(
         CONSISTENCY_CHECKS.out.checks
-            .combine(REPORT_HTML.out.html.map { _meta, html -> html })
+            .combine(REPORT_BUNDLE.out.zip.map { _meta, zip -> zip })
             .combine(DATAVZRD.out.report.map { _meta, folder -> folder })
             .combine(MULTIQC.out.report.map { _meta, report -> report })
-            .map { meta, checks, html, tables, multiqc -> [meta, checks, [html, tables, multiqc]] }
+            .map { meta, checks, zip, tables, multiqc -> [meta, checks, [zip, tables, multiqc]] }
     )
 
     emit:

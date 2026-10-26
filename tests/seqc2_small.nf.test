@@ -37,8 +37,12 @@ nextflow_pipeline {
                           'giab_segmental_duplication', 'giab_low_mappability', 'giab_all_difficult'].every { c -> c in annotatedHeader } },
                 // end-of-run checks: every count adds up; the reports were written
                 { assert path("$outputDir/report/consistency_checks.tsv").readLines().drop(1).every { line -> line.endsWith('\tok') } },
-                { assert path("$outputDir/report/variantcomp_report.html").text.contains('consistency checks passed') },
+                { assert path("$outputDir/multiqc/multiqc_report.html").text.contains('consistency checks passed') },
                 { assert path("$outputDir/report/tables/index.html").exists() },
+                { assert path("$outputDir/report/tables/multiqc-report/index_1.html").exists() },
+                { assert path("$outputDir/report/variantcomp_report.zip").exists() },
+                // VEP --hgvs: protein changes in the annotated table
+                { assert 'hgvsp' in annotatedHeader },
                 { assert snapshot(
                     removeNextflowVersion("$outputDir/pipeline_info/variantcomp_software_mqc_versions.yml"),
                     stable_path,

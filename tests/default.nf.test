@@ -62,8 +62,10 @@ nextflow_pipeline {
                 // end-of-run checks: every count adds up; the reports were written
                 { assert path("$outputDir/report/consistency_checks.tsv").readLines().size() > 40 },
                 { assert path("$outputDir/report/consistency_checks.tsv").readLines().drop(1).every { line -> line.endsWith('\tok') } },
-                { assert path("$outputDir/report/variantcomp_report.html").text.contains('consistency checks passed') },
+                { assert path("$outputDir/multiqc/multiqc_report.html").text.contains('consistency checks passed') },
                 { assert path("$outputDir/report/tables/index.html").exists() },
+                { assert path("$outputDir/report/tables/multiqc-report/index_1.html").exists() },
+                { assert path("$outputDir/report/variantcomp_report.zip").exists() },
                 // accounting: E08 (non-PASS in wes) is removed in the PASS split
                 { assert path("$outputDir/vcf_preprocessed/accounting/S1_wes.removed.tsv").text.contains('pass_split\tfilter_not_pass\tchr1\t4700') },
                 { assert snapshot(

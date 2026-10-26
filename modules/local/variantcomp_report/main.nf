@@ -18,7 +18,6 @@ process VARIANTCOMP_REPORT {
     tuple val(meta), path("${prefix}.truth_variants.tsv"), emit: truth_variants
     tuple val(meta), path("${prefix}.annotation_counts.tsv"), emit: annotation_counts
     tuple val(meta), path("plots/*.png"), emit: plots, optional: true
-    path "*_mqc.{tsv,yaml}", emit: multiqc
     tuple val("${task.process}"), val('python'), eval("python --version | sed 's/Python //'"), topic: versions, emit: versions_python
     tuple val("${task.process}"), val('pandas'), eval("python -c 'import pandas; print(pandas.__version__)'"), topic: versions, emit: versions_pandas
     tuple val("${task.process}"), val('scipy'), eval("python -c 'import scipy; print(scipy.__version__)'"), topic: versions, emit: versions_scipy
@@ -34,7 +33,7 @@ process VARIANTCOMP_REPORT {
     """
     # matplotlib needs a writable config/cache directory (the home may be read-only on HPC)
     export MPLCONFIGDIR=\$PWD/.matplotlib
-    # enrichment statistics, gene table, discordance classes, plots and MultiQC files
+    # enrichment statistics, gene table, discordance classes and plots
     variantcomp_report.py \\
         --metrics ${metrics} \\
         --per-pair ${per_pair} \\
@@ -47,6 +46,6 @@ process VARIANTCOMP_REPORT {
     stub:
     prefix = task.ext.prefix ?: "variantcomp"
     """
-    touch ${prefix}.enrichment.tsv ${prefix}.genes.tsv ${prefix}.classes.tsv ${prefix}.strata.tsv ${prefix}.truth_variants.tsv ${prefix}.annotation_counts.tsv ${prefix}_metrics_mqc.tsv
+    touch ${prefix}.enrichment.tsv ${prefix}.genes.tsv ${prefix}.classes.tsv ${prefix}.strata.tsv ${prefix}.truth_variants.tsv ${prefix}.annotation_counts.tsv
     """
 }

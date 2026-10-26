@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Statistics, plots and MultiQC files of a variantcomp run.
+"""Statistics and plots of a variantcomp run (the MultiQC sections are written by
+report_content.py).
 
 Inputs (from the benchmark and discordance steps):
   --metrics     metrics.aggregated.tsv
@@ -34,7 +35,6 @@ Outputs (prefix "variantcomp"):
                              impact, variant_class, in_repeat, every stratification):
                              TP, FN, FP, recall, precision and discordance rate
                              (FN + FP) / (TP + FN + FP)
-  *_mqc.*                    MultiQC custom content (tables, bar and line graphs)
   plots/*.png                recall/precision, recall by VAF, classes, enrichment
 
 Checks: the required columns of every input, status values TP/FN/FP and known
@@ -375,11 +375,18 @@ TRUTH_INFO = [
     "truth_vaf",
     "truth_dp",
     "gene",
+    "hgvsp",
+    "hgvsc",
     "consequence",
     "consequence_group",
     "impact",
     "variant_class",
     "in_repeat",
+    "transcript",
+    "dbsnp",
+    "cosmic",
+    "clin_sig",
+    "biotype",
 ]
 
 
@@ -462,112 +469,6 @@ def class_summary(df):
         if c not in table.columns:
             table[c] = 0
     return table[CLASS_ORDER].reset_index()
-
-
-# ------------------------------------------------------------------ MultiQC files
-
-
-def mqc_header(section_id, name, description, plot_type, extra=""):
-    """Comment lines that define a MultiQC custom-content section."""
-    return (
-        f"# id: 'variantcomp_{section_id}'\n# section_name: '{name}'\n"
-        f"# description: '{description}'\n# plot_type: '{plot_type}'\n{extra}"
-    )
-
-
-def write_mqc(prefix, metrics, per_pair, power, classes):
-    """MultiQC custom-content files: metrics tables, class bar graph, recall-by-VAF line graph."""
-    # overall metrics per comparison, with the power-adjusted recall if available
-    overall = metrics[(metrics["stratum_type"] == "overall")].copy()
-    if power is not None and not power.empty:
-        overall = overall.merge(
-            power[["truth", "query", "micro_recall"]].rename(
-                columns={"micro_recall": "power_adjusted_recall"}
-            ),
-            on=["truth", "query"],
-            how="left",
-        )
-    overall.insert(0, "comparison", overall["truth"] + " vs " + overall["query"])
-    for col in ("n_samples", "tp_baseline", "fn", "tp_call", "fp"):
-        overall[col] = pd.to_numeric(overall[col], errors="coerce").astype("Int64")
-    cols = [
-        "comparison",
-        "n_samples",
-        "tp_baseline",
-        "fn",
-        "tp_call",
-        "fp",
-        "micro_recall",
-        "micro_precision",
-        "micro_f1",
-        "macro_recall_mean",
-        "macro_precision_mean",
-    ]
-    if "power_adjusted_recall" in overall.columns:
-        cols.append("power_adjusted_recall")
-    with open(f"{prefix}_metrics_mqc.tsv", "w") as fh:
-        fh.write(
-            mqc_header(
-                "metrics",
-                "Recall and precision",
-                "Per comparison, summed over samples (micro) and mean over samples " "(macro).",
-                "table",
-            )
-        )
-        overall[cols].to_csv(fh, sep="\t", index=False, na_rep="NA", float_format="%.4f")
-
-    pairs = per_pair[per_pair["stratum_type"] == "overall"].copy()
-    pairs.insert(0, "comparison", pairs["sample"] + ": " + pairs["truth"] + " vs " + pairs["query"])
-    with open(f"{prefix}_per_sample_mqc.tsv", "w") as fh:
-        fh.write(
-            mqc_header(
-                "per_sample",
-                "Recall and precision per sample",
-                "Every sample and technology pair.",
-                "table",
-            )
-        )
-        pairs[
-            ["comparison", "tp_baseline", "fn", "tp_call", "fp", "recall", "precision", "f1"]
-        ].to_csv(fh, sep="\t", index=False)
-
-    if not classes.empty:
-        cl = classes.copy()
-        cl.insert(0, "comparison", cl["truth"] + " vs " + cl["query"] + " " + cl["status"])
-        with open(f"{prefix}_classes_mqc.tsv", "w") as fh:
-            fh.write(
-                mqc_header(
-                    "classes",
-                    "Discordance classes",
-                    "Why variants were missed (FN) or only called by the query " "(FP).",
-                    "bargraph",
-                )
-            )
-            cl[["comparison", *CLASS_ORDER]].to_csv(fh, sep="\t", index=False)
-
-    vaf = metrics[metrics["stratum_type"] == "truth_vaf"]
-    lines = [
-        "id: 'variantcomp_recall_vaf'",
-        "section_name: 'Recall by truth VAF'",
-        "description: 'Micro recall per truth VAF bin.'",
-        "plot_type: 'linegraph'",
-        "pconfig:",
-        "  id: 'variantcomp_recall_vaf_plot'",
-        "  title: 'Recall by truth VAF'",
-        "  xlab: 'VAF bin (lower edge)'",
-        "  ylab: 'Recall'",
-        "  ymin: 0",
-        "  ymax: 1",
-        "data:",
-    ]
-    for (truth, query), group in vaf.groupby(["truth", "query"]):
-        lines.append(f"  '{truth} vs {query}':")
-        for _, row in group.iterrows():
-            if row["stratum"] == "unknown" or pd.isna(row["micro_recall"]):
-                continue
-            lower = float(row["stratum"].strip("[)").split(",")[0])
-            lines.append(f"    {lower}: {row['micro_recall']:.4f}")
-    Path(f"{prefix}_recall_vaf_mqc.yaml").write_text("\n".join(lines) + "\n")
 
 
 # ------------------------------------------------------------------ plots
@@ -713,31 +614,6 @@ def main():
     strata.to_csv(
         f"{args.prefix}.strata.tsv", sep="\t", index=False, na_rep="NA", float_format="%.4f"
     )
-    # MultiQC table of the stratified counts
-    if not strata.empty:
-        table = strata.copy()
-        table.insert(
-            0,
-            "id",
-            table["truth"]
-            + " vs "
-            + table["query"]
-            + " "
-            + table["annotation"]
-            + "="
-            + table["value"].astype(str),
-        )
-        with open(f"{args.prefix}_strata_mqc.tsv", "w") as fh:
-            fh.write(
-                mqc_header(
-                    "strata",
-                    "Discordance by annotation",
-                    "TP, FN, FP and discordance rate per VEP consequence group, "
-                    "impact, variant class, repeat context and stratification.",
-                    "table",
-                )
-            )
-            table.to_csv(fh, sep="\t", index=False, na_rep="NA", float_format="%.4f")
     enrich.to_csv(
         f"{args.prefix}.enrichment.tsv", sep="\t", index=False, na_rep="NA", float_format="%.4g"
     )
@@ -753,7 +629,6 @@ def main():
     annotation_counts(variants).to_csv(
         f"{args.prefix}.annotation_counts.tsv", sep="\t", index=False
     )
-    write_mqc(args.prefix, metrics, per_pair, power, classes)
 
     plots = Path("plots")
     plots.mkdir(exist_ok=True)
