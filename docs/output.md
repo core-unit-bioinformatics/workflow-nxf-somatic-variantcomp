@@ -450,6 +450,11 @@ Annotation columns of `discordance/variants.annotated.tsv`:
 
 ### Report
 
+**Start here: `main.html`** at the top of the output folder. It opens the table browser
+on its first page, which shows the MultiQC report; the menu at the top of the page
+switches to the variant tables, and the links of the MultiQC report open them in a new
+tab. `main.html` also links to the MultiQC report and the tables on their own.
+
 The **MultiQC report** `multiqc/multiqc_report.html` is the main report of a run (decision
 D37): one self-contained HTML file, interactive (hover, zoom, export of every plot; the
 toolbox hides, highlights and renames samples in all plots and tables). It starts with the
@@ -475,7 +480,9 @@ results and ends with the details and the quality control:
    and why, as a list (main reasons, variants with several reasons, indel share, median VAF,
    protein-altering variants, genes); share of every category of type, consequence,
    impact, VAF, repeat, GIAB strata and class among TP, FN and FP; VAF of TP, FN and FP;
-   combinations of reasons; the protein-altering discordant variants, the genes and the
+   Venn diagrams of the three most frequent reasons of the FN and of the FP (a variant
+   counts in every circle whose reason applies: the overlaps are the variants with several
+   reasons); all combinations of reasons; the protein-altering discordant variants, the genes and the
    enrichment tests (top 15 rows each, the rest in the table browser).
 8. **Comparison metrics per sample**: recall, precision and F1 by variant type, recall by
    truth VAF (one line per sample), power-adjusted recall; **Metrics per sample**: table
@@ -500,8 +507,8 @@ coverage is in the section Coverage.
 
 The **table browser** `report/tables/index.html` (datavzrd) holds the variant tables. Every
 view starts with a description (what the table shows, how to read it, links to the MultiQC
-report and related tables, the column glossary). Views: the MultiQC report as a page,
-truth variants (default view), discordant variants (all FN and FP, with the class
+report and related tables, the column glossary). Views: the MultiQC report (first page),
+truth variants, discordant variants (all FN and FP, with the class
 explanations), all compared variants, genes, enrichment, metrics per sample, required
 variants, known-variant benchmark, removed records, preprocessing accounting, region steps,
 coverage, consistency checks, samplesheet. In the variant tables:
@@ -519,17 +526,20 @@ coverage, consistency checks, samplesheet. In the variant tables:
   detail view of a row (`+`);
 - the variant tables can be downloaded as Excel.
 
-To send the reports, use **`report/variantcomp_report.zip`**: the MultiQC report and the
-table browser in the layout of the output folder (`multiqc/`, `report/tables/`) plus an
-`index.html` that opens the MultiQC report; unzip it and open `index.html`. The MultiQC
+To send the reports, use **`report/variantcomp_report.zip`**: the start page `main.html`,
+the MultiQC report and the table browser in the layout of the output folder (`multiqc/`,
+`report/tables/`); unzip it and open `main.html`. The MultiQC
 report alone is a single file and can be sent as it is (its links to the tables then do
 not work).
 
 <details markdown="1">
 <summary>Output files</summary>
 
-- `report/tables/`: the datavzrd table browser (open `index.html`).
-- `report/variantcomp_report.zip`: MultiQC report and table browser in one zip (above).
+- `main.html` (top of the output folder): the start page (above).
+- `report/tables/`: the datavzrd table browser (`index.html` opens its first page, the
+  MultiQC report).
+- `report/variantcomp_report.zip`: start page, MultiQC report and table browser in one zip
+  (above).
 - `report/consistency_checks.tsv`: do the counts of the steps add up? (columns below)
 - `report/variantcomp.truth_variants.tsv`: every compared truth variant per sample:
   `sample`, `truth`, `chrom`, `pos`, `ref`, `alt`, `found_by` (int: query technologies that
