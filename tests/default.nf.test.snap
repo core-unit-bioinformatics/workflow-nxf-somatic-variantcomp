@@ -355,6 +355,7 @@
                 "known_variants/required/required_demo/required_demo_S1.known_variants.tsv",
                 "known_variants/required_summary.tsv",
                 "known_variants/required_variants.tsv",
+                "main.html",
                 "multiqc",
                 "multiqc/multiqc_data",
                 "multiqc/multiqc_data/consequences_all__plot_Coding_consequences.txt",
@@ -531,6 +532,7 @@
                 "required_demo_S1.known_variants.tsv:md5,103ef35009c3006cf1d705bc84a23abd",
                 "required_summary.tsv:md5,4326e4f6de86aaff0bc48dc8653d5127",
                 "required_variants.tsv:md5,37faff7aee5b5e93923d783967d58387",
+                "main.html:md5,601fb641d71ebb4a9cc8d68443841b4d",
                 "consequences_all__plot_Coding_consequences.txt:md5,824d082e7d1e9c83fd8d1b73ecc77aa6",
                 "consequences_all__plot_Consequences_all_.txt:md5,f73b1725fa33fc964ea66e2e3e42e92b",
                 "consequences_all__plot_Consequences_most_severe_.txt:md5,824d082e7d1e9c83fd8d1b73ecc77aa6",
@@ -559,7 +561,7 @@
                 "variantcomp.genes.tsv:md5,72f9781a82b2ad928bc7302d0adfbcdd",
                 "variantcomp.strata.tsv:md5,526c6441fdb5c26ffb81514b2f4f06dc",
                 "variantcomp.truth_variants.tsv:md5,0155bc0719a5b086a13df5d335e97835",
-                "variantcomp_report.zip:md5,ab0f1b6e408a9a5cc2fff9022920cbe6",
+                "variantcomp_report.zip:md5,c24cff9c6129a074a85a7e88e9eeed25",
                 "S1_panel.non_pass.normalized.harmonize_summary.tsv:md5,40b99a3edfcd9572747a64abe321570d",
                 "S1_panel.pass.normalized.harmonize_summary.tsv:md5,b85594476d1c563ffef3e9193fdb09c2",
                 "S1_wes.non_pass.normalized.harmonize_summary.tsv:md5,20e98eeaf41584d1719daed6d1195223",
@@ -604,7 +606,7 @@
                 "S2_wgs.pass.norm.norm.log:md5,c54ce01fd99970fb0a3ee17d82f03252"
             ]
         ],
-        "timestamp": "2026-10-26T17:00:12.010879551",
+        "timestamp": "2026-10-26T17:43:59.000190902",
         "meta": {
             "nf-test": "0.9.5",
             "nextflow": "26.10.2"

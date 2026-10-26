@@ -15,6 +15,7 @@ process REPORT_BUNDLE {
     // versions are not sent to the `versions` topic: this process waits for the MultiQC
     // report, which waits for the collated versions, so it would keep the topic open forever
     tuple val(meta), path("${prefix}.zip"), emit: zip
+    tuple val(meta), path("main.html"), emit: start_page
     tuple val("${task.process}"), val('python'), eval("python --version | sed 's/Python //'"), emit: versions_python
 
     when:
@@ -24,19 +25,21 @@ process REPORT_BUNDLE {
     def args = task.ext.args ?: ''
     prefix = task.ext.prefix ?: "variantcomp_report"
     """
-    # one zip with the MultiQC report and the table browser in the layout of the output
-    # folder (the reports link to each other with relative paths)
+    # the start page main.html (opens the table browser on its MultiQC page) and one zip
+    # with the start page, the MultiQC report and the table browser in the layout of the
+    # output folder (the reports link to each other with relative paths)
     report_bundle.py \\
         --multiqc ${multiqc} \\
         --tables ${tables} \\
         --name ${prefix} \\
         --output ${prefix}.zip \\
+        --start-page main.html \\
         ${args}
     """
 
     stub:
     prefix = task.ext.prefix ?: "variantcomp_report"
     """
-    touch ${prefix}.zip
+    touch ${prefix}.zip main.html
     """
 }

@@ -41,6 +41,7 @@ nextflow_pipeline {
                 { assert path("$outputDir/report/tables/index.html").exists() },
                 { assert path("$outputDir/report/tables/multiqc-report/index_1.html").exists() },
                 { assert path("$outputDir/report/variantcomp_report.zip").exists() },
+                { assert path("$outputDir/main.html").text.contains("report/tables/multiqc-report/index_1.html") },
                 // VEP --hgvs: protein changes in the annotated table
                 { assert 'hgvsp' in annotatedHeader },
                 { assert snapshot(

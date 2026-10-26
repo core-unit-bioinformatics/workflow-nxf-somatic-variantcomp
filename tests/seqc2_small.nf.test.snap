@@ -622,6 +622,7 @@
                 "known_variants/required/required_demo/required_demo_SEQC2_IL_1.known_variants.tsv",
                 "known_variants/required_summary.tsv",
                 "known_variants/required_variants.tsv",
+                "main.html",
                 "multiqc",
                 "multiqc/multiqc_data",
                 "multiqc/multiqc_data/consequences_all__plot_Coding_consequences.txt",
@@ -971,6 +972,7 @@
                 "required_demo_SEQC2_IL_1.known_variants.tsv:md5,f58ea4ad8a96c01f87e6d9192035ee1a",
                 "required_summary.tsv:md5,dd32d3b4e070d3430cdaee3a94b41790",
                 "required_variants.tsv:md5,57f117e5e0c12dde28a13fa4021d3238",
+                "main.html:md5,601fb641d71ebb4a9cc8d68443841b4d",
                 "consequences_all__plot_Coding_consequences.txt:md5,1715a582bf22bd1cc73b487774e22d07",
                 "consequences_all__plot_Consequences_all_.txt:md5,4dc8d121bc5e075acfc5e39c826bd7a2",
                 "consequences_all__plot_Consequences_most_severe_.txt:md5,84dacdff4e4e172592c2617796736345",
@@ -1003,7 +1005,7 @@
                 "variantcomp.genes.tsv:md5,442499eba1de4d028550ffdfe7e86791",
                 "variantcomp.strata.tsv:md5,30b43838bff1345ef14a972deb6a6525",
                 "variantcomp.truth_variants.tsv:md5,225c56aaf75906936f03879381479ca9",
-                "variantcomp_report.zip:md5,17279c493a99d2acbbf3b413b1e0872e",
+                "variantcomp_report.zip:md5,bad24592b2a8a5a4844432bf1327552e",
                 "SEQC2_FD_1_wes.non_pass.normalized.harmonize_summary.tsv:md5,15c11871f9788e0fcc144bc034cad531",
                 "SEQC2_FD_1_wes.pass.normalized.harmonize_summary.tsv:md5,dd4b881d8868ab50ab2210b4940eeea2",
                 "SEQC2_FD_1_wgs.non_pass.normalized.harmonize_summary.tsv:md5,d0a7a46f81d74bfc8d69a04fbc7befdb",
@@ -1048,7 +1050,7 @@
                 "SEQC2_NV_1_wgs.pass.norm.norm.log:md5,40cffae0543c95f31b0a80dd9ae723e4"
             ]
         ],
-        "timestamp": "2026-10-26T17:09:20.568071189",
+        "timestamp": "2026-10-26T17:52:41.136895257",
         "meta": {
             "nf-test": "0.9.5",
             "nextflow": "26.10.2"
