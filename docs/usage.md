@@ -323,7 +323,7 @@ impact and stratum.
 | `--vep_cache_version` | `116` | Cache version. |
 | `--vep_genome` | `GRCh38` | Genome assembly of the cache. |
 | `--vep_species` | `homo_sapiens` | Species of the cache. |
-| `--vep_args` | `--flag_pick_allele_gene --terms SO --no_escape --symbol --biotype --variant_class --canonical` | VEP options in every mode. |
+| `--vep_args` | `--flag_pick_allele_gene --terms SO --no_escape --symbol --biotype --variant_class --canonical --hgvs` | VEP options in every mode. `--hgvs` adds HGVSc and HGVSp (protein change, e.g. `p.Gly12Val`), computed with the reference FASTA; without it the report shows the consequence instead. |
 | `--vep_cache_args` | `--check_existing --var_synonyms --clin_sig_allele 1` | Extra VEP options used only with a cache. |
 | `--annotate_repeats` | `true` | Annotate repeat context. |
 | `--repeats_bed` | – | Precomputed repeat BED (skips `msisensor-pro scan`). |

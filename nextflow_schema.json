@@ -595,8 +595,8 @@
                 },
                 "vep_args": {
                     "type": "string",
-                    "default": "--flag_pick_allele_gene --terms SO --no_escape --symbol --biotype --variant_class --canonical",
-                    "description": "VEP options for every run (output fields needed by the report: SYMBOL, IMPACT, VARIANT_CLASS, BIOTYPE, Consequence).",
+                    "default": "--flag_pick_allele_gene --terms SO --no_escape --symbol --biotype --variant_class --canonical --hgvs",
+                    "description": "VEP options for every run (output fields needed by the report: SYMBOL, IMPACT, VARIANT_CLASS, BIOTYPE, Consequence; --hgvs adds HGVSc/HGVSp, read from the reference FASTA).",
                     "fa_icon": "fas fa-terminal"
                 },
                 "vep_cache_args": {

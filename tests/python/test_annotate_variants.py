@@ -120,6 +120,51 @@ def test_merge_adds_vep_repeat_and_stratum_columns(tmp_path):
     ]
 
 
+def test_merge_optional_vep_fields(tmp_path):
+    table = write(tmp_path / "v.tsv", TABLE)
+    header = VEP_HEADER.rstrip("\n") + "\t[10]Feature\t[11]HGVSc\t[12]HGVSp\t"
+    vep = write(
+        tmp_path / "vep.tsv",
+        header
+        + "[13]Existing_variation\t[14]CLIN_SIG\n"
+        + "chr1\t100\tA\tC\tmissense_variant\tKRAS\tMODERATE\tSNV\tprotein_coding\t"
+        + "ENST1.4\tENST1.4:c.35G>T\tENSP1.1:p.Gly12Val\trs121913529&COSV55497369\t"
+        + "pathogenic&likely_pathogenic\n"
+        + "chr1\t200\tGTT\tG\tintron_variant\t\tMODIFIER\tdeletion\t\t.\t.\t.\t.\t.\n",
+    )
+    out = tmp_path / "annotated.tsv"
+    proc = run("merge", "--table", table, "--vep", vep, "--output", str(out))
+    assert proc.returncode == 0, proc.stderr
+    first, second, _ = rows_of(out)
+    assert [first[c] for c in annotate_variants.OPTIONAL_COLUMNS] == [
+        "ENST1.4",
+        "c.35G>T",
+        "p.Gly12Val",
+        "rs121913529",
+        "COSV55497369",
+        "pathogenic,likely_pathogenic",
+    ]
+    assert {second[c] for c in annotate_variants.OPTIONAL_COLUMNS} == {"."}
+
+
+def test_merge_without_optional_fields_writes_dots(tmp_path):
+    table = write(tmp_path / "v.tsv", "chrom\tpos\tref\talt\nchr1\t100\tA\tC\n")
+    vep = write(
+        tmp_path / "vep.tsv",
+        VEP_HEADER + "chr1\t100\tA\tC\tmissense_variant\tKRAS\tMODERATE\tSNV\tx\n",
+    )
+    out = tmp_path / "annotated.tsv"
+    assert run("merge", "--table", table, "--vep", vep, "--output", str(out)).returncode == 0
+    assert {rows_of(out)[0][c] for c in annotate_variants.OPTIONAL_COLUMNS} == {"."}
+
+
+def test_merge_optional_fields_out_of_order_is_an_error(tmp_path):
+    table = write(tmp_path / "v.tsv", TABLE)
+    vep = write(tmp_path / "vep.tsv", VEP_HEADER.rstrip("\n") + "\t[10]HGVSp\t[11]HGVSc\n")
+    proc = run("merge", "--table", table, "--vep", vep, "--output", str(tmp_path / "a.tsv"))
+    assert proc.returncode == 1 and "in this order" in proc.stderr
+
+
 def test_merge_missing_vep_annotation_is_an_error(tmp_path):
     table = write(tmp_path / "v.tsv", TABLE)
     vep = write(

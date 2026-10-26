@@ -25,6 +25,15 @@ Subcommands
                   other; see CONSEQUENCE_GROUPS), gene (SYMBOL, '.' if none), impact
                   (HIGH, MODERATE, LOW, MODIFIER), variant_class (SO class: SNV,
                   insertion, deletion, ...), biotype
+                  Optional extra fields after these nine (any subset, in this order;
+                  requested by conf/modules/annotation.config only when VEP writes them):
+                  %Feature -> transcript; %HGVSc, %HGVSp (VEP --hgvs) -> hgvsc, hgvsp
+                  without the transcript/protein ID prefix (c.35G>T, p.Gly12Val);
+                  %Existing_variation (VEP cache, --check_existing) -> dbsnp (rs IDs),
+                  cosmic (COSV/COSM IDs), comma-separated; %CLIN_SIG -> clin_sig
+                  (comma-separated). These six columns are always written ('.' if the
+                  field was not given or is empty), so the table has the same columns
+                  with a VEP cache and with a GTF.
       --repeats   output of `bedtools map -c 4,5 -o distinct,max` of the variant BED
                   with the repeat BED -> columns in_repeat (yes/no), repeat_unit
                   (repeat unit bases, '.' if none), repeat_times
@@ -53,6 +62,10 @@ VEP_COLUMNS = [
     "VARIANT_CLASS",
     "BIOTYPE",
 ]
+# optional split-vep fields after VEP_COLUMNS (in this order)
+OPTIONAL_VEP_COLUMNS = ["Feature", "HGVSc", "HGVSp", "Existing_variation", "CLIN_SIG"]
+# columns written from the optional fields
+OPTIONAL_COLUMNS = ["transcript", "hgvsc", "hgvsp", "dbsnp", "cosmic", "clin_sig"]
 
 # Sequence Ontology consequence terms (Ensembl VEP) -> group of the report
 CONSEQUENCE_GROUPS = {
@@ -212,17 +225,48 @@ def read_vep(path):
         # split-vep -H writes a header like '# [1]CHROM [2]POS ...'
         first = fh.readline().lstrip("#").strip().split("\t")
         names = [re.sub(r"^\[\d+\]", "", name) for name in first]
-        if names != VEP_COLUMNS:
+        # the nine fixed columns first, then optional fields in the order of
+        # OPTIONAL_VEP_COLUMNS (a subsequence of it)
+        extra = names[len(VEP_COLUMNS) :]
+        in_order = [c for c in OPTIONAL_VEP_COLUMNS if c in extra]
+        if names[: len(VEP_COLUMNS)] != VEP_COLUMNS or extra != in_order:
             sys.exit(
                 f"ERROR: {path}: columns {', '.join(names)}; expected {', '.join(VEP_COLUMNS)} "
+                f"followed by any of {', '.join(OPTIONAL_VEP_COLUMNS)} in this order "
                 "(bcftools +split-vep -H with the format of conf/modules/annotation.config)"
             )
         annotations = {}
         for line in fh:
-            fields = dict(zip(VEP_COLUMNS, line.rstrip("\n").split("\t"), strict=True))
+            fields = dict(zip(names, line.rstrip("\n").split("\t"), strict=True))
             key = (fields["CHROM"], int(fields["POS"]), fields["REF"], fields["ALT"])
             annotations[key] = fields
     return annotations
+
+
+def strip_id(hgvs):
+    """HGVS notation without the transcript/protein ID ('ENST1.2:c.35G>T' -> 'c.35G>T');
+    '.' for an empty value."""
+    if not hgvs or hgvs == ".":
+        return "."
+    return hgvs.split(":", 1)[1] if ":" in hgvs else hgvs
+
+
+def optional_vep_values(fields):
+    """The OPTIONAL_COLUMNS of one split-vep line ('.' for fields not given or empty)."""
+    # Existing_variation: '&'-joined IDs of known variants (rs..., COSV..., COSM..., CM...)
+    known = [v for v in fields.get("Existing_variation", "").split("&") if v not in ("", ".")]
+    dbsnp = [v for v in known if v.startswith("rs")]
+    cosmic = [v for v in known if v.startswith(("COSV", "COSM"))]
+    # CLIN_SIG: '&'-joined ClinVar significances
+    clin_sig = [v for v in fields.get("CLIN_SIG", "").split("&") if v not in ("", ".")]
+    return {
+        "transcript": fields.get("Feature") or ".",
+        "hgvsc": strip_id(fields.get("HGVSc")),
+        "hgvsp": strip_id(fields.get("HGVSp")),
+        "dbsnp": ",".join(dbsnp) or ".",
+        "cosmic": ",".join(cosmic) or ".",
+        "clin_sig": ",".join(clin_sig) or ".",
+    }
 
 
 def merge(args):
@@ -244,6 +288,7 @@ def merge(args):
             row["impact"] = fields["IMPACT"] or "."
             row["variant_class"] = fields["VARIANT_CLASS"] or "."
             row["biotype"] = fields["BIOTYPE"] or "."
+            row.update(optional_vep_values(fields))
         new_columns += [
             "consequence",
             "consequence_group",
@@ -251,7 +296,14 @@ def merge(args):
             "impact",
             "variant_class",
             "biotype",
+            *OPTIONAL_COLUMNS,
         ]
+        n_hgvsp = sum(r["hgvsp"] != "." for r in rows)
+        n_dbsnp = sum(r["dbsnp"] != "." for r in rows)
+        print(
+            f"INFO: VEP: {n_hgvsp} of {n} variants with HGVSp, {n_dbsnp} with a dbSNP ID",
+            file=sys.stderr,
+        )
         groups = {
             g: sum(r["consequence_group"] == g for r in rows)
             for g in ("synonymous", "non_synonymous", "other")

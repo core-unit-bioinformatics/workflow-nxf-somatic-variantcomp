@@ -58,6 +58,9 @@ nextflow_workflow {
                 { assert rows[2].gene == 'GENE_B' && rows[2].variant_class == 'deletion' },
                 { assert rows[2].homopolymer == 'yes' && rows[0].homopolymer == 'no' },
                 { assert rows[3].gene == '.' && rows[3].consequence_group == 'other' },
+                // --hgvs (default --vep_args): HGVS columns; IDs only with a cache ('.')
+                { assert ['transcript', 'hgvsc', 'hgvsp', 'dbsnp', 'cosmic', 'clin_sig'].every { c -> c in header } },
+                { assert rows[3].hgvsp == '.' && rows[0].dbsnp == '.' },
                 { assert workflow.out.multiqc.size() == 1 }
             )
         }
