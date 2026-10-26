@@ -1,5 +1,6 @@
 """Unit tests for bin/classify_discordance.py."""
 
+import argparse
 import csv
 import subprocess
 import sys
@@ -135,6 +136,32 @@ def test_classes(run):
     }
     assert rows[200]["other_filter"] == "weak_evidence"
     assert rows[300]["normal_alt"] == "48"
+
+
+def test_first_reason_is_the_class(run):
+    rows, _ = run
+    for row in rows.values():
+        assert row["reasons"].split(",")[0] == row["class"]
+
+
+def test_reasons_lists_every_reason_that_applies():
+    args = argparse.Namespace(min_coverage=10, min_alt_reads=2, germline_vaf=0.1)
+    reasons = classify_discordance.reasons
+    # non-PASS call at a position with low depth and alt reads
+    assert reasons("FN", True, "weak_evidence", 5, 2, 0, 0.0, args) == [
+        "filtered_non_pass",
+        "low_coverage",
+        "subthreshold_evidence",
+    ]
+    # germline evidence in the normal and alt reads in the tumor
+    assert reasons("FP", False, "NA", 50, 4, 10, 0.4, args) == [
+        "germline_in_normal",
+        "subthreshold_evidence",
+    ]
+    # no alignment: absent only if nothing else applies
+    assert reasons("FN", False, "NA", None, None, None, None, args) == ["absent"]
+    assert reasons("FN", True, "PASS", None, None, None, None, args) == ["present_but_filtered"]
+    assert reasons("TP", True, "PASS", 50, 10, 0, 0.0, args) == ["concordant"]
 
 
 def test_power(run):

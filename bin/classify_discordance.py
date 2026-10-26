@@ -27,6 +27,15 @@ the script looks for the reason in this order (the first that applies is used):
   no_evidence            the other tumor alignment has no alt read
 TP variants get the class `concordant`.
 
+Several reasons can apply to one variant (e.g. a non-PASS call at a position with low
+depth, or germline evidence in the normal together with alt reads in the tumor). The
+column `reasons` lists all that apply, comma-separated, in the order above, so its first
+entry is always `class`. Exclusive pairs: filtered_non_pass / present_but_filtered (FILTER
+of the call), absent / low_coverage / subthreshold_evidence / no_evidence need a tumor
+alignment (absent is only listed if no other reason applies), and
+subthreshold_evidence / no_evidence (alt reads or not). low_coverage can come together
+with subthreshold_evidence or no_evidence. TP variants get `concordant`.
+
 Read evidence comes from VCFs of `bcftools mpileup -a AD,DP` + `bcftools call -m
 --keep-alts` + `bcftools norm -m-any` (one VCF per alignment, one sample each):
 alt reads are matched by (CHROM, POS, REF, ALT), depth by (CHROM, POS) (the
@@ -71,6 +80,7 @@ EVIDENCE_COLUMNS = [
 ]
 EXTRA_COLUMNS = [
     "class",
+    "reasons",
     "other_in_normalized",
     "other_filter",
     "other_vaf_normalized",
@@ -231,6 +241,32 @@ def classify(status, in_other, other_filter, tumor_dp, tumor_alt, normal_alt, no
     return "no_evidence"
 
 
+def reasons(status, in_other, other_filter, tumor_dp, tumor_alt, normal_alt, normal_vaf, args):
+    """Every discordance reason that applies to one variant, in the order of classify()
+    (so the first one is the class); ['concordant'] for TP."""
+    if status == "TP":
+        return ["concordant"]
+    found = []
+    # the other technology called it: the FILTER decides between the two classes
+    if in_other:
+        found.append(
+            "filtered_non_pass" if other_filter not in ("PASS", ".") else "present_but_filtered"
+        )
+    # alt reads in the normal(s): likely germline
+    if (normal_alt or 0) >= args.min_alt_reads and (normal_vaf or 0) >= args.germline_vaf:
+        found.append("germline_in_normal")
+    if tumor_dp is None:
+        # no tumor alignment: 'absent' only if nothing else explains the difference
+        if not found:
+            found.append("absent")
+        return found
+    # depth and alt reads of the tumor alignment of the technology that misses the variant
+    if tumor_dp < args.min_coverage:
+        found.append("low_coverage")
+    found.append("subthreshold_evidence" if tumor_alt > 0 else "no_evidence")
+    return found
+
+
 def main():
     """Parse the command line and run the (sub)command."""
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
@@ -306,6 +342,10 @@ def main():
             status, in_other, other_filter, tumor_dp, tumor_alt, normal_alt, normal_vaf, args
         )
         classes[(status, row_class)] += 1
+        # all reasons that apply (the first one is the class)
+        row_reasons = reasons(
+            status, in_other, other_filter, tumor_dp, tumor_alt, normal_alt, normal_vaf, args
+        )
 
         # detection power of the query for truth variants (needs the query tumor depth)
         power, detectable = None, None
@@ -322,6 +362,7 @@ def main():
         row.update(
             {
                 "class": row_class,
+                "reasons": ",".join(row_reasons),
                 "other_in_normalized": "yes" if in_other else "no",
                 "other_filter": other_filter,
                 "other_vaf_normalized": fmt(other_vaf),
