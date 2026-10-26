@@ -289,7 +289,14 @@ as in [variantinterpretation](https://github.com/cio-abcd/variantinterpretation)
   allele and gene, `--flag_pick_allele_gene`). VEP runs offline, either with a cache
   (`--vep_cache`) or with a bgzipped, tabix-indexed GTF (`--vep_gtf`, e.g. GENCODE); exactly
   one of them is required, otherwise the run stops at the start. Set `--vep false` to skip
-  it.
+  it. **VEP never needs an internet connection**: with a cache it runs with `--offline`;
+  with a GTF it switches to offline mode itself (`--offline` together with `--gtf` would
+  make VEP look for a cache directory). Both modes were tested without network. Options
+  that would open a database connection (`--database`, `--host`, `--port`, `--user`,
+  `--password`, `--registry`, `--genomes`) in `--vep_args` / `--vep_cache_args` stop the run
+  at the start. The cache gives more annotation (dbSNP/COSMIC IDs, ClinVar significance via
+  `--check_existing`) and is the recommended source for real data; download it beforehand
+  with `scripts/download_resources.py`.
 - **Repeats** (`--annotate_repeats`, default `true`): microsatellite regions of the
   reference from `msisensor-pro scan`, or a precomputed BED (`--repeats_bed`: contig,
   start, end, repeat unit, repeat times; the file written by a previous run can be reused).

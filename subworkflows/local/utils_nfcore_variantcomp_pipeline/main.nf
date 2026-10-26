@@ -200,6 +200,14 @@ def validateInputParameters() {
     if (params.vep && params.vep_cache && params.vep_gtf) {
         error("--vep_cache and --vep_gtf are both given: VEP uses one annotation source, give only one of them")
     }
+    // VEP never goes online: with a cache it runs with --offline, with a GTF it switches to
+    // offline mode itself. Options that open a database connection (or download) are refused
+    def online = ['--database', '--host', '--port', '--user', '--password', '--registry', '--genomes']
+    def vep_options = "${params.vep_args ?: ''} ${params.vep_cache_args ?: ''}".tokenize(' ')
+    def found = online.findAll { option -> option in vep_options }
+    if (params.vep && found) {
+        error("--vep_args / --vep_cache_args contain ${found.join(', ')}: the pipeline runs VEP offline only (no internet on the HPC); remove these options and give a downloaded cache (--vep_cache, see scripts/download_resources.py) or a GTF (--vep_gtf)")
+    }
 }
 
 //
