@@ -300,32 +300,40 @@ nf-core-style pipelines.
 - **Statistics from scipy** (`fisher_exact`, `false_discovery_control`),
   not own implementations.
 
-### Report and end-of-run checks (feedback 2026-10-22, D33/D34)
+### Report and end-of-run checks (feedback 2026-10-22 and 2026-10-26, D34/D37)
 
-- **Two reports, two audiences.** MultiQC holds the QC of every step. The narrative report
-  `report/variantcomp_report.html` (`bin/report_html.py`) is for readers: offline, one
-  file, inline SVG plots, no external JavaScript, structured as
-  Summary → Introduction → Results → Methods and ordered by importance. The Summary shows
-  the key plots (recall vs. precision with one dot per sample, truth variants found,
-  discordance classes). Every section starts with text that explains what is shown.
-- **Browsable tables with datavzrd** (nf-core `datavzrd`, `report/tables/`): every
-  compared variant, truth variant, discordance class, removed record, region step,
-  coverage row and check, linked by `variant_id` (`sample:chrom:pos:ref>alt`).
+- **MultiQC is the main report** (D37, replaces the narrative report of D33). The variantcomp
+  sections (`bin/report_content.py`, ids `vc_*`, order in `assets/multiqc_config.yml`) come
+  first, ordered by importance: Summary (cards of recall/precision/F1 per matching method,
+  run cards, key findings), Introduction (bullet lists), key results, then details, then
+  the QC of the steps, methods and versions. Concise, not overloaded: every section starts
+  with text that explains what is shown.
+- **Plots for readers.** Bar plots are vertical with the samples on the x-axis (Plotly of
+  the MultiQC report via `JS_LIB`, following the toolbox: hide, highlight, rename);
+  recall/precision axes always span 0 to 1; sizes in Mbp; matching methods (vcfeval,
+  isec exact, isec position) can be switched where metrics are shown.
+- **Variant tables live in datavzrd** (nf-core `datavzrd`, `report/tables/`). MultiQC shows
+  at most 15 variant rows (`MAX_ROWS`) and links to the table. datavzrd views start with a
+  description, show gene + HGVS.p first, colour status columns, link to GeneCards, Ensembl,
+  dbSNP and COSMIC, put minor columns in the detail view, and link the tables by
+  `variant_id` (`sample:chrom:pos:ref>alt`) and `gene`. The MultiQC report is a datavzrd page.
+- **Shareable.** `report/variantcomp_report.zip` (`report_bundle.py`) keeps the output layout
+  (`multiqc/`, `report/tables/`), so the relative links between the reports work.
 - **One source of explanations.** Class, reason and column texts live once in
-  `report_html.py` (`CLASS_TEXT`, `REASON_TEXT`, `COLUMN_TEXT`) and are used by both
-  reports; keep them in line with `docs/output.md`.
+  `report_content.py` (`CLASS_TEXT`, `CLASS_LABEL`, `REASON_TEXT`, `COLUMN_TEXT`) and are
+  used by both reports; keep them in line with `docs/output.md`.
 - **Every count is traceable.** Each VCF has an accounting table (records kept, removed
   with the reason, added per step; `variant_accounting.py`) and a table of every removed
   record; the comparison region has a step table (`region_summary.py steps`); coverage is
   summarized in the common and in the target region (`coverage_summary.py`, MultiQC
-  General Statistics).
+  section Coverage).
 - **Consistency checks at the end.** `consistency_checks.py check` verifies that the counts
-  of all steps add up. New steps that change counts add their checks there. The report
-  and MultiQC show the table; `CHECKS_GATE` stops the run if a check failed, after the
+  of all steps add up. New steps that change counts add their checks there. MultiQC
+  shows the summary, datavzrd the table; `CHECKS_GATE` stops the run if a check failed, after the
   reports were written (so the failure can be inspected). Never weaken a check to make a
   run pass; find the cause.
 - **No versions topic after the versions are collated.** A process that waits for the
-  collated versions, directly or through another report (MULTIQC, REPORT_HTML, DATAVZRD
+  collated versions, directly or through another report (MULTIQC, REPORT_BUNDLE, DATAVZRD
   (patched), CHECKS_GATE), must not emit into the `versions` topic: the topic would stay
   open and the run would hang.
 

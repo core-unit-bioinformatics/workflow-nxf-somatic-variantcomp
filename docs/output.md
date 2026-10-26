@@ -28,9 +28,9 @@ line. Missing values are `NA` (numbers) or `.` (names, alleles).
 - [Discordance](#discordance) - why variants differ, with read evidence and annotation
 - [Annotation](#annotation) - VEP consequences and repeat regions
 - [Known variants](#known-variants) - required variants and external truth sets
-- [Report](#report) - the narrative report, the table browser, the consistency checks,
-  enrichment statistics, gene and annotation tables, plots
-- [MultiQC](#multiqc) - the report of all results and step summaries
+- [Report](#report) - the MultiQC report (main report), the table browser, the zip to send
+  both, the consistency checks, enrichment statistics, gene and annotation tables, plots
+- [MultiQC](#multiqc) - output files and configuration of the MultiQC report
 - [Pipeline information](#pipeline-information) - run reports and checked sheets
 
 Tools that produce each output folder (citations in [`CITATIONS.md`](../CITATIONS.md)):
@@ -45,8 +45,8 @@ Tools that produce each output folder (citations in [`CITATIONS.md`](../CITATION
 | `discordance/` | `bcftools query`, `bcftools mpileup` + `bcftools call`, `bcftools norm`, `classify_discordance.py`, `annotate_variants.py` |
 | `annotation/` | Ensembl VEP, `bcftools +split-vep`, msisensor-pro, `bedtools map`, `bedtools intersect` |
 | `known_variants/` | `known_variants.py`, `bcftools norm`, `bcftools isec`, `rtg vcfeval`, `benchmark_metrics.py`, `known_summary.py` |
-| `report/` | `variantcomp_report.py` (pandas, SciPy, Matplotlib), `consistency_checks.py`, `report_html.py` (pandas, Matplotlib), datavzrd |
-| `multiqc/` | MultiQC, `mqc_tables.py` |
+| `report/` | `variantcomp_report.py` (pandas, SciPy, Matplotlib), `consistency_checks.py`, `report_content.py` (pandas), datavzrd, `report_bundle.py` |
+| `multiqc/` | MultiQC (with the sections of `report_content.py`; plots with the Plotly library bundled in MultiQC), `mqc_tables.py` |
 
 ### Input checks
 
@@ -351,7 +351,8 @@ Discordance columns:
 
 | Column | Type | Meaning |
 | --- | --- | --- |
-| `class` | text | discordance class (below); `concordant` for TP |
+| `class` | text | discordance class (below): the first reason that applies; `concordant` for TP |
+| `reasons` | text | every reason (class) that applies, comma-separated, in the order of the table below; the first one is `class`. Exclusive: `filtered_non_pass` / `present_but_filtered`; `absent` (only if nothing else applies) / `low_coverage`, `subthreshold_evidence`, `no_evidence`; `subthreshold_evidence` / `no_evidence`. `low_coverage` comes together with one of the last two; `germline_in_normal` with any. |
 | `other_in_normalized` | yes/no | the technology that misses the variant has it in its normalized VCF |
 | `other_filter` | text | its FILTER (`NA` if not called) |
 | `other_vaf_normalized` | float | its VAF |
@@ -407,6 +408,10 @@ Annotation columns of `discordance/variants.annotated.tsv`:
 | `impact` | text | `HIGH`, `MODERATE`, `LOW`, `MODIFIER` |
 | `variant_class` | text | Sequence Ontology class (`SNV`, `insertion`, `deletion`, ...) |
 | `biotype` | text | biotype of the transcript (e.g. `protein_coding`) |
+| `transcript` | text | transcript of the most severe consequence (VEP Feature; `.` without `--hgvs`) |
+| `hgvsc`, `hgvsp` | text | coding and protein change (HGVS, VEP `--hgvs`, default) without the transcript/protein ID, e.g. `c.35G>T`, `p.Gly12Val`; `.` if none (non-coding, intergenic) or without `--hgvs` |
+| `dbsnp`, `cosmic` | text | IDs of known variants at the allele (VEP `--check_existing`, only with `--vep_cache`): rs IDs; COSV/COSM IDs; comma-separated, `.` if none |
+| `clin_sig` | text | ClinVar significance (only with `--vep_cache`), comma-separated, `.` if none |
 | `in_repeat` | yes/no | the variant overlaps a repeat region |
 | `repeat_unit`, `repeat_times` | text, int | repeat unit and number of repeats (`.` if none) |
 | `giab_<name>` | yes/no | one column per GIAB file given with `--giab_<name>` (overlap with the variant's REF span) |
@@ -445,40 +450,93 @@ Annotation columns of `discordance/variants.annotated.tsv`:
 
 ### Report
 
-The **narrative report** `report/variantcomp_report.html` is the main result for readers:
-one offline HTML file (plots inline, no external scripts) with these sections:
+The **MultiQC report** `multiqc/multiqc_report.html` is the main report of a run (decision
+D37): one self-contained HTML file, interactive (hover, zoom, export of every plot; the
+toolbox hides, highlights and renames samples in all plots and tables). It starts with the
+results and ends with the details and the quality control:
 
-- a banner with the result of the consistency checks;
-- **Summary**: key numbers (samples, technologies, compared region, truth variants), the
-  overall recall/precision/F1, recall vs. precision with one dot per sample, the truth
-  variants found per technology and the discordance classes;
-- **Introduction**: the question, the metrics and the samplesheet;
-- **Results**: compared region (the steps as a flow, plot and tables), input variant sets and
-  their filtering (records removed per step and reason), comparison metrics (by type and
-  VAF, per sample, power-adjusted), truth variants, each discordance class explained with its
-  variants, annotation of truth variants, query calls, FN and FP per technology (consequence
-  group, impact, type, repeat), enrichment and genes, known variants;
-- **Methods**: steps and tool versions, parameters, coverage (plot and table), consistency
-  checks, links to the table browser and the MultiQC report.
+1. **Summary**: banner of the consistency checks; cards with recall, precision, F1, FN and
+   FP of every query technology (summed over the samples), with buttons for the matching
+   method (RTG vcfeval, bcftools isec same allele, bcftools isec same position); cards of
+   the run (samples, technologies, compared region, truth variants, required variants);
+   key findings as a list; links to the variant tables.
+2. **Introduction**: this run (question, samples, callers, compared region, filters) and
+   how the technologies are compared, as lists; one row per technology (role, library type,
+   caller, target BED and its size).
+3. **Recall and precision per sample**: MultiQC scatter plot, both axes 0 to 1, one dot per
+   sample and query technology (hover: sample name), one dataset per matching method.
+4. **Truth variants found**: vertical bars per sample, label `found/total`, per method.
+5. **Known variants**: required variants as cards (found / required per technology) and a
+   PASS/FAIL matrix (variant × technology × sample, details on hover); the benchmark
+   against an external truth set as cards and bars per sample.
+6. **Why variants differ**: discordant variants per sample (vertical bars) by class; views
+   FN + FP, FN only (in the truth technology only), FP only (in the query technology only).
+7. **Discordant variants in detail** (per comparison): what is found in one technology only
+   and why, as a list (main reasons, variants with several reasons, indel share, median VAF,
+   protein-altering variants, genes); share of every category of type, consequence,
+   impact, VAF, repeat, GIAB strata and class among TP, FN and FP; VAF of TP, FN and FP;
+   combinations of reasons; the protein-altering discordant variants, the genes and the
+   enrichment tests (top 15 rows each, the rest in the table browser).
+8. **Comparison metrics per sample**: recall, precision and F1 by variant type, recall by
+   truth VAF (one line per sample), power-adjusted recall; **Metrics per sample**: table
+   of counts and the metrics of all three matching methods.
+9. **Compared genomic region**: cards (genome, every target BED with its technology and
+   role, common region, callable per sample) in Mbp; the steps as a flow; vertical bars
+   (log or linear scale); the callable region per sample.
+10. **Input variant sets and their filtering**: records per VCF, compared and removed per
+    reason (counts or percent).
+11. **Coverage**: mean depth and percent of bases ≥ each threshold per alignment, in the
+    common and the target region.
+12. The QC of the steps: input checks, normalization (`bcftools norm`), harmonization,
+    mosdepth, VEP; **Consistency checks** (passed/failed per category, failed checks listed);
+    methods description, software versions and parameters.
 
-The **table browser** `report/tables/index.html` (datavzrd) has searchable, sortable tables
-of: truth variants (default view), metrics per sample, all compared variants, one table per
-discordance class, removed records, preprocessing accounting, region steps, coverage,
-enrichment tests, genes, required variants and consistency checks. Every view describes its columns; rows of
-discordant variants link to their truth variant (column `variant_id` =
-`sample:chrom:pos:ref>alt`).
+No table with variants in rows has more than 15 rows in MultiQC; the sections link to the
+table browser. The bar plots are vertical with the samples on the x-axis: MultiQC's own bar
+plots are horizontal only, so these plots are drawn with the Plotly library that MultiQC
+bundles; they follow the toolbox like the MultiQC plots. The General Statistics table is
+switched off (`skip_generalstats`), because MultiQC always puts it above all sections;
+coverage is in the section Coverage.
+
+The **table browser** `report/tables/index.html` (datavzrd) holds the variant tables. Every
+view starts with a description (what the table shows, how to read it, links to the MultiQC
+report and related tables, the column glossary). Views: the MultiQC report as a page,
+truth variants (default view), discordant variants (all FN and FP, with the class
+explanations), all compared variants, genes, enrichment, metrics per sample, required
+variants, known-variant benchmark, removed records, preprocessing accounting, region steps,
+coverage, consistency checks, samplesheet. In the variant tables:
+
+- the first columns are `variant` (gene and protein change, e.g. `KRAS p.Gly12Val`; HGVS.c
+  or the consequence if there is no protein change), `gene`, `hgvsp`, `consequence`,
+  `impact`, then sample, status, class and reasons, then position, alleles, VAF and the rest;
+- coloured columns: `status` (TP green, FN orange, FP purple), `class` / `class_<query>`,
+  `reasons` (one coloured pill per reason), `found_<query>` and other yes/no columns,
+  `impact`, metrics (red to green), q-values; VAF columns as ticks on 0 to 1;
+- links: `gene` to GeneCards and Ensembl, `locus` (`chrom:pos`) to the Ensembl genome
+  browser (`--vep_genome`), `dbsnp` to dbSNP, `cosmic` to COSMIC; rows link to the truth
+  variant (`variant_id` = `sample:chrom:pos:ref>alt`) and to the gene table;
+- the less important columns (HGVS.c, transcript, biotype, evidence counts, ...) are in the
+  detail view of a row (`+`);
+- the variant tables can be downloaded as Excel.
+
+To send the reports, use **`report/variantcomp_report.zip`**: the MultiQC report and the
+table browser in the layout of the output folder (`multiqc/`, `report/tables/`) plus an
+`index.html` that opens the MultiQC report; unzip it and open `index.html`. The MultiQC
+report alone is a single file and can be sent as it is (its links to the tables then do
+not work).
 
 <details markdown="1">
 <summary>Output files</summary>
 
-- `report/variantcomp_report.html`: the narrative report (above).
 - `report/tables/`: the datavzrd table browser (open `index.html`).
+- `report/variantcomp_report.zip`: MultiQC report and table browser in one zip (above).
 - `report/consistency_checks.tsv`: do the counts of the steps add up? (columns below)
 - `report/variantcomp.truth_variants.tsv`: every compared truth variant per sample:
   `sample`, `truth`, `chrom`, `pos`, `ref`, `alt`, `found_by` (int: query technologies that
   found it), `queries` (int: query technologies compared), the annotation of the truth call
-  (`type`, `length`, `truth_vaf`, `truth_dp`, `gene`, `consequence`, `consequence_group`,
-  `impact`, `variant_class`, `in_repeat`, if present) and per query technology
+  (`type`, `length`, `truth_vaf`, `truth_dp`, `gene`, `hgvsp`, `hgvsc`, `consequence`,
+  `consequence_group`, `impact`, `variant_class`, `in_repeat`, `transcript`, `dbsnp`,
+  `cosmic`, `clin_sig`, `biotype`, if present) and per query technology
   `found_<query>` (yes/no) and `class_<query>` (discordance class of a miss, `.` if found).
 - `report/variantcomp.annotation_counts.tsv`: counts per `sample`, `technology`, `set`
   (`truth_variants`: TP+FN of the truth technology, each variant once; `query_calls`: TP+FP
@@ -519,8 +577,8 @@ discordant variants link to their truth variant (column `variant_id` =
 | `expected`, `observed` | text | the values compared |
 | `status` | text | `ok` or `FAIL` |
 
-**A failed check stops the run** (`CHECKS_GATE`, exit status 1) after the narrative report,
-the table browser and the MultiQC report were written, so the failure can be inspected
+**A failed check stops the run** (`CHECKS_GATE`, exit status 1) after the MultiQC report,
+the table browser and the zip were written, so the failure can be inspected
 there. A failed check means the results may be wrong: please report it as a bug.
 
 ### MultiQC
@@ -535,12 +593,10 @@ there. A failed check means the results may be wrong: please report it as a bug.
 
 </details>
 
-The report contains: recall and precision per comparison and per sample, recall by truth
-VAF, the discordance classes, discordance by annotation, the required variants, and one
-table per step summary (input checks, normalization by `bcftools norm`, harmonization,
-comparison region and its steps, variant accounting, callable regions, consistency
-checks), the mosdepth and VEP summaries, coverage in the common and target regions in the
-General Statistics table, and the software versions.
+The MultiQC report is the main report of the run; its sections are described under
+[Report](#report). `assets/multiqc_config.yml` sets the order of the sections, the title and
+fixed output names (`multiqc_report.html`, `multiqc_data/`, `multiqc_plots/`; the table
+browser and the zip link to them).
 
 ### Pipeline information
 
