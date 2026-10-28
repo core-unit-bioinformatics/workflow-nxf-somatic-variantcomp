@@ -25,7 +25,7 @@ Outputs (prefix "variantcomp"):
                              ref, alt), found_by (number of query technologies that found
                              it), queries, its annotation (type, length, truth VAF/depth,
                              gene, consequence, impact, variant class, repeat) and per query
-                             technology found_<query> (yes/no) and class_<query> (class
+                             technology found_<query> (yes/no) and reasons_<query> (every reason
                              of a miss, '.' if found)
   <prefix>.annotation_counts.tsv  annotation counts per sample, technology and set
                              (truth_variants, query_calls, missed_FN, extra_FP): sample,
@@ -100,10 +100,10 @@ BASE_COLUMNS = {
 }
 # annotation columns the report is stratified by (if present), plus every yes/no column
 STRATA_COLUMNS = ["consequence_group", "impact", "variant_class", "in_repeat"]
+# main reasons of classify_discordance.py (exactly one per FN/FP)
 CLASS_ORDER = [
     "filtered_non_pass",
     "present_but_filtered",
-    "germline_in_normal",
     "low_coverage",
     "subthreshold_evidence",
     "no_evidence",
@@ -149,6 +149,7 @@ VARIANT_COLUMNS = [
     "truth_vaf",
     "query_vaf",
     "class",
+    "reasons",
 ]
 COLORS = {"recall": "#2a6f97", "precision": "#c8553d", "f1": "#6a994e"}
 
@@ -392,10 +393,11 @@ TRUTH_INFO = [
 
 def truth_variants(df):
     """Every compared truth variant per sample: annotation and, per query technology,
-    whether it was found (TP) or missed (FN) and the class of a miss.
+    whether it was found (TP) or missed (FN) and the reasons of a miss.
 
     One row per sample, truth technology and variant (chrom, pos, ref, alt); columns
-    found_<query> (yes/no) and class_<query> (discordance class of an FN, '.' if found).
+    found_<query> (yes/no) and reasons_<query> (all reasons of an FN, main reason first,
+    '.' if found).
     """
     truth = df[df["status"].isin(["TP", "FN"])].copy()
     if truth.empty:
@@ -406,7 +408,8 @@ def truth_variants(df):
     for query, rows in truth.groupby("query"):
         rows = rows.drop_duplicates(keys).set_index(keys)
         table[f"found_{query}"] = rows["status"].map({"TP": "yes", "FN": "no"})
-        table[f"class_{query}"] = rows["class"].where(rows["status"] == "FN", ".")
+        # every reason of a miss (main reason first), '.' if found
+        table[f"reasons_{query}"] = rows["reasons"].where(rows["status"] == "FN", ".")
     table = table.reset_index()
     # how many query technologies found the variant
     found = [c for c in table.columns if c.startswith("found_")]

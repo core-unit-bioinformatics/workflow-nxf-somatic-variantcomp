@@ -10,8 +10,12 @@ Subcommands
       INPUT   --table: TSV with at least chrom, pos (1-based), ref, alt;
               --fai: reference index (contig order and lengths of the VCF header)
       OUTPUT  --output: VCF, one record per distinct CHROM/POS/REF/ALT
-  to-bed          variant table -> BED4 of the REF span of every row, for bedtools
-      OUTPUT  chrom, start (pos - 1), end (pos - 1 + len(ref)), row number (1-based)
+  to-bed          variant table -> BED4 of the span of every row, for bedtools
+      OUTPUT  chrom, start (pos - 1), end, row number (1-based); end = pos - 1 + len(ref)
+              (the REF span), for an insertion (ALT longer than REF) one base more: a
+              left-aligned insertion has only its anchor base in REF, which lies just
+              before a repeat; the inserted bases go between the anchor and the next base,
+              so the next base decides whether the insertion is in a repeat or stratum
   repeats-to-bed  msisensor-pro scan list -> BED of the repeat (microsatellite) regions
       INPUT   tab-separated with header: chromosome, location (0-based start),
               repeat_unit_length, repeat_times, repeat_unit_bases, ... (msisensor-pro 1.3)
@@ -39,6 +43,12 @@ Subcommands
                   (repeat unit bases, '.' if none), repeat_times
       --stratum   NAME=FILE, output of `bedtools intersect -c` of the variant BED with
                   a stratification BED -> column NAME = yes (> 0 intervals) / no
+      --context-reasons  (needs a column `reasons`, classify_discordance.py) adds to the
+                  reasons of every FN and FP row the context that applies, after its main
+                  reason and germline_in_normal, in this order: indel (type INS, DEL or
+                  COMPLEX), low_vaf (VAF of the existing call < --low-vaf: truth_vaf of an
+                  FN, query_vaf of an FP), in_repeat (in_repeat = yes), and the NAME of every
+                  --stratum with yes (GIAB stratifications are named giab_<name>)
 
 Every variant (row number, resp. CHROM/POS/REF/ALT) must appear in every tool result,
 otherwise the script stops: a missing row would silently lose an annotation.
@@ -163,7 +173,11 @@ def to_bed(args):
         for i, row in enumerate(rows, start=1):
             # positions are 1-based in the table, BED is 0-based half-open
             start = int(row["pos"]) - 1
-            fh.write(f"{row['chrom']}\t{start}\t{start + len(row['ref'])}\t{i}\n")
+            end = start + len(row["ref"])
+            # insertion: include the base after the REF span (where the bases are inserted)
+            if len(row["alt"]) > len(row["ref"]):
+                end += 1
+            fh.write(f"{row['chrom']}\t{start}\t{end}\t{i}\n")
     print(f"INFO: {args.table}: {len(rows)} variants written as BED", file=sys.stderr)
 
 
@@ -269,6 +283,46 @@ def optional_vep_values(fields):
     }
 
 
+def context_reasons(row, strata, low_vaf):
+    """Context reasons of one FN/FP row (see the module docstring), in a fixed order."""
+    found = []
+    # indels are harder to call and to represent the same way
+    if row.get("type") in ("INS", "DEL", "COMPLEX"):
+        found.append("indel")
+    # low VAF of the call that exists (truth call of an FN, query call of an FP)
+    vaf_text = row.get("truth_vaf" if row["status"] == "FN" else "query_vaf", "NA")
+    try:
+        vaf = float(vaf_text)
+    except (TypeError, ValueError):
+        vaf = None
+    if vaf is not None and vaf < low_vaf:
+        found.append("low_vaf")
+    # repeat (microsatellite) region and every stratification the variant overlaps
+    if row.get("in_repeat") == "yes":
+        found.append("in_repeat")
+    found += [name for name in strata if row.get(name) == "yes"]
+    return found
+
+
+def add_context_reasons(rows, header, strata, args):
+    """Append the context reasons to the column reasons of every FN and FP row."""
+    missing = [c for c in ("reasons", "status", "type") if c not in header]
+    if missing:
+        sys.exit(
+            f"ERROR: {args.table}: --context-reasons needs the column(s) {', '.join(missing)} "
+            "(table of classify_discordance.py)"
+        )
+    counts = {}
+    for row in rows:
+        if row["status"] not in ("FN", "FP"):
+            continue
+        extra = context_reasons(row, strata, args.low_vaf)
+        row["reasons"] = ",".join(row["reasons"].split(",") + extra)
+        for reason in extra:
+            counts[reason] = counts.get(reason, 0) + 1
+    print(f"INFO: context reasons of the discordant variants: {counts}", file=sys.stderr)
+
+
 def merge(args):
     """Annotated table: input columns + VEP, repeat and stratification columns."""
     header, rows = read_table(args.table)
@@ -339,6 +393,9 @@ def merge(args):
         new_columns.append(name)
         n_yes = sum(1 for row in rows if row[name] == "yes")
         print(f"INFO: stratum {name}: {n_yes} of {n} variants inside", file=sys.stderr)
+    # context reasons of the discordant variants (from the columns just added)
+    if args.context_reasons:
+        add_context_reasons(rows, header, [item.split("=", 1)[0] for item in args.stratum], args)
     with open(args.output, "w", newline="") as fh:
         writer = csv.DictWriter(
             fh, fieldnames=header + new_columns, delimiter="\t", lineterminator="\n"
@@ -366,6 +423,12 @@ def main():
     m.add_argument("--vep", help="bcftools +split-vep TSV")
     m.add_argument("--repeats", help="bedtools map result with the repeat BED")
     m.add_argument("--stratum", nargs="*", default=[], help="NAME=bedtools intersect -c result")
+    m.add_argument(
+        "--context-reasons",
+        action="store_true",
+        help="add indel, low_vaf, in_repeat and the strata to the reasons of FN/FP rows",
+    )
+    m.add_argument("--low-vaf", type=float, default=0.1, help="low_vaf: VAF of the call below this")
     m.add_argument("--output", required=True)
     args = parser.parse_args()
     {"to-vcf": to_vcf, "to-bed": to_bed, "repeats-to-bed": repeats_to_bed, "merge": merge}[

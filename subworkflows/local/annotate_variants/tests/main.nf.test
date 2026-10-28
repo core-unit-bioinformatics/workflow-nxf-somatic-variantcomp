@@ -19,12 +19,13 @@ nextflow_workflow {
                 // intergenic on chr2; the same variant twice (two comparisons)
                 def table = file("${outputDir}/variants.tsv")
                 table.parent.mkdirs()
+                // columns of the discordance table that the context reasons need
                 table.text = [
-                    'comparison\\tchrom\\tpos\\tref\\talt',
-                    'S1_wes\\tchr1\\t4100\\tA\\tC',
-                    'S1_panel\\tchr1\\t4100\\tA\\tC',
-                    'S1_wes\\tchr1\\t4999\\tGA\\tG',
-                    'S1_wes\\tchr2\\t15000\\tA\\tC',
+                    'comparison\\tchrom\\tpos\\tref\\talt\\tstatus\\ttype\\ttruth_vaf\\tquery_vaf\\treasons',
+                    'S1_wes\\tchr1\\t4100\\tA\\tC\\tTP\\tSNV\\t0.3\\t0.3\\tconcordant',
+                    'S1_panel\\tchr1\\t4100\\tA\\tC\\tTP\\tSNV\\t0.3\\t0.3\\tconcordant',
+                    'S1_wes\\tchr1\\t4999\\tGA\\tG\\tFN\\tDEL\\t0.05\\tNA\\tno_evidence',
+                    'S1_wes\\tchr2\\t15000\\tA\\tC\\tFP\\tSNV\\tNA\\t0.3\\tabsent',
                 ].join('\\n') + '\\n'
                 input[0] = channel.of([[id: 'variants'], table])
                 input[1] = channel.value([[id: 'synthetic'], file(base + 'reference/synthetic.fa'), file(base + 'reference/synthetic.fa.fai'), []])
@@ -57,6 +58,9 @@ nextflow_workflow {
                 { assert rows[0].consequence_group in ['synonymous', 'non_synonymous'] },
                 { assert rows[2].gene == 'GENE_B' && rows[2].variant_class == 'deletion' },
                 { assert rows[2].homopolymer == 'yes' && rows[0].homopolymer == 'no' },
+                // context reasons of the discordant rows (TP rows unchanged)
+                { assert rows[2].reasons == 'no_evidence,indel,low_vaf,in_repeat,homopolymer' },
+                { assert rows[3].reasons == 'absent' && rows[0].reasons == 'concordant' },
                 { assert rows[3].gene == '.' && rows[3].consequence_group == 'other' },
                 // --hgvs (default --vep_args): HGVS columns; IDs only with a cache ('.')
                 { assert ['transcript', 'hgvsc', 'hgvsp', 'dbsnp', 'cosmic', 'clin_sig'].every { c -> c in header } },
@@ -74,7 +78,7 @@ nextflow_workflow {
                 def base = params.pipelines_testdata_base_path + 'synthetic/'
                 def table = file("${outputDir}/variants.tsv")
                 table.parent.mkdirs()
-                table.text = 'comparison\\tchrom\\tpos\\tref\\talt\\nS1_wes\\tchr1\\t4999\\tGA\\tG\\n'
+                table.text = 'comparison\\tchrom\\tpos\\tref\\talt\\tstatus\\ttype\\ttruth_vaf\\tquery_vaf\\treasons\\nS1_wes\\tchr1\\t4999\\tGA\\tG\\tFN\\tDEL\\t0.3\\tNA\\tno_evidence\\n'
                 input[0] = channel.of([[id: 'variants'], table])
                 input[1] = channel.value([[id: 'synthetic'], file(base + 'reference/synthetic.fa'), file(base + 'reference/synthetic.fa.fai'), []])
                 input[2] = channel.of([[id: 'homopolymer', role: 'stratum'], file(base + 'bed/stratification_homopolymer.bed')])
@@ -92,8 +96,9 @@ nextflow_workflow {
             def lines = path(workflow.out.annotated[0][1]).readLines()
             assertAll(
                 { assert workflow.success },
-                { assert lines[0] == 'comparison\tchrom\tpos\tref\talt\thomopolymer' },
-                { assert lines[1] == 'S1_wes\tchr1\t4999\tGA\tG\tyes' },
+                { assert lines[0] == 'comparison\tchrom\tpos\tref\talt\tstatus\ttype\ttruth_vaf\tquery_vaf\treasons\thomopolymer' },
+                // context: indel and the stratum (no VEP, no repeats)
+                { assert lines[1] == 'S1_wes\tchr1\t4999\tGA\tG\tFN\tDEL\t0.3\tNA\tno_evidence,indel,homopolymer\tyes' },
                 { assert workflow.out.multiqc.size() == 0 }
             )
         }

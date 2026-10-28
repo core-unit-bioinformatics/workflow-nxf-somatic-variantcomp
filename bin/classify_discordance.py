@@ -2,44 +2,41 @@
 """Explain the discordant variants of one truth/query comparison.
 
 Input is the per-variant table of benchmark_metrics.py (status TP, FN or FP).
-For a variant missing in one technology ("other" = query for FN, truth for FP),
-the script looks for the reason in this order (the first that applies is used):
+A variant missing in one technology ("other" = the query for an FN, the truth for an FP)
+gets reasons from the view of that other technology.
 
-  filtered_non_pass      the other technology has the call (same CHROM, POS, REF,
-                         ALT) in its normalized VCF (all records), but its FILTER is
-                         not PASS (the FILTER value is in other_filter); with
-                         --filter_pass_only such calls are not compared
-  present_but_filtered   the other technology has the call with FILTER PASS, but it
-                         failed the uniform thresholds (--min_vaf, --min_depth,
-                         --min_alt_reads) or lies outside the comparison region. Calls outside the comparison region end up here,
-                         too; the comparison region is the same for both
-                         technologies of a sample, so a separate
-                         `outside_callable` class can't occur.
-  germline_in_normal     the normal alignments (summed) have alt reads
-                         (alt reads >= --min-alt-reads and VAF >= --germline-vaf):
-                         likely a germline variant, so a somatic call is expected
-                         to be missing in the technology that saw the normal reads
-  absent                 the other technology has no call and no tumor alignment
-                         was given to look further
-  low_coverage           the other technology's tumor depth < --min-coverage
-  subthreshold_evidence  the other tumor alignment has >= 1 alt read, but the
-                         variant wasn't called
-  no_evidence            the other tumor alignment has no alt read
-TP variants get the class `concordant`.
+The main reason (column `class`) describes the call and the reads of the other
+technology. Exactly one applies; they exclude each other:
+  called, but not compared (the call is in its normalized VCF, same CHROM, POS, REF, ALT):
+    filtered_non_pass      FILTER is not PASS (value in other_filter); with
+                           --filter_pass_only only PASS calls are compared
+    present_but_filtered   FILTER PASS, but the call failed the uniform thresholds
+                           (--min_vaf, --min_depth, --min_alt_reads) or lies outside the
+                           comparison region (the region is the same for both
+                           technologies of a sample, so there is no separate
+                           `outside_callable` reason)
+  not called (no record with these alleles in the normalized VCF):
+    absent                 no tumor alignment to look further (none given, or
+                           --read_evidence false)
+    low_coverage           tumor depth at the variant < --min-coverage
+    subthreshold_evidence  depth >= --min-coverage and >= 1 read with the alt allele
+    no_evidence            depth >= --min-coverage and no read with the alt allele
+TP variants get `concordant`.
 
-Several reasons can apply to one variant (e.g. a non-PASS call at a position with low
-depth, or germline evidence in the normal together with alt reads in the tumor). The
-column `reasons` lists all that apply, comma-separated, in the order above, so its first
-entry is always `class`. Exclusive pairs: filtered_non_pass / present_but_filtered (FILTER
-of the call), absent / low_coverage / subthreshold_evidence / no_evidence need a tumor
-alignment (absent is only listed if no other reason applies), and
-subthreshold_evidence / no_evidence (alt reads or not). low_coverage can come together
-with subthreshold_evidence or no_evidence. TP variants get `concordant`.
+Further reasons that can come in addition to the main reason (column `reasons` = the
+main reason first, then these, comma-separated):
+    germline_in_normal     the normal alignments (summed) show the alt allele (alt reads
+                           >= --min-alt-reads and VAF >= --germline-vaf): likely a
+                           germline variant (or a contaminated normal)
+Context reasons (indel, low VAF, repeat, GIAB and other stratifications) need the
+annotation and are added by `annotate_variants.py merge --context-reasons`.
 
-Read evidence comes from VCFs of `bcftools mpileup -a AD,DP` + `bcftools call -m
---keep-alts` + `bcftools norm -m-any` (one VCF per alignment, one sample each):
-alt reads are matched by (CHROM, POS, REF, ALT), depth by (CHROM, POS) (the
-largest DP of all records at the position).
+Read evidence comes from read_evidence.py (one VCF per alignment, one sample each, one
+record per variant: FORMAT/DP, AD = REF and ALT reads, OT = reads with another allele):
+reads and depth are matched by (CHROM, POS, REF, ALT); a variant without a record has
+depth 0.
+Indels are counted by their haplotype sequence, so the count doesn't depend on how the
+aligner placed the indel.
 
 For truth variants (TP and FN), the script also computes the detection power of
 the query: P(X >= --power-min-alt) with X ~ Binomial(query tumor depth, truth VAF).
@@ -52,7 +49,10 @@ columns (other_tumor_dp, other_tumor_alt, normal_*, query_power, detectable) are
 written.
 
 Outputs (--prefix):
-  <prefix>.discordance.tsv  input table + class and evidence columns
+  <prefix>.discordance.tsv  input table + class, reasons and evidence columns
+                            (other_tumor_dp, other_tumor_alt, other_tumor_other: depth, alt
+                            reads and reads with another allele of the other technology's
+                            tumor alignment; normal_*: summed over the normal alignments)
   <prefix>.power.tsv        power-adjusted recall (one metrics row)
 
 Why a script: the classification combines the normalized calls, the read evidence of
@@ -72,6 +72,7 @@ REQUIRED_COLUMNS = ["sample", "truth", "query", "status", "chrom", "pos", "ref",
 EVIDENCE_COLUMNS = [
     "other_tumor_dp",
     "other_tumor_alt",
+    "other_tumor_other",
     "normal_dp",
     "normal_alt",
     "normal_vaf",
@@ -86,12 +87,16 @@ EXTRA_COLUMNS = [
     "other_vaf_normalized",
     "other_tumor_dp",
     "other_tumor_alt",
+    "other_tumor_other",
     "normal_dp",
     "normal_alt",
     "normal_vaf",
     "query_power",
     "detectable",
 ]
+# the main reasons (exclusive) and the further reasons of this script
+CALLED = ("filtered_non_pass", "present_but_filtered")
+NOT_CALLED = ("absent", "low_coverage", "subthreshold_evidence", "no_evidence")
 
 
 def detection_power(depth, vaf, min_alt):
@@ -118,27 +123,40 @@ def load_calls(path):
                 f"ERROR: {path}: INFO/VC_T_VAF is not defined; expected a VCF harmonized "
                 "by harmonize_vcf.py"
             )
+        collisions = 0
         for rec in vcf:
             for alt in rec.alts or ():
+                key = (rec.chrom, rec.pos, rec.ref, alt)
                 # FILTER as written in the VCF ('PASS', or the failed filters joined by ';')
-                calls[(rec.chrom, rec.pos, rec.ref, alt)] = (
-                    ";".join(rec.filter.keys()) or ".",
-                    rec.info.get("VC_T_VAF"),
-                )
-    print(f"INFO: {path}: {len(calls)} normalized calls", file=sys.stderr)
+                call = (";".join(rec.filter.keys()) or ".", rec.info.get("VC_T_VAF"))
+                if key in calls:
+                    # the same allele twice (e.g. a PASS and a non-PASS record after
+                    # atomizing): a PASS call wins, so the variant counts as called PASS
+                    collisions += 1
+                    if calls[key][0] in ("PASS", "."):
+                        continue
+                calls[key] = call
+    print(
+        f"INFO: {path}: {len(calls)} normalized calls ({collisions} alleles in more than one "
+        "record; PASS kept)",
+        file=sys.stderr,
+    )
     return calls
 
 
 def load_evidence(path):
-    """Pileup evidence of one alignment: ({(chrom, pos, ref, alt): alt reads}, {(chrom, pos): depth})."""
-    alts, depth = {}, {}
+    """Read evidence of one alignment (read_evidence.py): ({(chrom, pos, ref, alt): alt
+    reads}, {(chrom, pos, ref, alt): depth}, {(chrom, pos, ref, alt): reads with another
+    allele}). The depth is the variant's own (an indel counts the reads spanning its
+    window), not the largest depth at the position."""
+    alts, depth, others = {}, {}, {}
     with pysam.VariantFile(path) as vcf:
-        # one alignment = one sample; AD must be annotated (mpileup -a AD)
+        # one alignment = one sample with FORMAT/AD (read_evidence.py)
         samples = list(vcf.header.samples)
         if len(samples) != 1:
             sys.exit(f"ERROR: {path}: expected one sample (one alignment), found {len(samples)}")
         if "AD" not in vcf.header.formats:
-            sys.exit(f"ERROR: {path}: FORMAT/AD is not defined; run bcftools mpileup with -a AD,DP")
+            sys.exit(f"ERROR: {path}: FORMAT/AD is not defined; expected read_evidence.py output")
         sample = samples[0]
         for rec in vcf:
             fmt = rec.samples[sample]
@@ -147,36 +165,42 @@ def load_evidence(path):
             # depth: FORMAT/DP, else the sum of the allelic depths
             if dp is None and ad is not None:
                 dp = sum(x for x in ad if x is not None)
-            # several records at one position (split alleles): keep the largest depth
+            # depth of this variant (one ALT per record in read_evidence.py)
             if dp is not None:
-                depth[(rec.chrom, rec.pos)] = max(depth.get((rec.chrom, rec.pos), 0), dp)
+                for alt in rec.alts or ():
+                    depth[(rec.chrom, rec.pos, rec.ref, alt)] = dp
             # alt reads of each non-symbolic ALT allele (AD index i = ALT i)
             for i, alt in enumerate(rec.alts or (), start=1):
                 if alt.startswith("<") or ad is None or i >= len(ad) or ad[i] is None:
                     continue
                 alts[(rec.chrom, rec.pos, rec.ref, alt)] = ad[i]
+                # reads with another allele (FORMAT/OT of read_evidence.py, one ALT per record)
+                if i == 1 and "OT" in rec.format and fmt.get("OT") is not None:
+                    others[(rec.chrom, rec.pos, rec.ref, alt)] = fmt.get("OT")
     print(f"INFO: {path}: evidence at {len(depth)} positions", file=sys.stderr)
-    return alts, depth
+    return alts, depth, others
 
 
 def evidence_at(evidence, key):
-    """(depth, alt reads) at a variant; 0 if the pileup has no record; (None, None) without alignment."""
+    """(depth, alt reads, other-allele reads) at a variant; 0 if the evidence has no record
+    there; (None, None, None) without alignment."""
     if evidence is None:
-        return None, None
-    alts, depth = evidence
-    return depth.get(key[:2], 0), alts.get(key, 0)
+        return None, None, None
+    alts, depth, others = evidence
+    return depth.get(key, 0), alts.get(key, 0), others.get(key, 0)
 
 
 def merge_evidence(paths):
     """Sum the normal evidence over several alignments (normals of truth and query)."""
     if not paths:
         return None
-    merged_alts, merged_depth = Counter(), Counter()
+    merged_alts, merged_depth, merged_others = Counter(), Counter(), Counter()
     for path in paths:
-        alts, depth = load_evidence(path)
+        alts, depth, others = load_evidence(path)
         merged_alts.update(alts)
         merged_depth.update(depth)
-    return dict(merged_alts), dict(merged_depth)
+        merged_others.update(others)
+    return dict(merged_alts), dict(merged_depth), dict(merged_others)
 
 
 def fmt(value, digits=4):
@@ -223,15 +247,14 @@ def read_variants(path, sample, truth, query):
     return rows
 
 
-def classify(status, in_other, other_filter, tumor_dp, tumor_alt, normal_alt, normal_vaf, args):
-    """Discordance class of one variant (see the module docstring for the order)."""
+def classify(status, in_other, other_filter, tumor_dp, tumor_alt, args):
+    """Main reason of one variant (exactly one; see the module docstring)."""
     if status == "TP":
         return "concordant"
-    # the other technology called it: non-PASS FILTER, or removed by the uniform filters
+    # the other technology called it: the FILTER decides between the two called reasons
     if in_other:
         return "filtered_non_pass" if other_filter not in ("PASS", ".") else "present_but_filtered"
-    if (normal_alt or 0) >= args.min_alt_reads and (normal_vaf or 0) >= args.germline_vaf:
-        return "germline_in_normal"
+    # not called: what the other technology's tumor reads show
     if tumor_dp is None:
         return "absent"
     if tumor_dp < args.min_coverage:
@@ -241,29 +264,15 @@ def classify(status, in_other, other_filter, tumor_dp, tumor_alt, normal_alt, no
     return "no_evidence"
 
 
-def reasons(status, in_other, other_filter, tumor_dp, tumor_alt, normal_alt, normal_vaf, args):
-    """Every discordance reason that applies to one variant, in the order of classify()
-    (so the first one is the class); ['concordant'] for TP."""
-    if status == "TP":
+def reasons(main_reason, normal_alt, normal_vaf, args):
+    """The reasons of one variant: the main reason first, then germline_in_normal if the
+    normals show the alt allele; ['concordant'] for TP."""
+    if main_reason == "concordant":
         return ["concordant"]
-    found = []
-    # the other technology called it: the FILTER decides between the two classes
-    if in_other:
-        found.append(
-            "filtered_non_pass" if other_filter not in ("PASS", ".") else "present_but_filtered"
-        )
-    # alt reads in the normal(s): likely germline
+    found = [main_reason]
+    # alt reads in the normal(s): likely germline (in addition to the main reason)
     if (normal_alt or 0) >= args.min_alt_reads and (normal_vaf or 0) >= args.germline_vaf:
         found.append("germline_in_normal")
-    if tumor_dp is None:
-        # no tumor alignment: 'absent' only if nothing else explains the difference
-        if not found:
-            found.append("absent")
-        return found
-    # depth and alt reads of the tumor alignment of the technology that misses the variant
-    if tumor_dp < args.min_coverage:
-        found.append("low_coverage")
-    found.append("subthreshold_evidence" if tumor_alt > 0 else "no_evidence")
     return found
 
 
@@ -335,22 +344,18 @@ def main():
         )
         in_other = key in other_calls
         other_filter, other_vaf = other_calls.get(key, ("NA", None))
-        tumor_dp, tumor_alt = evidence_at(other_tumor, key)
-        normal_dp, normal_alt = evidence_at(normals, key)
+        tumor_dp, tumor_alt, tumor_other = evidence_at(other_tumor, key)
+        normal_dp, normal_alt, _ = evidence_at(normals, key)
         normal_vaf = normal_alt / normal_dp if normal_dp else None
-        row_class = classify(
-            status, in_other, other_filter, tumor_dp, tumor_alt, normal_alt, normal_vaf, args
-        )
+        # main reason (exactly one), then the further reasons
+        row_class = classify(status, in_other, other_filter, tumor_dp, tumor_alt, args)
         classes[(status, row_class)] += 1
-        # all reasons that apply (the first one is the class)
-        row_reasons = reasons(
-            status, in_other, other_filter, tumor_dp, tumor_alt, normal_alt, normal_vaf, args
-        )
+        row_reasons = reasons(row_class, normal_alt, normal_vaf, args)
 
         # detection power of the query for truth variants (needs the query tumor depth)
         power, detectable = None, None
         if status in ("TP", "FN"):
-            query_dp, _ = evidence_at(query_tumor, key)
+            query_dp, _, _ = evidence_at(query_tumor, key)
             truth_vaf = to_float(row["truth_vaf"], f"{args.variants}: line {i}: truth_vaf")
             if query_dp is not None and truth_vaf is not None:
                 power = detection_power(query_dp, truth_vaf, args.power_min_alt)
@@ -368,6 +373,7 @@ def main():
                 "other_vaf_normalized": fmt(other_vaf),
                 "other_tumor_dp": fmt(tumor_dp),
                 "other_tumor_alt": fmt(tumor_alt),
+                "other_tumor_other": fmt(tumor_other),
                 "normal_dp": fmt(normal_dp),
                 "normal_alt": fmt(normal_alt),
                 "normal_vaf": fmt(normal_vaf),

@@ -203,3 +203,61 @@ def test_missing_table_column_is_an_error(tmp_path):
     )
     assert proc.returncode == 1
     assert "missing column(s) pos, ref, alt" in proc.stderr
+
+
+def test_to_bed_insertion_includes_the_next_base(tmp_path):
+    # a left-aligned insertion has only its anchor base in REF; the next base decides
+    # whether it lies in a repeat (audit: chr2:2999 G>GCA before a CA repeat)
+    table = "chrom\tpos\tref\talt\nchr2\t2999\tG\tGCA\nchr2\t2500\tCTAG\tC\n"
+    out = tmp_path / "v.bed"
+    proc = run("to-bed", "--table", write(tmp_path / "v.tsv", table), "--output", str(out))
+    assert proc.returncode == 0, proc.stderr
+    assert out.read_text() == "chr2\t2998\t3000\t1\nchr2\t2499\t2503\t2\n"
+
+
+def test_merge_context_reasons(tmp_path):
+    table = write(
+        tmp_path / "v.tsv",
+        "chrom\tpos\tref\talt\tstatus\ttype\ttruth_vaf\tquery_vaf\treasons\n"
+        "chr1\t100\tA\tC\tTP\tSNV\t0.3\t0.3\tconcordant\n"
+        "chr1\t200\tGTT\tG\tFN\tDEL\t0.05\tNA\tno_evidence,germline_in_normal\n"
+        "chr1\t300\tA\tC\tFP\tSNV\tNA\t0.4\tfiltered_non_pass\n",
+    )
+    repeats = write(
+        tmp_path / "rep.bed",
+        "chr1\t99\t100\t1\t.\t.\nchr1\t199\t202\t2\tT\t9\nchr1\t299\t300\t3\t.\t.\n",
+    )
+    hp = write(
+        tmp_path / "hp.bed", "chr1\t99\t100\t1\t1\nchr1\t199\t202\t2\t2\nchr1\t299\t300\t3\t0\n"
+    )
+    out = tmp_path / "a.tsv"
+    proc = run(
+        "merge",
+        "--table",
+        table,
+        "--repeats",
+        repeats,
+        "--stratum",
+        f"giab_homopolymer={hp}",
+        "--context-reasons",
+        "--low-vaf",
+        "0.1",
+        "--output",
+        str(out),
+    )
+    assert proc.returncode == 0, proc.stderr
+    tp, fn, fp = rows_of(out)
+    # TP: no reasons added (in a homopolymer, but concordant)
+    assert tp["reasons"] == "concordant"
+    # FN: main reason, germline, then indel, low VAF (truth VAF 0.05), repeat, stratum
+    assert (
+        fn["reasons"] == "no_evidence,germline_in_normal,indel,low_vaf,in_repeat,giab_homopolymer"
+    )
+    # FP: query VAF 0.4, not in a repeat or the stratum: nothing added
+    assert fp["reasons"] == "filtered_non_pass"
+
+
+def test_merge_context_reasons_needs_reasons_column(tmp_path):
+    table = write(tmp_path / "v.tsv", "chrom\tpos\tref\talt\nchr1\t100\tA\tC\n")
+    proc = run("merge", "--table", table, "--context-reasons", "--output", str(tmp_path / "a.tsv"))
+    assert proc.returncode == 1 and "needs the column(s) reasons, status, type" in proc.stderr

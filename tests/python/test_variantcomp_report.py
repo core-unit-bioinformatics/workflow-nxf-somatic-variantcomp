@@ -35,6 +35,7 @@ def variants():
     df["sample"], df["truth"], df["query"] = "S1", "wgs", "wes"
     df["pos"] = range(len(df))
     df["class"] = np.where(df["status"] == "TP", "concordant", "absent")
+    df["reasons"] = df["class"]
     return df
 
 
@@ -123,16 +124,45 @@ def comparison_rows():
         "truth_vaf": 0.3,
     }
     rows = [
-        {**base, "query": "wes", "pos": 100, "status": "TP", "class": "concordant"},
-        {**base, "query": "panel", "pos": 100, "status": "TP", "class": "concordant"},
-        {**base, "query": "wes", "pos": 200, "status": "TP", "class": "concordant"},
-        {**base, "query": "panel", "pos": 200, "status": "FN", "class": "absent"},
+        {
+            **base,
+            "query": "wes",
+            "pos": 100,
+            "status": "TP",
+            "class": "concordant",
+            "reasons": "concordant",
+        },
+        {
+            **base,
+            "query": "panel",
+            "pos": 100,
+            "status": "TP",
+            "class": "concordant",
+            "reasons": "concordant",
+        },
+        {
+            **base,
+            "query": "wes",
+            "pos": 200,
+            "status": "TP",
+            "class": "concordant",
+            "reasons": "concordant",
+        },
+        {
+            **base,
+            "query": "panel",
+            "pos": 200,
+            "status": "FN",
+            "class": "absent",
+            "reasons": "absent,in_repeat",
+        },
         {
             **base,
             "query": "wes",
             "pos": 300,
             "status": "FP",
             "class": "no_evidence",
+            "reasons": "no_evidence",
             "truth_vaf": None,
         },
     ]
@@ -148,9 +178,9 @@ def test_truth_variants_found_per_query():
         v2["queries"],
         v2["found_wes"],
         v2["found_panel"],
-        v2["class_panel"],
-        v2["class_wes"],
-    ) == (1, 2, "yes", "no", "absent", ".")
+        v2["reasons_panel"],
+        v2["reasons_wes"],
+    ) == (1, 2, "yes", "no", "absent,in_repeat", ".")
 
 
 def test_annotation_counts_per_set():

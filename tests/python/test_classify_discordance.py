@@ -50,7 +50,7 @@ def run(tmp_path):
         # status, pos, ref, alt, truth_vaf
         ("TP", 100, "A", "C", "0.30"),
         ("FN", 200, "A", "C", "0.30"),  # filtered in query
-        ("FN", 300, "A", "C", "0.30"),  # alt reads in normal -> germline
+        ("FN", 300, "A", "C", "0.30"),  # no alt read in query; alt reads in normal -> germline
         ("FN", 400, "A", "C", "0.30"),  # low coverage in query
         ("FN", 500, "A", "C", "0.02"),  # 1 alt read in query -> subthreshold; low power
         ("FN", 600, "A", "C", "0.30"),  # no alt read in query
@@ -125,10 +125,12 @@ def run(tmp_path):
 
 def test_classes(run):
     rows, _ = run
-    assert {pos: r["class"] for pos, r in rows.items()} == {
+    assert {pos: r["reasons"] for pos, r in rows.items()} == {
         100: "concordant",
+        # called in the query, but FILTER not PASS (its reads don't matter)
         200: "filtered_non_pass",
-        300: "germline_in_normal",
+        # not called, no alt read in the query tumor; the normal has the alt allele
+        300: "no_evidence,germline_in_normal",
         400: "low_coverage",
         500: "subthreshold_evidence",
         600: "no_evidence",
@@ -138,30 +140,45 @@ def test_classes(run):
     assert rows[300]["normal_alt"] == "48"
 
 
-def test_first_reason_is_the_class(run):
+def test_main_reason_is_the_class_and_first_reason(run):
     rows, _ = run
     for row in rows.values():
         assert row["reasons"].split(",")[0] == row["class"]
 
 
-def test_reasons_lists_every_reason_that_applies():
-    args = argparse.Namespace(min_coverage=10, min_alt_reads=2, germline_vaf=0.1)
-    reasons = classify_discordance.reasons
-    # non-PASS call at a position with low depth and alt reads
-    assert reasons("FN", True, "weak_evidence", 5, 2, 0, 0.0, args) == [
-        "filtered_non_pass",
-        "low_coverage",
-        "subthreshold_evidence",
-    ]
-    # germline evidence in the normal and alt reads in the tumor
-    assert reasons("FP", False, "NA", 50, 4, 10, 0.4, args) == [
-        "germline_in_normal",
-        "subthreshold_evidence",
-    ]
-    # no alignment: absent only if nothing else applies
-    assert reasons("FN", False, "NA", None, None, None, None, args) == ["absent"]
-    assert reasons("FN", True, "PASS", None, None, None, None, args) == ["present_but_filtered"]
-    assert reasons("TP", True, "PASS", 50, 10, 0, 0.0, args) == ["concordant"]
+ARGS = argparse.Namespace(min_coverage=10, min_alt_reads=2, germline_vaf=0.1)
+
+
+def test_called_variant_gets_no_read_evidence_reason():
+    classify = classify_discordance.classify
+    # a non-PASS call with low depth and alt reads is filtered_non_pass only
+    assert classify("FN", True, "weak_evidence", 5, 2, ARGS) == "filtered_non_pass"
+    assert classify("FN", True, "PASS", None, None, ARGS) == "present_but_filtered"
+    assert classify("TP", True, "PASS", 50, 10, ARGS) == "concordant"
+
+
+def test_exactly_one_main_reason_for_every_combination():
+    called = set(classify_discordance.CALLED)
+    not_called = set(classify_discordance.NOT_CALLED)
+    for in_other in (True, False):
+        for flt in ("PASS", "weak_evidence"):
+            for dp, alt in ((None, None), (0, 0), (5, 0), (5, 3), (50, 0), (50, 1)):
+                for n_alt, n_vaf in ((0, 0.0), (10, 0.4)):
+                    main = classify_discordance.classify("FN", in_other, flt, dp, alt, ARGS)
+                    found = classify_discordance.reasons(main, n_alt, n_vaf, ARGS)
+                    mains = [r for r in found if r in called | not_called]
+                    # exactly one main reason, the first one; called iff in the other VCF
+                    assert mains == [found[0]] == [main]
+                    assert (main in called) == in_other
+                    # low_coverage / subthreshold / no_evidence follow depth and alt reads
+                    if not in_other and dp is not None:
+                        expected = (
+                            "low_coverage"
+                            if dp < 10
+                            else ("subthreshold_evidence" if alt else "no_evidence")
+                        )
+                        assert main == expected
+                    assert ("germline_in_normal" in found) == (n_alt >= 2 and n_vaf >= 0.1)
 
 
 def test_power(run):
