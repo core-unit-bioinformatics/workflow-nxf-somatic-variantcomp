@@ -226,7 +226,9 @@ nf-core-style pipelines.
      unfiltered normalized VCF is kept as well)
 - **Matching.**
   - Primary: `rtgtools vcfeval --squash-ploidy` (haplotype-aware).
-  - Also report exact-allele (`bcftools isec`) and position-only matches.
+  - Also report exact-allele (`bcftools isec`) and position-only matches, each with its
+    own published outputs and metrics (`benchmark/<tool>/`, column `method`), and the
+    isec status of every variant. All methods count the same records in the same region.
 - **Regions.**
   - N-way intersection of all target BEDs, with the optional
     `regions_bed` / `exclude_bed`.
@@ -237,16 +239,20 @@ nf-core-style pipelines.
 - **Metrics.** Report overall, by SNV/indel, by VAF bin, by stratum, and as
   power-adjusted recall. Aggregate micro (summed counts) and macro
   (mean ± sd) over samples.
-- **Discordance classes.**
-  - `absent`
-  - `filtered_non_pass` (called, but FILTER not PASS)
-  - `present_but_filtered` (PASS, but removed by the uniform filters/region)
-  - `no_evidence`
-  - `subthreshold_evidence`
-  - `germline_in_normal`
-  - `low_coverage`
-  - There is no `outside_callable` class: both technologies of a sample are
-    compared in the same region (open question in `docs/roadmap.md`).
+- **Reasons of discordant variants** (D38). Exactly one **main reason** (`class`, first
+  entry of `reasons`) from the view of the technology that misses the variant; they exclude
+  each other:
+  - called, not compared: `filtered_non_pass` (FILTER not PASS), `present_but_filtered`
+    (PASS, but removed by the uniform filters/region);
+  - not called: `absent` (no alignment), `low_coverage`, `subthreshold_evidence` (alt
+    reads), `no_evidence` (no alt reads). Read-evidence reasons never for called variants.
+  - **Further reasons** in addition: `germline_in_normal`, and the context `indel`,
+    `low_vaf`, `in_repeat`, `giab_<name>`, stratifications.
+  - `reasons` is what readers see; `consistency_checks.py` recomputes every rule.
+  - There is no `outside_callable` reason: both technologies of a sample are compared in
+    the same region (open question in `docs/roadmap.md`).
+- **Read evidence** is allele-specific (`read_evidence.py`): indels by haplotype sequence,
+  never by a pileup's own allele discovery (it reports other indel alleles than callers).
 - **No hardcoded paths, env vars or downloads** in the pipeline. All
   resources come in via params. It must run offline on an HPC (PBS Pro +
   Singularity).

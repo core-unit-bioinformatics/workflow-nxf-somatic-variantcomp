@@ -42,7 +42,7 @@ Tools that produce each output folder (citations in [`CITATIONS.md`](../CITATION
 | `coverage/` | `check_reference.py`, `mosdepth`, `mosdepth_callable.py`, `bedtools sort`, `bedtools multiinter`, `bedtools intersect`, `region_summary.py`, `coverage_summary.py` |
 | `vcf_preprocessed/` | `bcftools view`, `bcftools annotate`, `bcftools reheader`, `bcftools norm`, `harmonize_vcf.py`, `bcftools concat`, `variant_accounting.py` (pysam) |
 | `benchmark/` | `rtg vcfeval`, `bcftools isec`, `benchmark_metrics.py`, `aggregate_metrics.py` |
-| `discordance/` | `bcftools query`, `bcftools mpileup` + `bcftools call`, `bcftools norm`, `classify_discordance.py`, `annotate_variants.py` |
+| `discordance/` | `bcftools query`, `read_evidence.py` (pysam), `classify_discordance.py`, `annotate_variants.py` |
 | `annotation/` | Ensembl VEP, `bcftools +split-vep`, msisensor-pro, `bedtools map`, `bedtools intersect` |
 | `known_variants/` | `known_variants.py`, `bcftools norm`, `bcftools isec`, `rtg vcfeval`, `benchmark_metrics.py`, `known_summary.py` |
 | `report/` | `variantcomp_report.py` (pandas, SciPy, Matplotlib), `consistency_checks.py`, `report_content.py` (pandas), datavzrd, `report_bundle.py` |
@@ -274,25 +274,54 @@ VAF), `depth_DP`, `depth_AD_sum`, `depth_none`, `af_nan` (FORMAT/AF was NaN).
 <details markdown="1">
 <summary>Output files</summary>
 
-- `benchmark/metrics.aggregated.tsv`: **main result**: per truth/query technology and
-  stratum, over all samples (columns below).
-- `benchmark/metrics.per_pair.tsv`: the metrics of every sample and technology pair.
-- `benchmark/<sample>/<sample>_<truth>_vs_<query>.metrics.tsv`: the metrics of one pair.
-- `benchmark/<sample>/<sample>_<truth>_vs_<query>.variants.tsv`: every compared variant of
-  the pair (columns below).
-- `benchmark/<sample>/vcfeval/`: rtg vcfeval output per pair (`*.tp.vcf.gz`,
-  `*.tp-baseline.vcf.gz`, `*.fn.vcf.gz`, `*.fp.vcf.gz`, `*.summary.txt`, ROC tables over
-  the tumor VAF).
-- `benchmark/power.aggregated.tsv`, `benchmark/power.per_pair.tsv`: power-adjusted recall (same columns,
-  stratum type `power_adjusted`); `NA` without read evidence.
+Every matching method has its own folder, named by the tool:
+
+- `benchmark/rtgtools_vcfeval/<sample>/<pair>/`: rtg vcfeval output (`*.tp-baseline.vcf.gz`:
+  truth variants found, `*.fn.vcf.gz`: truth variants missed, `*.tp.vcf.gz`: query calls
+  matching a truth variant, `*.fp.vcf.gz`: query calls without, `*.summary.txt`, ROC tables
+  over the tumor VAF). `<pair>` = `<sample>_<truth>_vs_<query>`.
+- `benchmark/bcftools_isec_exact/<sample>/<pair>/`: `bcftools isec --collapse none` (same
+  CHROM, POS, REF, ALT): `sites.txt` (CHROM, POS, REF, ALT, flags truth/query: `10` truth
+  only, `01` query only, `11` both), `0000.vcf.gz` (truth only), `0001.vcf.gz` (query
+  only), `0002.vcf.gz`/`0003.vcf.gz` (in both, truth and query records), `README.txt`.
+- `benchmark/bcftools_isec_position/<sample>/<pair>/`: the same with `--collapse all`
+  (same CHROM and POS, any allele).
+- `benchmark/metrics/`: recall, precision and F1 of every method:
+  - `metrics.aggregated.tsv`: **main result**, per method, truth/query technology and
+    stratum, over all samples (columns below); `metrics.per_pair.tsv`: every sample and
+    technology pair;
+  - `metrics.rtgtools_vcfeval.{aggregated,per_pair}.tsv`,
+    `metrics.bcftools_isec_exact.{aggregated,per_pair}.tsv`,
+    `metrics.bcftools_isec_position.{aggregated,per_pair}.tsv`: the same, one method each;
+  - `power.aggregated.tsv`, `power.per_pair.tsv` (and `power.rtgtools_vcfeval.*`):
+    power-adjusted recall (stratum type `power_adjusted`); `NA` without read evidence;
+  - `<sample>/<pair>.metrics.tsv`: the metrics of one pair; `<sample>/<pair>.variants.tsv`:
+    every compared variant of the pair with its status per method (columns below).
 
 </details>
 
 The truth technology's calls are the baseline and every other technology is compared with
 it. With `--comparison_mode all_pairs`, all other technologies are also compared pairwise
-(the alphabetically first technology is the baseline). Matching uses `rtg vcfeval`
-(haplotype-aware, `--squash-ploidy`, `--decompose`), so different representations of the
-same variant still match.
+(the alphabetically first technology is the baseline). Three matching methods are
+computed from the same compared VCFs (same records, same region):
+
+- **RTG vcfeval** (main result; `--squash-ploidy`, `--decompose`): haplotype-aware, so
+  different representations of the same haplotype match (e.g. two SNVs against a
+  deletion + insertion that give the same sequence). All strata (variant type, VAF) and the
+  discordance analysis use this method.
+- **bcftools isec, same allele** (`--collapse none`): a match needs the same CHROM, POS, REF
+  and ALT, counted per record.
+- **bcftools isec, same position** (`--collapse all`): a match needs the same CHROM and POS,
+  counted per position (several alleles at one position count once).
+
+All VCFs are normalized the same way before (split, left-aligned, MNVs atomized, complex
+variants decomposed by `bcftools norm --atomize`), so most representation differences are
+already removed and the methods often give the same numbers. They differ where a haplotype
+is called as different events (vcfeval matches, same-allele isec doesn't), and where the
+technologies call different alleles at the same position (only same-position isec
+matches). The column `isec_exact` / `isec_position` of `*.variants.tsv` shows for every
+variant where the methods disagree. Tested with the synthetic events E06 and E15
+(`design.tsv` of the test data).
 
 `*.metrics.tsv` and `metrics.per_pair.tsv`:
 
@@ -308,7 +337,11 @@ same variant still match.
 | `precision` | float | `tp_call / (tp_call + fp)` |
 | `f1` | float | harmonic mean of recall and precision |
 
-`metrics.aggregated.tsv` has `truth`, `query`, `stratum_type`, `stratum`, `n_samples`
+`metrics.per_pair.tsv` and `metrics.aggregated.tsv` start with the column `method`
+(`rtgtools_vcfeval`, `bcftools_isec_exact`, `bcftools_isec_position`); the per-pair
+`<pair>.metrics.tsv` has no method column (the stratum shows it).
+
+`metrics.aggregated.tsv` has `method`, `truth`, `query`, `stratum_type`, `stratum`, `n_samples`
 (int), the four counts summed over the samples, `micro_recall`, `micro_precision`,
 `micro_f1` (float, from the summed counts) and `macro_recall_mean`, `macro_recall_sd`,
 `macro_precision_mean`, `macro_precision_sd`, `macro_f1_mean`, `macro_f1_sd` (float, mean
@@ -320,14 +353,15 @@ and standard deviation of the per-sample values; `NA` with fewer than 2 samples 
 | `variant_type` | `SNV`, `INDEL` | SNV includes atomized MNVs; INDEL includes insertions, deletions and complex variants |
 | `truth_vaf` | VAF bins (`--vaf_bins`), `unknown` | recall by the VAF of the truth call: the detection limit of the query |
 | `query_vaf` | VAF bins, `unknown` | precision by the VAF of the query call: low-VAF false positives |
-| `match` | `exact`, `position` | `bcftools isec`: same CHROM/POS/REF/ALT (per allele), same CHROM/POS (per position) |
+| `match` | `exact`, `position` | `bcftools isec` (method `bcftools_isec_exact` / `bcftools_isec_position`): same CHROM/POS/REF/ALT (per allele), same CHROM/POS (per position); all other strata are RTG vcfeval |
 
 `*.variants.tsv`:
 
 | Column | Type | Meaning |
 | --- | --- | --- |
 | `sample`, `truth`, `query` | text | the pair |
-| `status` | text | `TP`, `FN` (truth only) or `FP` (query only) |
+| `status` | text | RTG vcfeval: `TP`, `FN` (truth only) or `FP` (query only) |
+| `isec_exact`, `isec_position` | text | the status of the same record with bcftools isec, same allele / same position (`TP`, `FN`, `FP`; `NA` for a record vcfeval decomposed, which isec doesn't know) |
 | `chrom`, `pos`, `ref`, `alt` | contig, int, text, text | the variant (truth representation for TP/FN, query for FP) |
 | `type`, `length` | text, int | `SNV`, `MNV`, `INS`, `DEL`, `COMPLEX`; `len(ALT) - len(REF)` |
 | `truth_vaf`, `truth_dp`, `truth_alt` | float, int, int | values of the truth call (`NA` for FP) |
@@ -343,9 +377,10 @@ and standard deviation of the per-sample values; `NA` with fewer than 2 samples 
   the columns of `*.variants.tsv`, the discordance columns and the annotation columns below.
 - `discordance/<sample>/<sample>_<truth>_vs_<query>.discordance.tsv`: the same per
   comparison, without annotation.
-- `discordance/<sample>/evidence/<sample>_<technology>_<tumor|normal>.evidence.vcf.gz`:
-  allele counts (FORMAT/AD, FORMAT/DP) of every alignment at all compared positions of the
-  sample (only with `--read_evidence`).
+- `discordance/<sample>/read_evidence/<sample>_<technology>_<tumor|normal>.evidence.vcf.gz`:
+  read counts of every alignment at every compared variant of the sample (only with
+  `--read_evidence`), one record per variant: FORMAT/DP (reads counted), FORMAT/AD (REF
+  reads, ALT reads), FORMAT/OT (reads with another allele); see Read evidence below.
 
 </details>
 
@@ -353,12 +388,12 @@ Discordance columns:
 
 | Column | Type | Meaning |
 | --- | --- | --- |
-| `class` | text | discordance class (below): the first reason that applies; `concordant` for TP |
-| `reasons` | text | every reason (class) that applies, comma-separated, in the order of the table below; the first one is `class`. Exclusive: `filtered_non_pass` / `present_but_filtered`; `absent` (only if nothing else applies) / `low_coverage`, `subthreshold_evidence`, `no_evidence`; `subthreshold_evidence` / `no_evidence`. `low_coverage` comes together with one of the last two; `germline_in_normal` with any. |
-| `other_in_normalized` | yes/no | the technology that misses the variant has it in its normalized VCF |
+| `class` | text | the main reason (below): exactly one per FN/FP; `concordant` for TP. Not shown in the table browser: it is the first entry of `reasons` |
+| `reasons` | text | all reasons, comma-separated: the main reason first, then `germline_in_normal` and the context reasons (below); `concordant` for TP |
+| `other_in_normalized` | yes/no | the technology that misses the variant has it in its normalized VCF (called) |
 | `other_filter` | text | its FILTER (`NA` if not called) |
 | `other_vaf_normalized` | float | its VAF |
-| `other_tumor_dp`, `other_tumor_alt` | int | depth and alt reads of its tumor alignment (read evidence) |
+| `other_tumor_dp`, `other_tumor_alt`, `other_tumor_other` | int | reads counted, alt reads and reads with another allele at the variant in its tumor alignment (read evidence) |
 | `normal_dp`, `normal_alt`, `normal_vaf` | int, int, float | summed over the normal alignments of both technologies |
 | `query_power` | float | detection power of the query for truth variants |
 | `detectable` | yes/no | `query_power >= --detection_power` |
@@ -367,17 +402,63 @@ The read-evidence columns (`other_tumor_*`, `normal_*`, `query_power`, `detectab
 left out with `--read_evidence false`.
 
 A variant found in only one technology is explained from the point of view of the
-technology that misses it (the query for an FN, the truth for an FP):
+technology that misses it (the query for an FN, the truth for an FP).
 
-| Class | Meaning |
+**Main reason** (`class`, first entry of `reasons`): exactly one, they exclude each other.
+It describes the call and the reads of the technology that misses the variant:
+
+| Main reason | Meaning |
 | --- | --- |
-| `filtered_non_pass` | The other technology called it, but its FILTER is not PASS (`other_filter`); with `--filter_pass_only` such calls are not compared. |
-| `present_but_filtered` | The other technology called it as PASS, but the call was removed by the uniform filters (`--min_vaf`, `--min_depth`, `--min_alt_reads`) or lies outside the comparison region. |
-| `germline_in_normal` | The normal alignments show the alt allele (VAF ≥ `--germline_vaf`, ≥ `--evidence_min_alt_reads` reads): likely germline. |
-| `low_coverage` | The other technology's tumor depth is below `--min_coverage_tumor`. |
-| `subthreshold_evidence` | The other tumor alignment has alt reads, but the variant was not called. |
-| `no_evidence` | The other tumor alignment has no alt read (MQ ≥ `--evidence_min_mapq`, BQ ≥ `--evidence_min_baseq`). |
-| `absent` | No call and no read evidence to look further. |
+| `filtered_non_pass` | Called, but its FILTER is not PASS (`other_filter`); with `--filter_pass_only` such calls are not compared. |
+| `present_but_filtered` | Called with PASS, but the call was removed by the uniform filters (`--min_vaf`, `--min_depth`, `--min_alt_reads`) or lies outside the comparison region. |
+| `absent` | Not called, and no tumor alignment to look further (none given, or `--read_evidence false`). |
+| `low_coverage` | Not called; the tumor alignment has fewer than `--min_coverage_tumor` reads at the variant. |
+| `subthreshold_evidence` | Not called, although the tumor alignment has enough reads and at least one read with the alt allele. |
+| `no_evidence` | Not called; the tumor alignment has enough reads but none with the alt allele. |
+
+The read-evidence reasons (`low_coverage`, `subthreshold_evidence`, `no_evidence`) are only
+used for variants that the other technology did not call: a call (PASS or not) is
+explained by its call. A variant can't be `filtered_non_pass` and `subthreshold_evidence`
+at the same time.
+
+**Further reasons** (after the main reason, any number):
+
+| Reason | Meaning |
+| --- | --- |
+| `germline_in_normal` | The normal alignments show the alt allele (alt reads ≥ `--evidence_min_alt_reads`, VAF ≥ `--germline_vaf`): likely germline (or a contaminated normal). |
+| `indel` | The variant is an insertion, deletion or complex variant. |
+| `low_vaf` | The VAF of the call that exists (truth call of an FN, query call of an FP) is below `--low_vaf`. |
+| `in_repeat` | The variant lies in a repeat (microsatellite) region of the reference (column `in_repeat`). |
+| `giab_<name>`, `<stratum>` | The variant overlaps this GIAB stratification (`--giab_<name>`) or `--stratification` BED (column of the same name). |
+
+The context reasons (`indel` and below) come from the annotation (`annotate_variants.py
+merge --context-reasons`). An insertion counts as overlapping a region if its anchor base
+or the base after it does (the inserted bases go between them; a left-aligned insertion's
+anchor lies just before a repeat). The statistical test of these features is the
+enrichment table of the report.
+
+**Read evidence** (`read_evidence.py`, one run per alignment). For every compared variant
+of the sample (and every known variant), the reads of the alignment are counted (mapping
+quality ≥ `--evidence_min_mapq`, no secondary, supplementary, QC-failed or duplicate
+reads; duplicates are kept for amplicon libraries with `--amplicon_keep_duplicates`; at
+most `--evidence_max_depth` reads):
+
+- SNV / MNV: the read's bases at the variant (base quality ≥ `--evidence_min_baseq`) are
+  compared with ALT and REF.
+- Indels and complex variants: a read supports the variant if its sequence (soft-clipped
+  bases included) contains the haplotype of the window around the variant with the variant
+  applied; the window spans every position the indel can be shifted to in a repeat plus
+  `--evidence_indel_flank` bases on each side. It supports REF if it contains the reference
+  window; a read aligned across the window that contains neither counts as other (another
+  indel, or a base error in the window). So the count doesn't depend on where or whether
+  the aligner placed the indel. Reads that end inside the window aren't counted, so the
+  depth of an indel is lower than the depth of an SNV at the same position.
+
+`bcftools mpileup`, used before, discovers indel alleles itself: in repeats it reports
+other lengths than the caller and it misses long deletions, so the alt reads of called
+indels were counted as 0 and such variants were wrongly explained as `no_evidence`. An
+end-of-run check now requires that most TP variants (`--evidence_check_min_fraction`, SNVs
+and indels separately) have alt reads in the query tumor alignment.
 
 Power-adjusted recall: for each truth variant, the detection power of the query is
 `P(X ≥ --power_min_alt_reads)` with `X ~ Binomial(query depth, truth VAF)`; only variants
@@ -441,8 +522,12 @@ Annotation columns of `discordance/variants.annotated.tsv`:
   `alt_reads` (int) of the call, `evidence_depth`, `evidence_alt_reads` (int, tumor
   alignment), `same_position_call` (other alleles called at the position, `.`).
 - `known_variants/required/<list>/`: the same per list and sample.
-- `known_variants/benchmark/known_benchmark.aggregated.tsv`, `.per_pair.tsv`, and
-  `benchmark/<sample>/`: every technology against each external truth set, with the columns
+- `known_variants/benchmark/`: every technology against each external truth set, in the
+  layout of `benchmark/` (`rtgtools_vcfeval/`, `bcftools_isec_exact/`,
+  `bcftools_isec_position/`, `metrics/known_benchmark.*.tsv`, `metrics/<sample>/`). All three
+  methods are restricted to the same region: the confident regions of the list intersected
+  with the comparison region of the sample (vcfeval `--bed-regions`, bcftools isec `-R`),
+  so a call that overlaps the region only partly is counted by every method; with the columns
   of the main benchmark (`truth` is the list name).
 - `known_variants/lists/`: the normalized known-variant VCFs: the records of the input lists
   (ID, QUAL, FILTER, INFO kept), on the reference contigs, split and left-aligned, with
@@ -472,19 +557,24 @@ results and ends with the details and the quality control:
    caller, target BED and its size).
 3. **Recall and precision per sample**: MultiQC scatter plot, both axes 0 to 1, one dot per
    sample and query technology (hover: sample name), one dataset per matching method.
-4. **Truth variants found**: vertical bars per sample, label `found/total`, per method.
+4. **Overlap of the technologies per sample**: a Venn diagram per sample and comparison:
+   variants only in the truth technology (FN), truth variants in both (TP), calls only in
+   the query technology (FP), for every matching method (buttons); with vcfeval the number
+   of query calls is added in brackets if it differs from the truth records.
+   **Truth variants found**: vertical bars per sample, label `found/total`, per method.
 5. **Known variants**: required variants as cards (found / required per technology) and a
    PASS/FAIL matrix (variant × technology × sample, details on hover); the benchmark
    against an external truth set as cards and bars per sample.
-6. **Why variants differ**: discordant variants per sample (vertical bars) by class; views
-   FN + FP, FN only (in the truth technology only), FP only (in the query technology only).
+6. **Why variants differ**: discordant variants per sample (vertical bars) by main reason
+   (exactly one per variant, stacked); views FN + FP, FN only (in the truth technology
+   only), FP only (in the query technology only); and the number of discordant variants
+   per sample with each further reason (germline, indel, low VAF, repeat, strata; grouped,
+   a variant can have several).
 7. **Discordant variants in detail** (per comparison): what is found in one technology only
    and why, as a list (main reasons, variants with several reasons, indel share, median VAF,
    protein-altering variants, genes); share of every category of type, consequence,
-   impact, VAF, repeat, GIAB strata and class among TP, FN and FP; VAF of TP, FN and FP;
-   Venn diagrams of the three most frequent reasons of the FN and of the FP (a variant
-   counts in every circle whose reason applies: the overlaps are the variants with several
-   reasons); all combinations of reasons; the protein-altering discordant variants, the genes and the
+   impact, VAF, repeat, GIAB strata and main reason among TP, FN and FP; VAF of TP, FN and
+   FP; the combinations of reasons (main reason + further reasons); the protein-altering discordant variants, the genes and the
    enrichment tests (top 15 rows each, the rest in the table browser).
 8. **Comparison metrics per sample**: recall, precision and F1 by variant type, recall by
    truth VAF (one line per sample), power-adjusted recall; **Metrics per sample**: table
@@ -518,7 +608,7 @@ coverage, consistency checks, samplesheet. In the variant tables:
 - the first columns are `variant` (gene and protein change, e.g. `KRAS p.Gly12Val`; HGVS.c
   or the consequence if there is no protein change), `gene`, `hgvsp`, `consequence`,
   `impact`, then sample, status, class and reasons, then position, alleles, VAF and the rest;
-- coloured columns: `status` (TP green, FN orange, FP purple), `class` / `class_<query>`,
+- coloured columns: `status` (TP green, FN orange, FP purple), `reasons_<query>`,
   `reasons` (one coloured pill per reason), `found_<query>` and other yes/no columns,
   `impact`, metrics (red to green), q-values; VAF columns as ticks on 0 to 1;
 - links: `gene` to GeneCards and Ensembl, `locus` (`chrom:pos`) to the Ensembl genome
@@ -549,7 +639,8 @@ not work).
   (`type`, `length`, `truth_vaf`, `truth_dp`, `gene`, `hgvsp`, `hgvsc`, `consequence`,
   `consequence_group`, `impact`, `variant_class`, `in_repeat`, `transcript`, `dbsnp`,
   `cosmic`, `clin_sig`, `biotype`, if present) and per query technology
-  `found_<query>` (yes/no) and `class_<query>` (discordance class of a miss, `.` if found).
+  `found_<query>` (yes/no) and `reasons_<query>` (all reasons of a miss, main reason
+  first, `.` if found).
 - `report/variantcomp.annotation_counts.tsv`: counts per `sample`, `technology`, `set`
   (`truth_variants`: TP+FN of the truth technology, each variant once; `query_calls`: TP+FP
   of a query technology; `missed_FN`; `extra_FP`), `annotation` (`type`,
@@ -568,6 +659,12 @@ not work).
 - `report/variantcomp.strata.tsv`: per comparison, annotation (`consequence_group`,
   `impact`, `variant_class`, `in_repeat`, every stratification) and value: `tp`, `fn`, `fp`
   (int), `recall`, `precision`, `discordance_rate` = (FN + FP) / (TP + FN + FP) (float).
+  Limitation: `tp` counts the TP rows of the variant table, which are in the truth
+  representation; `precision` = tp / (tp + fp) therefore equals the precision of the
+  metrics only if every truth record matched exactly one query call (TP_baseline =
+  TP_call, true for all tested data). With vcfeval matching one truth record to several
+  query records (e.g. a complex variant against SNVs), the strata and gene precision is
+  approximate; the metrics tables are exact.
 - `report/variantcomp.genes.tsv`: per comparison and gene: `tp`, `fn`, `fp`,
   `discordance_rate`, `samples`, `odds_ratio`, `p_value`, `q_value` (discordant vs.
   concordant in the gene vs. all other genes); sorted by p-value.

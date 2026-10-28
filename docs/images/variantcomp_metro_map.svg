@@ -192,7 +192,7 @@
 <text x="1170" y="1949.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">rtg vcfeval</text>
 <circle cx="230" cy="1981.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
 <line x1="246" y1="1981.0" x2="565" y2="1981.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
-<text x="575" y="1987.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">8.2</tspan>  Exact-allele and same-position matches</text>
+<text x="575" y="1987.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">8.2</tspan>  Same-allele and same-position matches with their own metrics</text>
 <text x="1170" y="1987.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">bcftools isec</text>
 <circle cx="230" cy="2019.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
 <line x1="246" y1="2019.0" x2="565" y2="2019.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
@@ -204,8 +204,8 @@
 <text x="1170" y="2063.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">aggregate_metrics.py</text>
 <circle cx="315" cy="2163.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
 <line x1="331" y1="2163.0" x2="565" y2="2163.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
-<text x="575" y="2169.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">9.1</tspan>  Read counts of every alignment at the compared positions</text>
-<text x="1170" y="2169.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">bcftools query, mpileup + call, norm</text>
+<text x="575" y="2169.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">9.1</tspan>  Read counts of every alignment at the compared variants</text>
+<text x="1170" y="2169.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">bcftools query, read_evidence.py</text>
 <circle cx="230" cy="2201.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
 <line x1="246" y1="2201.0" x2="565" y2="2201.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
 <text x="575" y="2207.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">9.2</tspan>  Reason for every FN/FP; detection power</text>

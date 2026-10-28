@@ -92,7 +92,7 @@ STATIONS = [
     ("rtg\nvcfeval", 1815, Y5, "below"),
     ("known_\nsummary.py", 1915, Y5, "above"),
     # 6 Discordance
-    ("bcftools\nmpileup", 2060, Y1, "below"),
+    ("read_\nevidence.py", 2060, Y1, "below"),
     ("classify_\ndiscordance.py", 2190, Y1, "above"),
     ("Ensembl\nVEP", 2320, Y1, "below"),
     ("msisensor-\npro", 2450, Y1, "below"),
