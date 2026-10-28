@@ -80,10 +80,11 @@ import pandas as pd
 
 # ----------------------------------------------------------------------------- texts
 
+# main reasons (classify_discordance.py): exactly one per discordant variant; they
+# describe the call and the reads of the technology that misses the variant
 CLASS_ORDER = [
     "filtered_non_pass",
     "present_but_filtered",
-    "germline_in_normal",
     "low_coverage",
     "subthreshold_evidence",
     "no_evidence",
@@ -103,39 +104,56 @@ CLASS_TEXT = {
         "lies outside the comparison region. The variant is in the data of both technologies; "
         "the difference comes from a threshold of this comparison."
     ),
-    "germline_in_normal": (
-        "The normal alignments of the sample show the alternative allele (VAF >= "
-        "--germline_vaf with at least --evidence_min_alt_reads reads). The variant is probably "
-        "germline (or a contamination of the normal); one caller rejected it as germline, the "
-        "other did not."
-    ),
     "low_coverage": (
-        "The tumor alignment of the technology that misses the variant has a depth below "
-        "--min_coverage_tumor at this position: the variant could not be detected reliably. "
-        "Typical for positions at the edge of or outside a capture target."
+        "Not called. The tumor alignment of the technology that misses the variant has a depth "
+        "below --min_coverage_tumor at the variant: it could not be detected reliably. Typical "
+        "for positions at the edge of or outside a capture target."
     ),
     "subthreshold_evidence": (
-        "The tumor alignment of the technology that misses the variant has reads with the "
-        "alternative allele, but the caller did not call it (or the call failed a threshold). "
-        "Typical for low-VAF variants near the detection limit of the technology."
+        "Not called, although the tumor alignment of the technology that misses the variant "
+        "has enough depth and at least one read with the alternative allele. Typical for "
+        "low-VAF variants near the detection limit of the technology."
     ),
     "no_evidence": (
-        "The tumor alignment of the technology that misses the variant has enough depth but "
-        "no read with the alternative allele (counted with MQ >= --evidence_min_mapq and "
-        "BQ >= --evidence_min_baseq). For a false negative this suggests a variant below the "
-        "detection limit or a sampling difference; for a false positive an artefact of the "
-        "technology that called it (sequencing or alignment error)."
+        "Not called; the tumor alignment of the technology that misses the variant has enough "
+        "depth but no read with the alternative allele (MQ >= --evidence_min_mapq, SNV bases "
+        "with BQ >= --evidence_min_baseq; indels by their haplotype sequence). For a false "
+        "negative this suggests a variant below the detection limit or a sampling difference; "
+        "for a false positive an artefact of the technology that called it."
     ),
     "absent": (
         "Not called and no read evidence available to look further (no alignment given, or "
         "--read_evidence false)."
     ),
 }
+# further reasons: in addition to the main reason (germline from the reads of the normal,
+# the others from the annotation; every stratification is a reason of its own name)
+FURTHER_ORDER = ["germline_in_normal", "indel", "low_vaf", "in_repeat"]
+FURTHER_TEXT = {
+    "germline_in_normal": (
+        "The normal alignments of the sample show the alternative allele (VAF >= "
+        "--germline_vaf with at least --evidence_min_alt_reads reads): probably a germline "
+        "variant (or a contaminated normal), which one caller rejected and the other not."
+    ),
+    "indel": "The variant is an insertion, deletion or complex variant (harder to call and to align).",
+    "low_vaf": (
+        "The VAF of the call that exists (truth call of an FN, query call of an FP) is below "
+        "--low_vaf: near the detection limit."
+    ),
+    "in_repeat": "The variant lies in a repeat (microsatellite) region of the reference (msisensor-pro).",
+}
+STRATUM_TEXT = (
+    "The variant overlaps the stratification of this name (GIAB genome stratifications are "
+    "named giab_<name>, e.g. giab_homopolymer; others come from --stratification)."
+)
 # short labels of the classes for legends and lists
 CLASS_LABEL = {
     "filtered_non_pass": "called, FILTER not PASS",
     "present_but_filtered": "PASS, removed by uniform filters/region",
     "germline_in_normal": "germline (alt reads in the normal)",
+    "indel": "indel",
+    "low_vaf": "low VAF",
+    "in_repeat": "in a repeat",
     "low_coverage": "low coverage",
     "subthreshold_evidence": "alt reads, not called",
     "no_evidence": "no alt reads",
@@ -150,7 +168,12 @@ CLASS_COLOR = {
     "no_evidence": "#e15759",
     "absent": "#bab0ac",
     "concordant": "#59a14f",
+    "indel": "#edc948",
+    "low_vaf": "#ff9da7",
+    "in_repeat": "#86bcb6",
 }
+# colour of a stratification reason (giab_* and --stratification)
+STRATUM_COLOR = "#a0cbe8"
 STATUS_COLOR = {"TP": "#59a14f", "FN": "#f28e2b", "FP": "#b07aa1"}
 REASON_TEXT = {
     "filter_not_pass": "FILTER not PASS ('.' counts as PASS); only PASS calls are compared",
@@ -173,8 +196,9 @@ COLUMN_TEXT = {
     "truth": "truth (baseline) technology",
     "query": "query technology compared with the truth",
     "status": "TP: found by both; FN: truth variant missed by the query (in the truth only); FP: query call without truth variant (in the query only)",
-    "class": "discordance class: the first reason that applies (concordant for TP)",
-    "reasons": "every reason that applies to the discordant variant, the first one is the class",
+    "class": "main reason: the call and reads of the technology that misses the variant (exactly one; concordant for TP)",
+    "reasons": "all reasons of a discordant variant: the main reason first, then germline_in_normal and the context (indel, low_vaf, in_repeat, stratifications)",
+    "other_tumor_other": "reads with another allele at the variant in that alignment (e.g. another indel in a repeat)",
     "locus": "position as chrom:pos (1-based), linked to the Ensembl genome browser",
     "chrom": "contig",
     "pos": "position (1-based)",
@@ -423,79 +447,37 @@ def html_table(df, link=None, link_text=None, total=None, classes="table table-s
     return out
 
 
-# Venn geometry (SVG units, viewBox 360 x 265): circle centres and the positions of the
-# region counts, keyed by membership (True = in the circle of that reason)
-VENN_LAYOUT = {
-    1: {"centres": [(180, 150)], "regions": {(True,): (180, 150)}},
-    2: {
-        "centres": [(140, 150), (220, 150)],
-        "regions": {(True, False): (105, 150), (False, True): (255, 150), (True, True): (180, 150)},
-    },
-    3: {
-        "centres": [(135, 120), (225, 120), (180, 195)],
-        "regions": {
-            (True, False, False): (100, 105),
-            (False, True, False): (260, 105),
-            (False, False, True): (180, 245),
-            (True, True, False): (180, 95),
-            (True, False, True): (130, 180),
-            (False, True, True): (230, 180),
-            (True, True, True): (180, 150),
-        },
-    },
-}
-
-
-def venn_svg(reasons, title):
-    """An SVG Venn diagram of the (at most) three most frequent discordance reasons of a
-    set of variants. reasons: the column reasons (comma-separated per variant). Every
-    region shows the number of variants with exactly these of the shown reasons; variants
-    with none of them are counted below. '' if there are no variants."""
-    sets = [set(str(r).split(",")) for r in reasons if str(r) not in ("", "nan", "NA")]
-    if not sets:
-        return ""
-    # the three most frequent reasons (number of variants each applies to)
-    freq = pd.Series([r for s in sets for r in s]).value_counts()
-    top = freq.index[:3].tolist()
-    layout = VENN_LAYOUT[len(top)]
-    # number of variants per membership pattern of the shown reasons
-    counts = {}
-    for s in sets:
-        key = tuple(r in s for r in top)
-        counts[key] = counts.get(key, 0) + 1
-    radius = 82
-    parts = [
-        f"<svg viewBox='0 25 360 265' width='340' role='img' aria-label='{esc(title)}' "
-        "style='font-family: inherit'>"
-    ]
-    for (cx, cy), reason in zip(layout["centres"], top, strict=True):
-        color = CLASS_COLOR.get(reason, "#888888")
-        parts.append(
-            f"<circle cx='{cx}' cy='{cy}' r='{radius}' fill='{color}' fill-opacity='0.3' "
-            f"stroke='{color}' stroke-width='2'><title>{esc(reason)}: {freq[reason]} variants"
-            "</title></circle>"
-        )
-    for key, (x, y) in layout["regions"].items():
-        n = counts.get(key, 0)
-        names = " + ".join(r for r, inside in zip(top, key, strict=True) if inside)
-        parts.append(
-            f"<text x='{x}' y='{y + 6}' text-anchor='middle' font-size='18' font-weight='700' "
-            f"fill='currentColor'>{n}<title>{esc(names)}: {n} variants</title></text>"
-        )
-    other = counts.get(tuple(False for _ in top), 0)
-    parts.append("</svg>")
-    # legend under the diagram (long reason names do not fit into the SVG)
-    legend = "".join(
-        f"<div><span class='vc-dot' style='background:{CLASS_COLOR.get(r, '#888888')}'></span>"
-        f"{esc(CLASS_LABEL.get(r, r))} <code>{esc(r)}</code>: {freq[r]}</div>"
-        for r in top
+def venn2_svg(truth, query, n_truth_only, n_both, n_query_only, n_both_query=None):
+    """SVG Venn diagram of the variants of two technologies of one sample: the truth
+    technology only (FN), both (TP), the query technology only (FP). n_both_query: TP in
+    the query representation, shown if it differs (one truth record can match several
+    query records with vcfeval)."""
+    left, right = STATUS_COLOR["FN"], STATUS_COLOR["FP"]
+    both = f"{n_both}" if n_both_query in (None, n_both) else f"{n_both} ({n_both_query})"
+    tip_both = f"in both: {n_both} truth variants found by {query}" + (
+        "" if n_both_query in (None, n_both) else f" ({n_both_query} {query} calls)"
     )
     return (
-        f"<div class='vc-venn'><div class='vc-group'>{esc(title)}: {len(sets)} variants</div>"
-        + "".join(parts)
-        + f"<div class='vc-legend'>{legend}</div>"
-        + (f"<div class='vc-note'>{other} with none of these reasons</div>" if other else "")
-        + "</div>"
+        "<svg viewBox='0 0 300 190' width='280' role='img' style='font-family: inherit'>"
+        f"<circle cx='115' cy='95' r='75' fill='{left}' fill-opacity='0.3' stroke='{left}' "
+        f"stroke-width='2'><title>{esc(truth)}</title></circle>"
+        f"<circle cx='185' cy='95' r='75' fill='{right}' fill-opacity='0.3' stroke='{right}' "
+        f"stroke-width='2'><title>{esc(query)}</title></circle>"
+        f"<text x='72' y='101' text-anchor='middle' font-size='18' font-weight='700' "
+        f"fill='currentColor'>{n_truth_only}<title>only in {esc(truth)} (FN): {n_truth_only}"
+        "</title></text>"
+        f"<text x='150' y='101' text-anchor='middle' font-size='18' font-weight='700' "
+        f"fill='currentColor'>{both}<title>{esc(tip_both)}</title></text>"
+        f"<text x='228' y='101' text-anchor='middle' font-size='18' font-weight='700' "
+        f"fill='currentColor'>{n_query_only}<title>only in {esc(query)} (FP): {n_query_only}"
+        "</title></text>"
+        f"<text x='72' y='185' text-anchor='middle' font-size='12' fill='{left}'>"
+        f"{esc(truth)} only (FN)</text>"
+        f"<text x='150' y='14' text-anchor='middle' font-size='12' fill='currentColor'>"
+        "truth variants in both (TP)</text>"
+        f"<text x='228' y='185' text-anchor='middle' font-size='12' fill='{right}'>"
+        f"{esc(query)} only (FP)</text>"
+        "</svg>"
     )
 
 
@@ -1003,9 +985,11 @@ def section_introduction(mqc, d, args):
         "same allele and with the same position as a check of representation differences. "
         "The buttons of the Summary and of the recall/precision plot switch between them.",
         "<b>Discordant variants</b> (FN: in the truth only; FP: in the query only) are explained "
-        "from the view of the technology that misses them: non-PASS call, removed by a "
-        "filter, germline evidence in the normal, low coverage, alt reads without a call, "
-        "no alt reads. A variant can have several reasons; the first is its class.",
+        "from the view of the technology that misses them: exactly one main reason (non-PASS "
+        "call, removed by a filter, or not called with low coverage, with alt reads, without "
+        "alt reads), then further reasons: germline evidence in the normal and the context "
+        "(indel, low VAF, repeat, GIAB and other stratifications). Read evidence is counted "
+        "for the called alleles, indels by their haplotype sequence.",
         "<b>Annotation</b>: Ensembl VEP (gene, consequence, impact, HGVS), repeat regions "
         "(msisensor-pro) and GIAB stratifications; enrichment of features among discordant "
         "variants with Fisher's exact test (Benjamini-Hochberg q).",
@@ -1252,6 +1236,47 @@ def section_truth_found(mqc, d):
     )
 
 
+def section_overlap(mqc, d):
+    """Venn diagrams of truth and query per sample (TP in both, FN truth only, FP query
+    only), one set of diagrams per matching method (toggle)."""
+    pp = d["per_pair"]
+    if pp.empty:
+        return
+    parts = [toggle_buttons("overlap_method", [(m[0], m[3]) for m in METHODS])]
+    for key, stype, stratum, label, text in METHODS:
+        rows = overall_rows(pp, stype, stratum).sort_values(["query", "sample"])
+        block = [
+            f"<div data-vc-group='overlap_method' data-vc-key='{key}' "
+            f"class='{'' if key == 'vcfeval' else 'vc-hidden'}'>"
+            f"<p class='vc-note'><b>{esc(label)}</b>: {esc(text)}</p><div class='vc-venns'>"
+        ]
+        for _, r in rows.iterrows():
+            tpb, fn, tpc, fp = (int(r[c]) for c in ("tp_baseline", "fn", "tp_call", "fp"))
+            block.append(
+                f"<div class='vc-venn' data-sample='{esc(r['sample'])}'>"
+                f"<div class='vc-group'>{esc(r['sample'])}: {esc(r['truth'])} vs "
+                f"{esc(r['query'])}</div>"
+                + venn2_svg(r["truth"], r["query"], fn, tpb, fp, tpc)
+                + "</div>"
+            )
+        block.append("</div></div>")
+        parts.append("".join(block))
+    parts.append(
+        "<p class='vc-note'>Left: variants only in the truth technology (missed by the "
+        "query, FN); middle: truth variants called by both technologies (TP); right: calls "
+        "only in the query technology (FP). With RTG vcfeval one truth record can match "
+        "several query records (e.g. a complex variant against two simple ones): the number "
+        "of query calls is then shown in brackets. Hover a number for the details.</p>"
+    )
+    mqc.html(
+        "overlap",
+        "Overlap of the technologies per sample",
+        "How many variants each sample has in both technologies, in the truth technology only "
+        "and in the query technology only, for every matching method.",
+        "\n".join(parts),
+    )
+
+
 def section_known(mqc, d):
     """Known variants: required variants (PASS/FAIL matrix) and the benchmark against an
     external truth set."""
@@ -1461,25 +1486,96 @@ def section_why(mqc, d):
                     ),
                 }
             )
-    items = "".join(
+    # further reasons: per sample, how many discordant variants have each (not stacked:
+    # a variant can have several)
+    further_views = []
+    for (truth, query), _rows in variants.groupby(["truth", "query"]):
+        sub_disc = disc[(disc["truth"] == truth) & (disc["query"] == query)]
+        prefix = f"{query}: " if variants["query"].nunique() > 1 else ""
+        reason_lists = (
+            sub_disc["reasons"].astype(str).str.split(",") if "reasons" in sub_disc else []
+        )
+        names = further_reasons(sub_disc)
+        traces = []
+        for i, name in enumerate(names):
+            has = [name in r for r in reason_lists]
+            per_sample = (
+                sub_disc.assign(has=has)
+                .groupby("sample")["has"]
+                .sum()
+                .reindex(samples, fill_value=0)
+            )
+            traces.append(
+                {
+                    "type": "bar",
+                    "name": CLASS_LABEL.get(name, name),
+                    "x": samples,
+                    "y": [int(v) for v in per_sample],
+                    "s": samples,
+                    "renameX": True,
+                    "marker": {"color": CLASS_COLOR.get(name, PALETTE[i % len(PALETTE)])},
+                    "hovertemplate": f"%{{x}}: %{{y}} discordant variants<br>{name}<extra></extra>",
+                }
+            )
+        further_views.append(
+            {
+                "label": f"{prefix}FN + FP",
+                "traces": traces,
+                "layout": bar_layout("Discordant variants with the reason", barmode="group"),
+            }
+        )
+    main_items = "".join(
         f"<li>{badge(CLASS_LABEL[c], CLASS_COLOR[c])} <code>{c}</code>: {esc(CLASS_TEXT[c])}</li>"
         for c in CLASS_ORDER
     )
+    further_items = (
+        "".join(
+            f"<li>{badge(CLASS_LABEL[c], CLASS_COLOR[c])} <code>{c}</code>: {esc(FURTHER_TEXT[c])}</li>"
+            for c in FURTHER_ORDER
+        )
+        + f"<li><code>giab_&lt;name&gt;</code>, stratifications: {esc(STRATUM_TEXT)}</li>"
+    )
     body = [
+        "<p class='vc-note'>Every discordant variant has exactly one <b>main reason</b>: the "
+        "call and the reads of the technology that misses it (called but filtered, or not "
+        "called with low coverage, with alt reads, without alt reads, or no alignment). "
+        "<b>Further reasons</b> can come in addition: germline evidence in the normal and the "
+        "context (indel, low VAF, repeat, GIAB and other stratifications). The column "
+        "<code>reasons</code> of the tables lists all of them.</p>",
+        "<div class='vc-group'>Main reason</div>",
         mqc.plot(
             views,
-            caption="Discordant variants per sample, coloured by the class (the first reason "
-            "that applies). FN: in the truth technology only (missed by the query); FP: in the "
-            "query technology only. Number above a bar: all discordant variants of the sample.",
+            caption="Discordant variants per sample by their main reason (exactly one per "
+            "variant, so the bars add up). FN: in the truth technology only (missed by the "
+            "query); FP: in the query technology only. Number above a bar: all discordant "
+            "variants of the sample.",
         ),
-        f"<details><summary>What the classes mean</summary><ul>{items}</ul></details>",
+        "<div class='vc-group'>Further reasons</div>",
+        mqc.plot(
+            further_views,
+            height=380,
+            caption="Number of discordant variants (FN + FP) per sample with each further "
+            "reason. A variant can have several further reasons, so the bars don't add up.",
+        ),
+        f"<details><summary>What the reasons mean</summary><b>Main reasons</b><ul>{main_items}</ul>"
+        f"<b>Further reasons</b><ul>{further_items}</ul></details>",
     ]
     mqc.html(
         "why",
         "Why variants differ",
-        "The discordant variants of every sample by the reason why one technology misses them.",
+        "The discordant variants of every sample by the reasons why one technology misses them.",
         "\n".join(body),
     )
+
+
+def further_reasons(disc):
+    """The further reasons that occur among discordant variants, in a fixed order:
+    FURTHER_ORDER first, then the stratifications (alphabetically)."""
+    if disc.empty or "reasons" not in disc:
+        return []
+    seen = {r for rs in disc["reasons"].astype(str) for r in rs.split(",")}
+    seen -= set(CLASS_ORDER) | {"concordant"}
+    return [r for r in FURTHER_ORDER if r in seen] + sorted(seen - set(FURTHER_ORDER))
 
 
 def vaf_bin(values):
@@ -1552,7 +1648,7 @@ def section_characterization(mqc, d, fdr):
         features += [
             (c, c.replace("giab_", "GIAB ")) for c in rows.columns if c.startswith("giab_")
         ]
-        features.append(("class", "Class (first reason)"))
+        features.append(("class", "Main reason"))
         views = []
         for col, label in features:
             names, frames = [], []
@@ -1676,22 +1772,7 @@ def section_characterization(mqc, d, fdr):
                 for s in ("FN", "FP")
                 if s in combos.columns
             ]
-            parts.append("<div class='vc-group'>Variants with several reasons</div>")
-            # Venn diagrams of the three most frequent reasons, FN and FP side by side
-            venns = [
-                venn_svg(disc[disc["status"] == s]["reasons"], f"{sets[s][0]}")
-                for s in ("FN", "FP")
-            ]
-            parts.append(
-                "<div class='vc-venns'>"
-                + "".join(v for v in venns if v)
-                + "</div><p class='vc-note'>Venn diagrams of the three most frequent reasons "
-                "of the variants found in one technology only: a variant counts in every "
-                "circle whose reason applies to it (column reasons), so the overlaps are the "
-                "variants with several reasons. Some reasons exclude each other (e.g. "
-                "subthreshold_evidence and no_evidence). Hover a number for the reasons; "
-                "variants with none of the three reasons are counted below the diagram.</p>"
-            )
+            parts.append("<div class='vc-group'>Combinations of reasons</div>")
             parts.append(
                 mqc.plot(
                     [
@@ -1711,8 +1792,9 @@ def section_characterization(mqc, d, fdr):
                         }
                     ],
                     height=400,
-                    caption="Combinations of all reasons that apply to a discordant variant "
-                    "(column reasons; the first one is its class), the 12 most frequent.",
+                    caption="Combinations of the reasons of the discordant variants (column "
+                    "reasons: the main reason first, then the further reasons), the 12 most "
+                    "frequent.",
                 )
             )
         # protein-altering discordant variants (top list)
@@ -2243,6 +2325,7 @@ def write_multiqc(args, d):
     section_summary(mqc, d)
     section_introduction(mqc, d, args)
     section_recall_precision(mqc, d)
+    section_overlap(mqc, d)
     section_truth_found(mqc, d)
     section_known(mqc, d)
     section_why(mqc, d)
@@ -2364,13 +2447,17 @@ def column_specs(df, genome):
                     "range": [CLASS_COLOR.get(c, "#eeeeee") for c in domain],
                 }
             )
-        elif col == "reasons":
+        elif col == "reasons" or col.startswith("reasons_"):
+            # one coloured pill per reason; the domain is every reason in the table (main
+            # reasons, further reasons, stratifications)
+            domain = sorted({r for v in values for r in v.split(",") if r not in ("", ".")})
             specs[col] = {
                 "plot": {
                     "pills": {
                         "separator": ",",
-                        "domain": [*CLASS_ORDER, "concordant"],
-                        "range": [CLASS_COLOR[c] for c in [*CLASS_ORDER, "concordant"]],
+                        "domain": domain or ["concordant"],
+                        "range": [CLASS_COLOR.get(r, STRATUM_COLOR) for r in domain]
+                        or [CLASS_COLOR["concordant"]],
                     }
                 }
             }
@@ -2504,7 +2591,8 @@ def write_datavzrd(args, d):
         if df.empty:
             return
         df = order_columns(df, front, back=["variant_id"])
-        df = df.copy()
+        # the main reason is the first entry of reasons: no separate column class
+        df = df.drop(columns=[c for c in ("class",) if c in df.columns and "reasons" in df.columns])
         for col in df.columns:
             values = df[col].dropna()
             # counts that pandas read as floats (because of missing values) as integers
@@ -2546,7 +2634,7 @@ def write_datavzrd(args, d):
     }
     status_how = [
         "**status**: TP found by both technologies (green), FN in the truth technology only = missed by the query (orange), FP in the query technology only (purple).",
-        "**class**: the first reason that applies; **reasons**: all reasons (a variant can have several).",
+        "**reasons**: every reason of a discordant variant. The first is its main reason (exactly one: the call and the reads of the technology that misses the variant); then germline evidence in the normal and the context (indel, low VAF, repeat, stratifications).",
         "Click a row to see the detail columns (HGVS.c, transcript, biotype, evidence counts).",
         "Links: gene to GeneCards/Ensembl, locus to the Ensembl genome browser, dbSNP and COSMIC IDs (with a VEP cache).",
     ]
@@ -2556,7 +2644,8 @@ def write_datavzrd(args, d):
         "Truth variants",
         "Every variant of the truth technology that was compared, per sample: gene and protein "
         "change first, then whether each query technology found it (found_&lt;query&gt;, green "
-        "yes / red no) and, if missed, why (class_&lt;query&gt;).",
+        "yes / red no) and, if missed, why (reasons_&lt;query&gt;: all reasons, main reason "
+        "first).",
         how=[
             "Sort by found_by to see the variants found by no query technology: they may be artefacts of the truth technology.",
             "Filter a column with the funnel icon in its header, e.g. impact = HIGH.",
@@ -2579,14 +2668,19 @@ def write_datavzrd(args, d):
             "impact",
             "sample",
             "found_by",
-            *[c for c in truth.columns if c.startswith(("found_", "class_"))],
+            *[c for c in truth.columns if c.startswith(("found_", "reasons_"))],
             *VARIANT_FRONT,
         ],
         excel=True,
     )
     if not variants.empty:
         disc = variants[variants["status"].isin(["FN", "FP"])]
-        class_list = [f"**{c}** ({CLASS_LABEL[c]}): {CLASS_TEXT[c]}" for c in CLASS_ORDER]
+        # explanations of the main reasons and the further reasons (collapsed)
+        class_list = [
+            f"main reason **{c}** ({CLASS_LABEL[c]}): {CLASS_TEXT[c]}" for c in CLASS_ORDER
+        ]
+        class_list += [f"further reason **{c}**: {FURTHER_TEXT[c]}" for c in FURTHER_ORDER]
+        class_list += [f"further reason **giab_&lt;name&gt;** and stratifications: {STRATUM_TEXT}"]
         add(
             "discordant-variants",
             disc,
@@ -2595,7 +2689,7 @@ def write_datavzrd(args, d):
             "(missed by the query), FP = in the query technology only. Each is explained from "
             "the view of the technology that misses it.",
             how=status_how,
-            details=("Discordance classes", class_list),
+            details=("Reasons", class_list),
             links={"truth variant": truth_link, "gene table": gene_link},
             see=[
                 ("truth-variants", "Truth variants"),

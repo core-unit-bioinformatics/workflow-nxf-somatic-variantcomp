@@ -93,7 +93,7 @@ def inputs(tmp_path, check_status="ok"):
             ["S1", "wgs", "wes", "TP", "concordant", "chr1", 200, "G", "T", "SNV", 0.4, 0.4,
              "concordant", ".", ".", "intergenic_variant", "other", "MODIFIER", "."],
             ["S1", "wgs", "wes", "FN", "low_coverage", "chr1", 300, "AT", "A", "DEL", 0.1, "NA",
-             "low_coverage,subthreshold_evidence", "TP53", "p.Arg175fs", "frameshift_variant",
+             "low_coverage,indel,in_repeat", "TP53", "p.Arg175fs", "frameshift_variant",
              "non_synonymous", "HIGH", "."],
             ["S1", "wgs", "wes", "FP", "no_evidence", "chr1", 400, "C", "G", "SNV", "NA", 0.02,
              "no_evidence", "TP53", ".", "intron_variant", "other", "MODIFIER", "."],
@@ -279,6 +279,8 @@ def test_datavzrd_tables_and_links(tmp_path):
         assert (tmp_path / "dv" / dataset["path"]).exists()
     header = (tmp_path / "dv" / "discordant-variants.tsv").read_text().splitlines()[0].split("\t")
     assert header[:4] == ["variant", "gene", "hgvsp", "consequence"] and header[-1] == "variant_id"
+    # the main reason is the first entry of reasons: no column class in the tables
+    assert "class" not in header and "reasons" in header
     rows = (tmp_path / "dv" / "discordant-variants.tsv").read_text().splitlines()
     assert rows[1].startswith("TP53 p.Arg175fs\tTP53\t")  # fmt: skip
 
@@ -318,11 +320,21 @@ def test_needs_an_output(tmp_path):
     assert result.returncode == 1 and "nothing to write" in result.stderr
 
 
-def test_venn_counts_every_membership_pattern():
-    reasons = ["a", "a,b", "a,b,c", "b", "c", "d", "a,b"]
-    svg = report_content.venn_svg(reasons, "FN")
-    # top three: a (4), b (4), c (2); 'd' has none of them
-    assert "7 variants" in svg and "1 with none of these reasons" in svg
-    assert "<title>a + b: 2 variants</title>" in svg
-    assert "<title>a + b + c: 1 variants</title>" in svg
-    assert report_content.venn_svg([], "FP") == ""
+def test_venn2_shows_truth_only_both_query_only():
+    svg = report_content.venn2_svg("wgs", "wes", 3, 10, 2)
+    assert ">3<title>only in wgs (FN): 3</title>" in svg
+    assert ">10<title>in both: 10 truth variants found by wes</title>" in svg
+    assert ">2<title>only in wes (FP): 2</title>" in svg
+    # one truth record matched by two query records (vcfeval): calls in brackets
+    assert ">10 (11)<" in report_content.venn2_svg("wgs", "wes", 3, 10, 2, 11)
+
+
+def test_overlap_section_has_one_venn_per_sample_and_method(tmp_path):
+    result = run(tmp_path, *inputs(tmp_path), "--multiqc", "mqc")
+    assert result.returncode == 0, result.stderr
+    text = (tmp_path / "mqc" / "vc_overlap_mqc.html").read_text()
+    # three methods (toggle), one diagram each for the sample
+    assert text.count("data-vc-group='overlap_method'") == 3
+    assert text.count("<svg") == 3
+    # isec position: 3 TP, 0 FN, 0 FP in the fixture
+    assert ">0<title>only in wgs (FN): 0</title>" in text

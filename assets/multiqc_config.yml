@@ -30,6 +30,8 @@ report_section_order:
     order: 1990
   vc_recall_precision:
     order: 1980
+  vc_overlap:
+    order: 1975
   vc_truth_found:
     order: 1970
   vc_known:
