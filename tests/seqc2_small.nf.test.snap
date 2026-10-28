@@ -1213,7 +1213,7 @@
                 "mosdepth_cov_dist.txt:md5,65ab4b5c83c874cac99c0a2b1ba48336",
                 "mosdepth_cumcov_dist.txt:md5,65ab4b5c83c874cac99c0a2b1ba48336",
                 "mosdepth_perchrom.txt:md5,20d4cb10f4e72b714c3c90cb0a838658",
-                "multiqc_citations.txt:md5,9bfbeabc9faf1eb9b8c3afc2bb7c5da9",
+                "multiqc_citations.txt:md5,f3de3941a6c08737cf26edf4500bf986",
                 "multiqc_variantcomp_harmonization.txt:md5,13752812186405614751c418456adffa",
                 "multiqc_variantcomp_input_checks.txt:md5,097bacbd838e4564bab8e828fd80cee2",
                 "multiqc_variantcomp_normalization.txt:md5,ad42a479578e1442577c6f6df5389dd7",
@@ -1281,7 +1281,7 @@
                 "SEQC2_NV_1_wgs.pass.norm.norm.log:md5,40cffae0543c95f31b0a80dd9ae723e4"
             ]
         ],
-        "timestamp": "2026-10-28T12:14:19.149276826",
+        "timestamp": "2026-10-28T20:25:06.033569865",
         "meta": {
             "nf-test": "0.9.5",
             "nextflow": "26.10.2"

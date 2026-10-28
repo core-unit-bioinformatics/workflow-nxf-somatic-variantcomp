@@ -546,51 +546,82 @@ tab. `main.html` also links to the MultiQC report and the tables on their own.
 
 The **MultiQC report** `multiqc/multiqc_report.html` is the main report of a run (decision
 D37): one self-contained HTML file, interactive (hover, zoom, export of every plot; the
-toolbox hides, highlights and renames samples in all plots and tables). It starts with the
-results and ends with the details and the quality control:
+toolbox hides, highlights and renames samples in all plots and tables). It reads like a book
+(decision D39): six numbered chapters, each with an introduction (what the chapter shows,
+what was done, which section answers which question); every section starts with a
+description of what is shown and how to read it. The table of contents lists the chapters
+and their sections; the MultiQC modules of the tools follow their chapter, numbered and
+indented like its sections.
 
-1. **Summary**: banner of the consistency checks; cards with recall, precision, F1, FN and
-   FP of every query technology (summed over the samples), with buttons for the matching
-   method (RTG vcfeval, bcftools isec same allele, bcftools isec same position); cards of
-   the run (samples, technologies, compared region, truth variants, required variants);
-   key findings as a list; links to the variant tables.
-2. **Introduction**: this run (question, samples, callers, compared region, filters) and
-   how the technologies are compared, as lists; one row per technology (role, library type,
-   caller, target BED and its size).
-3. **Recall and precision per sample**: MultiQC scatter plot, both axes 0 to 1, one dot per
-   sample and query technology (hover: sample name), one dataset per matching method.
-4. **Overlap of the technologies per sample**: a Venn diagram per sample and comparison:
-   variants only in the truth technology (FN), truth variants in both (TP), calls only in
-   the query technology (FP), for every matching method (buttons); with vcfeval the number
-   of query calls is added in brackets if it differs from the truth records.
-   **Truth variants found**: vertical bars per sample, label `found/total`, per method.
-5. **Known variants**: required variants as cards (found / required per technology) and a
-   PASS/FAIL matrix (variant × technology × sample, details on hover); the benchmark
-   against an external truth set as cards and bars per sample.
-6. **Why variants differ**: discordant variants per sample (vertical bars) by main reason
-   (exactly one per variant, stacked); views FN + FP, FN only (in the truth technology
-   only), FP only (in the query technology only); and the number of discordant variants
-   per sample with each further reason (germline, indel, low VAF, repeat, strata; grouped,
-   a variant can have several).
-7. **Discordant variants in detail** (per comparison): what is found in one technology only
-   and why, as a list (main reasons, variants with several reasons, indel share, median VAF,
-   protein-altering variants, genes); share of every category of type, consequence,
-   impact, VAF, repeat, GIAB strata and main reason among TP, FN and FP; VAF of TP, FN and
-   FP; the combinations of reasons (main reason + further reasons); the protein-altering discordant variants, the genes and the
-   enrichment tests (top 15 rows each, the rest in the table browser).
-8. **Comparison metrics per sample**: recall, precision and F1 by variant type, recall by
-   truth VAF (one line per sample), power-adjusted recall; **Metrics per sample**: table
-   of counts and the metrics of all three matching methods.
-9. **Compared genomic region**: cards (genome, every target BED with its technology and
-   role, common region, callable per sample) in Mbp; the steps as a flow; vertical bars
-   (log or linear scale); the callable region per sample.
-10. **Input variant sets and their filtering**: records per VCF, compared and removed per
-    reason (counts or percent).
-11. **Coverage**: mean depth and percent of bases ≥ each threshold per alignment, in the
-    common and the target region.
-12. The QC of the steps: input checks, normalization (`bcftools norm`), harmonization,
-    mosdepth, VEP; **Consistency checks** (passed/failed per category, failed checks listed);
-    methods description, software versions and parameters.
+1. **Summary**
+   - 1.1 **Results at a glance**: banner of the consistency checks; cards with recall,
+     precision, F1, FN and FP of every query technology (summed over the samples), with
+     buttons for the matching method (RTG vcfeval, bcftools isec same allele, bcftools isec
+     same position); cards of the run (samples, technologies, compared region, truth
+     variants, required variants); key findings; links to the variant tables.
+   - 1.2 **What was compared and how**: this run (question, samples, callers, compared
+     region, filters) and how the technologies are compared; one row per technology (role,
+     library type, caller, target BED and its size).
+   - 1.3 **Recall and precision per sample**: MultiQC scatter plot, both axes 0 to 1, one dot
+     per sample and query technology (hover: sample name), one dataset per matching method.
+   - 1.4 **Comparison metrics per sample**: recall, precision and F1 by variant type, recall
+     by truth VAF (one line per sample), power-adjusted recall.
+   - 1.5 **Metrics table per sample**: counts and the metrics of all three matching methods.
+   - 1.6 **Overlap of the technologies per sample**: a Venn diagram per sample and
+     comparison: variants only in the truth technology (FN), truth variants in both (TP),
+     calls only in the query technology (FP), for every matching method (buttons); with
+     vcfeval the number of query calls is added in brackets if it differs from the truth
+     records.
+   - 1.7 **Truth variants found**: vertical bars per sample, label `found/total`, per method.
+2. **Known variants**
+   - 2.1 **Required variants and external truth sets**: required variants as cards (found /
+     required per technology) and a PASS/FAIL matrix (variant × technology × sample, details
+     on hover); the benchmark against an external truth set as cards and bars per sample.
+     Without `--known_variants` a short note (the chapter numbers stay the same in every
+     run).
+3. **Discordance**
+   - 3.1 **Why variants differ**: discordant variants per sample (vertical bars) by main
+     reason (exactly one per variant, stacked); views FN + FP, FN only (in the truth
+     technology only), FP only (in the query technology only); and the number of discordant
+     variants per sample with each further reason (germline, indel, low VAF, repeat, strata;
+     grouped, a variant can have several).
+   - 3.2 **Discordant variants in detail** (per comparison): what is found in one technology
+     only and why, as a list (main reasons, variants with several reasons, indel share, median
+     VAF, protein-altering variants, genes); share of every category of type, consequence,
+     impact, VAF, repeat, GIAB strata and main reason among TP, FN and FP; VAF of TP, FN and
+     FP; the combinations of reasons; the protein-altering discordant variants, the genes and
+     the enrichment tests (top 15 rows each, the rest in the table browser).
+4. **Variant filtering**
+   - 4.1 **Input variant sets and their filtering**: a funnel of the preprocessing steps
+     (all VCFs, or the VCFs of one technology; summed over the samples): one box per step in
+     the order of the normalization chain (input, PASS filter, contigs, gVCF blocks,
+     normalization, harmonization, uniform filters and region, compared), its width the
+     share of the input records left (at least 18 %), the records left with their percent,
+     SNV and indel counts of the input and the compared records, and next to every box the
+     records removed per reason and added by `split`. Then the records per VCF, compared and
+     removed per reason (counts or percent). The counts come from the accounting tables
+     (`vcf_preprocessed/accounting/`); steps that removed nothing show "no change".
+   - 4.2 **Normalization per VCF** (`bcftools norm` counts), 4.3 **Harmonization per VCF**
+     (VAF/depth source, missing values, removed records), 4.4 **Variant annotation**
+     (Ensembl VEP module: variant classes, consequences, position in protein, variants per
+     chromosome; with `--vep`).
+5. **Coverage and genomic regions**
+   - 5.1 **Compared genomic region**: cards (genome, every target BED with its technology and
+     role, common region, callable per sample) in Mbp; the steps as a flow; vertical bars
+     (log or linear scale); the callable region per sample.
+   - 5.2 **Coverage**: mean depth and percent of bases ≥ each threshold per alignment, in the
+     common and the target region (without alignments a short note).
+   - 5.3 **Depth distributions** (mosdepth module, with alignments).
+6. **Methods and quality control**
+   - 6.1 **Consistency checks**: passed/failed per category, failed checks listed.
+   - 6.2 **Input checks** (reference check of every input), 6.3 **Methods description**
+     (tools and citations), 6.4 **Software versions**, 6.5 **Workflow summary**
+     (parameters).
+
+The chapters are MultiQC custom-content modules (`parent_id` `vc_ch_<chapter>`, written by
+`report_content.py`); the names, descriptions and order of the tool modules are set in
+`assets/multiqc_config.yml`. MultiQC lists the sections of a chapter in the table of
+contents only if the chapter has more than one section.
 
 No table with variants in rows has more than 15 rows in MultiQC; the sections link to the
 table browser. The bar plots are vertical with the samples on the x-axis: MultiQC's own bar

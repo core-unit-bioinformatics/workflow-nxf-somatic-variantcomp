@@ -309,12 +309,16 @@ nf-core-style pipelines.
 
 ### Report and end-of-run checks (feedback 2026-10-22 and 2026-10-26, D34/D37)
 
-- **MultiQC is the main report** (D37, replaces the narrative report of D33). The variantcomp
-  sections (`bin/report_content.py`, ids `vc_*`, order in `assets/multiqc_config.yml`) come
-  first, ordered by importance: Summary (cards of recall/precision/F1 per matching method,
-  run cards, key findings), Introduction (bullet lists), key results, then details, then
-  the QC of the steps, methods and versions. Concise, not overloaded: every section starts
-  with text that explains what is shown.
+- **MultiQC is the main report** (D37, replaces the narrative report of D33). It reads like
+  a book (D39): six numbered chapters (`CHAPTERS`, `SECTIONS` in `bin/report_content.py`;
+  custom content grouped by `parent_id` `vc_ch_<chapter>`): 1 Summary, 2 Known variants,
+  3 Discordance, 4 Variant filtering, 5 Coverage and genomic regions, 6 Methods and quality
+  control. Every chapter starts with an introduction (markdown, `chapter_intros()`), every
+  section with a markdown description (what is shown, bullets with bold key terms, how to
+  read it). Tool modules (VEP, mosdepth, step tables, methods, versions, workflow summary)
+  get their chapter number and order in `assets/multiqc_config.yml` and are listed in
+  `TOOL_MODULES` (styled as sections). A new section gets an entry in `SECTIONS`; a chapter
+  is always written (a short note if its inputs are missing), so the numbers stay stable.
 - **Plots for readers.** Bar plots are vertical with the samples on the x-axis (Plotly of
   the MultiQC report via `JS_LIB`, following the toolbox: hide, highlight, rename);
   recall/precision axes always span 0 to 1; sizes in Mbp; matching methods (vcfeval,

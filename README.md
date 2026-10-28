@@ -149,11 +149,14 @@ in [`docs/testing.md`](docs/testing.md). Planned further work is collected in
 Open **`<outdir>/main.html`**: it shows the MultiQC report inside the table browser, and the
 menu at the top switches to the variant tables.
 
-- **MultiQC report** (`multiqc/multiqc_report.html`, the main report): summary cards of
-  recall, precision and F1 per matching method, per-sample plots (recall vs. precision,
-  Venn diagrams of truth and query, truth variants found), known variants, why variants
-  differ, the discordant variants in detail, region, filtering and coverage, then the QC of
-  every step.
+- **MultiQC report** (`multiqc/multiqc_report.html`, the main report), in six chapters,
+  each with an introduction: **1 Summary** (cards of recall, precision and F1 per matching
+  method, recall vs. precision, metrics per sample, Venn diagrams of truth and query, truth
+  variants found), **2 Known variants**, **3 Discordance** (why variants differ, the
+  discordant variants in detail), **4 Variant filtering** (a funnel from the input records
+  to the compared variants, normalization, harmonization, VEP), **5 Coverage and genomic
+  regions**, **6 Methods and quality control** (consistency checks, input checks, methods,
+  versions).
 - **Table browser** (`report/tables/`, datavzrd): every truth, compared and discordant
   variant with gene and HGVS.p first, reasons, links to GeneCards, Ensembl, dbSNP and
   COSMIC.

@@ -143,7 +143,7 @@ def inputs(tmp_path, check_status="ok"):
             "other",
         ],
         [
-            ["S1", "wes", 1, "input", "input", ".", 5, 4, 1, 0],
+            ["S1", "wes", 1, "input", "in", ".", 5, 4, 1, 0],
             ["S1", "wes", 2, "pass_split", "removed", "filter_not_pass", 1, 1, 0, 0],
             ["S1", "wes", 7, "filters", "removed", "outside_region", 1, 1, 0, 0],
             ["S1", "wes", 7, "filters", "kept", ".", 3, 2, 1, 0],
@@ -237,6 +237,112 @@ def test_multiqc_sections(tmp_path):
     assert "TP53 p.Arg175fs" in detail
     # region steps in Mbp/kbp, not bp
     assert "10.0 kbp" in (tmp_path / "mqc" / "vc_regions_mqc.html").read_text()  # fmt: skip
+
+
+def mqc_header(path):
+    """The keys of the header of a vc_*_mqc.html section (one 'key: JSON value' per line)."""
+    text = path.read_text()
+    header = text[text.index("<!--") + 4 : text.index("-->")]
+    return {
+        line.split(": ", 1)[0]: json.loads(line.split(": ", 1)[1])
+        for line in header.strip().splitlines()
+    }
+
+
+def test_sections_are_grouped_in_numbered_chapters(tmp_path):
+    result = run(tmp_path, *inputs(tmp_path), "--multiqc", "mqc")
+    assert result.returncode == 0, result.stderr
+    intros = {}
+    for path in sorted((tmp_path / "mqc").iterdir()):
+        section = path.name[3 : path.name.index("_mqc")]
+        if path.suffix == ".html":
+            keys = mqc_header(path)
+        else:
+            keys = json.loads(path.read_text())
+        chapter, number = report_content.SECTIONS[section]
+        chapter_no, title = report_content.CHAPTERS[chapter]
+        # every section in the MultiQC module of its chapter, with a numbered name
+        assert keys["parent_id"] == f"vc_ch_{chapter}", section
+        assert keys["parent_name"] == f"{chapter_no} {title}"
+        assert keys["section_name"].startswith(f"{chapter_no}.{number} "), keys["section_name"]
+        # the same introduction in every section of a chapter (MultiQC takes the first)
+        assert keys["parent_description"], section
+        assert intros.setdefault(chapter, keys["parent_description"]) == keys["parent_description"]
+    # all six chapters are written, also without known variants and alignments
+    assert set(intros) == set(report_content.CHAPTERS)
+    assert "No known-variant list was given" in intros["known"]
+    assert (
+        "No alignments were given"
+        in mqc_header(tmp_path / "mqc" / "vc_coverage_mqc.html")["description"]
+    )
+    # the intro of the filtering chapter names the uniform thresholds of the run
+    assert "VAF &ge; 0" in intros["filtering"]
+
+
+def test_funnel_steps_follow_the_accounting():
+    acc = report_content.pd.DataFrame(
+        [
+            ["S1", "wes", 1, "input", "in", ".", 10, 8, 2],
+            ["S1", "wes", 2, "pass_split", "removed", "filter_not_pass", 3, 2, 1],
+            ["S1", "wes", 5, "normalization", "added", "split", 2, "NA", "NA"],
+            ["S1", "wes", 5, "normalization", "removed", "duplicate", 1, "NA", "NA"],
+            ["S1", "wes", 6, "harmonization", "removed", "symbolic_allele", 0, "NA", "NA"],
+            ["S1", "wes", 7, "filters", "removed", "outside_region", 4, 3, 1],
+            ["S1", "wes", 7, "filters", "removed", "vaf_below_min", 1, 1, 0],
+            ["S1", "wes", 7, "filters", "kept", ".", 3, 2, 1],
+        ],
+        columns=["sample", "technology", "step", "step_name", "outcome", "reason", "records",
+                 "snv", "indel"],
+    )  # fmt: skip
+    steps = report_content.funnel_steps(acc)
+    # steps 3 and 4 (contigs, gVCF blocks) without rows: shown without change
+    assert [s["name"] for s in steps] == [
+        "input",
+        "pass_split",
+        "contigs",
+        "gvcf_blocks",
+        "normalization",
+        "harmonization",
+        "filters",
+        "compared",
+    ]
+    # records left after every step: 10 - 3 = 7, 7, 7, + 2 split - 1 duplicate = 8, 8,
+    # 8 - 5 = 3
+    assert [s["records"] for s in steps] == [10, 7, 7, 7, 8, 8, 3, 3]
+    assert steps[2]["removed"] == {} and steps[3]["removed"] == {}
+    assert steps[4]["removed"] == {"duplicate": 1} and steps[4]["added"] == 2
+    assert steps[5]["removed"] == {}  # zero counts are no change
+    assert steps[6]["removed"] == {"outside_region": 4, "vaf_below_min": 1}
+    assert (steps[0]["snv"], steps[0]["indel"]) == (8, 2)
+    assert (steps[-1]["snv"], steps[-1]["indel"], steps[-1]["expected"]) == (2, 1, 3)
+    html = report_content.funnel_html(steps)
+    assert html.count("class='vc-frow'") == 8
+    assert "&minus;3 <code>filter_not_pass</code>" in html and "+2 <code>split</code>" in html
+    # a compared count that differs from the steps above is pointed out
+    steps[-1]["records"] = 2
+    assert "expected 3 from the steps" in report_content.funnel_html(steps)
+
+
+def test_multiqc_config_orders_every_chapter_and_tool_module():
+    import yaml
+
+    config = yaml.safe_load((SCRIPT.parents[1] / "assets" / "multiqc_config.yml").read_text())
+    order = config["report_section_order"]
+    chapters = [f"vc_ch_{c}" for c in report_content.CHAPTERS]
+    # chapters in their order (higher = earlier), every tool module after its chapter
+    assert [order[c]["order"] for c in chapters] == sorted(
+        (order[c]["order"] for c in chapters), reverse=True
+    )
+    for anchor in report_content.TOOL_MODULES:
+        assert anchor in order, anchor
+    assert (
+        order["vc_ch_filtering"]["order"] > order["vep"]["order"] > order["vc_ch_regions"]["order"]
+    )
+    assert (
+        order["vc_ch_regions"]["order"]
+        > order["mosdepth"]["order"]
+        > order["vc_ch_methods"]["order"]
+    )
 
 
 def test_failed_check_banner(tmp_path):

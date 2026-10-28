@@ -4,6 +4,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Dates follow ISO 8601 (`YYYY-MM-DD`).
 
+## Unreleased
+
+### `Changed`
+
+- **MultiQC report as a book** (decision D39): six numbered chapters, each with an
+  introduction that explains what is shown and what was done: 1 Summary (results at a
+  glance, what was compared, recall and precision, metrics per sample right after the
+  recall/precision plot, overlap, truth variants found), 2 Known variants, 3 Discordance
+  (why variants differ, discordant variants in detail), 4 Variant filtering, 5 Coverage and
+  genomic regions (region first, then coverage and mosdepth), 6 Methods and quality control
+  (consistency checks, input checks, methods description, software versions, workflow
+  summary). Sections are numbered (1.1, 1.2, ...); the tool modules (VEP, mosdepth, step
+  tables) follow their chapter with its number and are indented like its sections.
+- Every section starts with a markdown description: what is shown, the key points as
+  bullets with bold terms, how to read it; larger text in the report.
+- Known variants and coverage are always written as chapters/sections, with a short note
+  if their inputs are missing (stable chapter numbers).
+
+### `Added`
+
+- **Filtering funnel** (section 4.1): one box per preprocessing step in the order of the
+  normalization chain (input, PASS filter, contigs, gVCF blocks, normalization,
+  harmonization, uniform filters and region, compared), its width the share of the input
+  records left, the records removed per reason and added by `split` next to every box; all
+  VCFs or the VCFs of one technology (`report_content.py`: `funnel_steps`, `funnel_html`).
+- Tests: chapters and numbering of every section, the funnel counts, the MultiQC order of
+  every chapter and tool module.
+
 ## v0.16.0-dev - [2026-10-28]
 
 Report, correctness and test-data release: MultiQC is the main report with a start page,

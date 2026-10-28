@@ -488,6 +488,19 @@ def badge(text, color):
 
 # ----------------------------------------------------------------------------- MultiQC
 
+# anchors of the MultiQC modules that follow a chapter (named and ordered in
+# assets/multiqc_config.yml); styled as sections of that chapter
+TOOL_MODULES = [
+    "variantcomp_normalization",
+    "variantcomp_harmonization",
+    "vep",
+    "mosdepth",
+    "variantcomp_input_checks",
+    "core-unit-bioinformatics-workflow-nxf-somatic-variantcomp-methods-description",
+    "multiqc_software_versions",
+    "core-unit-bioinformatics-workflow-nxf-somatic-variantcomp-summary",
+]
+
 CSS = """
 <style>
 .vc-cards { display: flex; flex-wrap: wrap; gap: 10px; margin: 8px 0 14px; }
@@ -520,8 +533,50 @@ CSS = """
 .vc-dot { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 6px; opacity: 0.8; }
 /* the MultiQC welcome banner (tutorial video) is not needed in this report */
 #mqc_welcome { display: none !important; }
+/* the report as a book (decision D39): larger text, chapters with a heading line and an
+   introduction box; the tool modules after a chapter (anchors in TOOL_MODULES) look like
+   its sections, in the text and in the table of contents */
+.mqc-module-section p, .mqc-module-section li, .mqc-section-description { font-size: 15px; line-height: 1.55; }
+.mqc-module-section .vc-note { font-size: 14px; }
+.mqc-module-section[data-module-anchor^="vc_ch_"] h2 { font-size: 2.1rem; font-weight: 700;
+    border-bottom: 3px solid #4e79a7; padding-bottom: 6px; width: 100%; }
+.mqc-module-section[data-module-anchor^="vc_ch_"] { margin-top: 3rem; }
+.mqc-module-section[data-module-anchor^="vc_ch_"] .mqc-module-section-first > p,
+.mqc-module-section[data-module-anchor^="vc_ch_"] .mqc-module-section-first > ul,
+.mqc-module-section[data-module-anchor^="vc_ch_"] .mqc-module-section-first > ol {
+    background: var(--bs-tertiary-bg, #f3f6f9); margin: 0; padding: 6px 16px 6px 16px; font-size: 15.5px; }
+.mqc-module-section[data-module-anchor^="vc_ch_"] .mqc-module-section-first > ul,
+.mqc-module-section[data-module-anchor^="vc_ch_"] .mqc-module-section-first > ol { padding-left: 36px; }
+.mqc-module-section[data-module-anchor^="vc_ch_"] .mqc-module-section-first > p:first-of-type { padding-top: 12px; border-radius: 8px 8px 0 0; }
+.mqc-module-section[data-module-anchor^="vc_ch_"] .mqc-module-section-first > :last-child { padding-bottom: 12px; border-radius: 0 0 8px 8px; margin-bottom: 12px; }
+.mqc-section h3 { font-size: 1.45rem; margin-top: 1.6rem; }
+/* filtering funnel: centred boxes, the changes of every step on the right */
+.vc-funnel { display: flex; flex-direction: column; gap: 5px; margin: 8px 0 16px; }
+.vc-frow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.vc-fbarwrap { flex: 0 0 62%; display: flex; justify-content: center; }
+.vc-fbar { background: rgba(78,121,167,0.18); border: 1px solid rgba(78,121,167,0.6);
+           border-radius: 6px; padding: 5px 10px; text-align: center; font-size: 13px; line-height: 1.35; }
+.vc-fbar.final { background: rgba(89,161,79,0.25); border-color: #59a14f; }
+.vc-fbar .vc-fn { font-size: 17px; font-weight: 700; margin-left: 4px; }
+.vc-fbar .vc-fpct, .vc-fbar .vc-fkind { display: block; font-size: 11.5px; color: var(--bs-secondary-color, #5c6b7a); }
+.vc-fchanges { flex: 1 1 30%; font-size: 12.5px; display: flex; flex-wrap: wrap; gap: 3px 8px; }
+.vc-fremoved, .vc-fadded { border-left: 4px solid #e15759; padding-left: 5px; white-space: nowrap; }
+.vc-fadded { border-color: #59a14f; }
+.vc-fchanges code { font-size: 11.5px; }
+.mqc-nav a.nav-l1[href^="#vc_ch_"] { font-weight: 700; }
+TOOL_MODULE_CSS
 </style>
 """
+# tool modules: heading of the size of a section, indented in the table of contents
+CSS = CSS.replace(
+    "TOOL_MODULE_CSS",
+    "\n".join(
+        # plain concatenation: nf-core lint takes double braces for Jinja placeholders
+        '.mqc-module-section[data-module-anchor="' + a + '"] h2 { font-size: 1.45rem; }\n'
+        '.mqc-nav a.nav-l1[href="#' + a + '"] { padding-left: 1.4em; font-size: 0.92em; }'
+        for a in TOOL_MODULES
+    ),
+)
 
 # the plot library: draws every registered plot (window.vcPlotSpecs) with the Plotly of the
 # MultiQC report, adds view buttons, and redraws on the toolbox events (hide, highlight and
@@ -644,6 +699,13 @@ JS_LIB = r"""
   function drawAll() { window.vcPlotSpecs.forEach(draw); }
   window.vcLib = { draw: draw };
   document.addEventListener("DOMContentLoaded", function () {
+    // the software versions module has a fixed name in MultiQC: number it as section 6.4
+    // of the chapter Methods (heading and table of contents)
+    var name = "6.4 Software versions";
+    var nav = document.querySelector('.mqc-nav a[href="#multiqc_software_versions"]');
+    if (nav) { nav.textContent = name; }
+    var head = document.getElementById("multiqc_software_versions");
+    if (head) { head.textContent = name; }
     window.vcPlotSpecs.forEach(function (s) { buttons(s); draw(s); });
     if (typeof $ !== "undefined") {
       $(document).on("mqc_hidesamples mqc_highlights mqc_renamesamples", drawAll);
@@ -656,34 +718,96 @@ JS_LIB = r"""
 """
 
 
+# ----------------------------------------------------------------------------- chapters
+
+# The MultiQC report reads like a book (decision D39): six chapters, each one MultiQC
+# module (custom content grouped by parent_id) with an introduction; chapters and
+# sections are numbered, and MultiQC sorts the sections of a chapter by their numbered
+# names. The tool modules (VEP, mosdepth), the step tables (MQC_TABLES), the methods
+# description, the software versions and the workflow summary can't be nested in a
+# custom-content module: assets/multiqc_config.yml gives them the number of their chapter
+# and places them right after it (report_section_order).
+CHAPTERS = {
+    "summary": ("1", "Summary"),
+    "known": ("2", "Known variants"),
+    "discordance": ("3", "Discordance"),
+    "filtering": ("4", "Variant filtering"),
+    "regions": ("5", "Coverage and genomic regions"),
+    "methods": ("6", "Methods and quality control"),
+}
+# section id -> (chapter, number of the section within its chapter)
+SECTIONS = {
+    "summary": ("summary", 1),
+    "introduction": ("summary", 2),
+    "recall_precision": ("summary", 3),
+    "metrics": ("summary", 4),
+    "metrics_table": ("summary", 5),
+    "overlap": ("summary", 6),
+    "truth_found": ("summary", 7),
+    "known": ("known", 1),
+    "why": ("discordance", 1),
+    "characterization": ("discordance", 2),
+    "filtering": ("filtering", 1),
+    "regions": ("regions", 1),
+    "coverage": ("regions", 2),
+    "checks": ("methods", 1),
+}
+
+
+def section_title(section_id, name):
+    """Numbered section name, e.g. '1.3 Recall and precision per sample'."""
+    chapter, number = SECTIONS[section_id]
+    return f"{CHAPTERS[chapter][0]}.{number} {name}"
+
+
 class Mqc:
     """Writes the MultiQC custom-content files of the variantcomp sections."""
 
-    def __init__(self, outdir, tables_link):
+    def __init__(self, outdir, tables_link, intros=None):
         self.outdir = outdir
         self.tables = tables_link.rstrip("/")
         self.n_plots = 0
+        # introduction (markdown) of every chapter, see chapter_intros()
+        self.intros = intros or {}
         os.makedirs(outdir, exist_ok=True)
 
     def link(self, view):
         """Path of a datavzrd view relative to the MultiQC report."""
         return f"{self.tables}/{view}/index_1.html"
 
+    def parent(self, section_id):
+        """The chapter of a section as MultiQC custom-content keys. Every section of a
+        chapter carries the same name and introduction: MultiQC takes them from whichever
+        file of the chapter it reads first."""
+        chapter, _ = SECTIONS[section_id]
+        number, title = CHAPTERS[chapter]
+        return {
+            "parent_id": f"vc_ch_{chapter}",
+            "parent_name": f"{number} {title}",
+            "parent_description": self.intros.get(chapter, ""),
+        }
+
     def html(self, section_id, name, description, body):
-        """An HTML section: vc_<id>_mqc.html."""
-        header = (
-            "<!--\n"
-            f"id: 'vc_{section_id}'\n"
-            f"section_name: {json.dumps(name)}\n"
-            f"description: {json.dumps(description)}\n"
-            "-->\n"
-        )
+        """An HTML section: vc_<id>_mqc.html (name and description: markdown)."""
+        keys = {
+            "id": f"vc_{section_id}",
+            "section_name": section_title(section_id, name),
+            "description": description,
+            **self.parent(section_id),
+        }
+        # YAML header in an HTML comment; JSON strings are valid YAML
+        header = "<!--\n" + "".join(f"{k}: {json.dumps(v)}\n" for k, v in keys.items()) + "-->\n"
         with open(os.path.join(self.outdir, f"vc_{section_id}_mqc.html"), "w") as fh:
             fh.write(header + body + "\n")
 
     def json(self, section_id, content):
         """A native MultiQC section (plot or table): vc_<id>_mqc.json."""
-        content = {"id": f"vc_{section_id}", **content}
+        content = {
+            "id": f"vc_{section_id}",
+            **content,
+            "section_name": section_title(section_id, content["section_name"]),
+            **self.parent(section_id),
+        }
         with open(os.path.join(self.outdir, f"vc_{section_id}_mqc.json"), "w") as fh:
             json.dump(content, fh, indent=1)
 
@@ -774,7 +898,7 @@ def section_summary(mqc, d):
         else:
             parts.append(
                 f"<div class='vc-banner fail'>{len(failed)} of {len(checks)} consistency "
-                "checks FAILED: the results may be wrong (section Consistency checks).</div>"
+                "checks FAILED: the results may be wrong (section 6.1 Consistency checks).</div>"
             )
     agg = d["metrics"]
     pairs = comparisons(d["per_pair"])
@@ -875,10 +999,17 @@ def section_summary(mqc, d):
     )
     mqc.html(
         "summary",
-        "Summary",
-        "The main results of the comparison: recall, precision and F1 of every query "
-        "technology compared with the truth technology (switch the matching method with the "
-        "buttons), the size of the run and the key findings.",
+        "Results at a glance",
+        "**What is shown:** the main numbers of the run on one screen.\n\n"
+        "- **Banner:** do the counts of all steps add up (section 6.1)?\n"
+        "- **Cards per query technology:** recall, precision and F1, and the numbers of "
+        "variants in one technology only (FN, FP), summed over all samples (micro average). "
+        "The buttons switch the matching method.\n"
+        "- **This run:** samples, technologies, the size of the compared region and the "
+        "number of compared truth variants.\n"
+        "- **Key findings:** the range of recall over the samples and the most common reason "
+        "of discordant variants.\n"
+        "- **Variant tables:** links to the table browser (datavzrd) with every variant.",
         "\n".join(parts),
     )
 
@@ -1043,8 +1174,10 @@ def section_introduction(mqc, d, args):
     )
     mqc.html(
         "introduction",
-        "Introduction",
-        "What was compared in this run and how.",
+        "What was compared and how",
+        "**What is shown:** the question of the run, its inputs and settings, and how the "
+        "pipeline compares the technologies. The table lists every technology with its "
+        "library type, role (truth or query), caller and target BED.",
         "\n".join(parts),
     )
 
@@ -1082,12 +1215,15 @@ def section_recall_precision(mqc, d):
             {
                 "section_name": "Recall and precision per sample",
                 "description": (
-                    "One dot per sample and query technology (hover for the sample name). "
-                    "Both axes span 0 to 1, so runs can be compared. The buttons switch the "
-                    "matching method: RTG vcfeval (haplotype-aware, main result), bcftools isec "
-                    "with the same allele, bcftools isec with the same position. Recall = "
-                    "TP / (TP + FN) of the truth variants, precision = TP / (TP + FP) of the "
-                    f"query calls. Colours: {legend}."
+                    "**What is shown:** one dot per sample and query technology (hover for "
+                    f"the sample name); colours: {legend}.\n\n"
+                    "- **x-axis: recall** = TP / (TP + FN), the share of the truth variants "
+                    "found; **y-axis: precision** = TP / (TP + FP), the share of the query "
+                    "calls confirmed. Both axes span 0 to 1, so runs can be compared.\n"
+                    "- **Top right is best.** A dot far left: the query misses truth variants "
+                    "(chapter 3, FN); a dot low: the query has calls the truth lacks (FP).\n"
+                    "- **Buttons:** the matching method: RTG vcfeval (haplotype-aware, main "
+                    "result), bcftools isec with the same allele or the same position."
                 ),
                 "plot_type": "scatter",
                 "pconfig": {
@@ -1156,11 +1292,15 @@ def section_recall_precision(mqc, d):
         mqc.json(
             "metrics_table",
             {
-                "section_name": "Metrics per sample",
+                "section_name": "Metrics table per sample",
                 "description": (
-                    "Counts (vcfeval) and recall, precision and F1 of every sample and query "
-                    "technology with the three matching methods. Rows can be hidden and "
-                    "highlighted with the toolbox."
+                    "**What is shown:** the numbers behind 1.3 and 1.4, one row per sample "
+                    "and query technology.\n\n"
+                    "- **TP, FN, FP** (vcfeval): truth variants found, truth variants missed, "
+                    "query calls without a truth variant.\n"
+                    "- **Recall, precision and F1** with the three matching methods (F1 of the "
+                    "isec methods hidden; *Configure columns* shows it).\n"
+                    "- Rows can be sorted, hidden and highlighted with the toolbox."
                 ),
                 "plot_type": "table",
                 "pconfig": {
@@ -1230,8 +1370,12 @@ def section_truth_found(mqc, d):
     mqc.html(
         "truth_found",
         "Truth variants found",
-        "How many of the variants of the truth technology every query technology found, per "
-        "sample.",
+        "**What is shown:** how many of the truth variants of every sample the query "
+        "technology found.\n\n"
+        "- **Bar:** truth variants also called by the query; **label:** found / all compared "
+        "truth variants of the sample.\n"
+        "- Compare the bar heights between samples to see samples with few variants, where "
+        "one missed variant changes the recall a lot.",
         "\n".join(body),
     )
 
@@ -1271,8 +1415,12 @@ def section_overlap(mqc, d):
     mqc.html(
         "overlap",
         "Overlap of the technologies per sample",
-        "How many variants each sample has in both technologies, in the truth technology only "
-        "and in the query technology only, for every matching method.",
+        "**What is shown:** one Venn diagram per sample and query technology.\n\n"
+        "- **Middle: truth variants** called by both technologies (TP).\n"
+        "- **Left:** in the truth technology only (FN, missed by the query); **right:** in the "
+        "query technology only (FP).\n"
+        "- **Buttons:** the matching method; the overlap grows when variants that are "
+        "represented differently are matched by their haplotype (vcfeval).",
         "\n".join(parts),
     )
 
@@ -1370,10 +1518,15 @@ def section_known(mqc, d):
             )
     mqc.html(
         "known",
-        "Known variants",
-        "Validation with known variants: the required variants of a clinical checklist and "
-        "the recall and precision against an external truth set (e.g. SEQC2, GIAB). These "
-        "results are as important for the validation as the comparison of the technologies.",
+        "Required variants and external truth sets",
+        "**What is shown:** the validation with variants known beforehand.\n\n"
+        "- **Required variants:** cards per technology (found / required; green: all found), "
+        "and a matrix variant × technology × sample: **PASS** = called with FILTER PASS inside "
+        "the comparison region; **FAIL** states why not (filtered, outside the region, not "
+        "called). Hover a cell for FILTER, VAF and depth.\n"
+        "- **Benchmark:** recall, precision and F1 of every technology against the external "
+        "truth set, summed over the samples (cards) and per sample (bars), within the "
+        "confident regions of the set and the comparison region.",
         "\n".join(parts),
     )
 
@@ -1565,7 +1718,16 @@ def section_why(mqc, d):
     mqc.html(
         "why",
         "Why variants differ",
-        "The discordant variants of every sample by the reasons why one technology misses them.",
+        "**What is shown:** the discordant variants of every sample by the reasons why one "
+        "technology misses them.\n\n"
+        "- **Main reason** (stacked bars, they add up to all discordant variants): the call "
+        "and the reads of the technology that misses the variant. Buttons: FN + FP, FN only "
+        "(in the truth only), FP only (in the query only).\n"
+        "- **Further reasons** (grouped bars, they don't add up): germline evidence in the "
+        "normal and the context (indel, low VAF, repeat, GIAB and other stratifications).\n"
+        "- **How to read it:** *filtered* reasons point to the caller settings, *no or "
+        "subthreshold evidence* to the data (depth, library), *low coverage* and *absent* to "
+        "the target design.",
         "\n".join(body),
     )
 
@@ -1889,9 +2051,16 @@ def section_characterization(mqc, d, fdr):
     mqc.html(
         "characterization",
         "Discordant variants in detail",
-        "Which variants are found in one technology only (FN: in the truth technology only; FP: "
-        "in the query technology only), why, and what characterizes them: variant type, VAF, "
-        "consequence, repeats, genes and the reasons, including variants with several reasons.",
+        "**What is shown:** which variants are found in one technology only, and what they "
+        "have in common, per comparison.\n\n"
+        "- **Lists:** FN (in the truth technology only) and FP (in the query technology only), "
+        "with gene, protein change and reasons (at most 15 rows; all in the table browser).\n"
+        "- **Category profiles:** the share of indels, low-VAF variants, repeats and "
+        "stratifications among TP, FN and FP; **VAF** of the three sets.\n"
+        "- **Combinations of reasons**, **protein-altering variants** and **genes** with "
+        "discordant variants.\n"
+        "- **Enrichment:** features more frequent among discordant than among concordant "
+        "variants (Fisher's exact test, Benjamini-Hochberg q).",
         "\n".join(parts),
     )
 
@@ -2008,8 +2177,14 @@ def section_metrics(mqc, d):
     mqc.html(
         "metrics",
         "Comparison metrics per sample",
-        "Recall, precision and F1 of every sample by variant type and by the VAF of the truth "
-        "call (RTG vcfeval).",
+        "**What is shown:** recall, precision and F1 of every sample split by what makes "
+        "variants hard to find (RTG vcfeval matching).\n\n"
+        "- **By variant type:** SNVs and indels separately; indels are usually harder "
+        "(alignment, representation).\n"
+        "- **By VAF of the truth call:** recall in VAF bins; low recall in the low bins shows "
+        "the detection limit of the query technology (depth, purity).\n"
+        "- **Power-adjusted recall** (with alignments): only the truth variants that the "
+        "query could detect at its depth.",
         "\n".join(parts),
     )
 
@@ -2127,12 +2302,6 @@ def section_regions(mqc, d):
     ]
     parts = [
         cards(items, accent="#f28e2b"),
-        "<p class='vc-note'>Variants are only compared where every technology could have "
-        "called them: the compared genome is restricted to the intersection of the target "
-        "BEDs of all targeted technologies (whole-genome sequencing has no target BED), "
-        "optionally to --regions_bed and without --exclude_bed; with alignments, every sample "
-        "is restricted further to the bases with enough depth in all its alignments "
-        "(callable).</p>",
         flow_html(steps),
         mqc.plot(
             views,
@@ -2168,18 +2337,180 @@ def section_regions(mqc, d):
     mqc.html(
         "regions",
         "Compared genomic region",
-        "The genomic region in which the technologies are compared and how it was built.",
+        "**What is shown:** the genomic region in which the technologies are compared, and "
+        "how it was built.\n\n"
+        "- **Cards:** the compared genome (without chrM, decoy and alt contigs), the target "
+        "BED of every targeted technology, the common region and the callable region per "
+        "sample.\n"
+        "- **Flow:** the steps from the genome to the common region with the size after every "
+        "step (intersection of the target BEDs, `--regions_bed`, `--exclude_bed`).\n"
+        "- **Bars:** the same sizes in Mbp (log or linear scale); green: callable per sample "
+        "(bases with enough depth in every alignment of the sample).\n"
+        "- **Table:** the callable region per sample (mosdepth mode and depth thresholds).",
         "\n".join(parts),
     )
 
 
+# the boxes of the filtering funnel: step name of the accounting tables -> (title, what
+# the step does); in the order of the normalization chain (variant_accounting.py)
+FUNNEL_STEPS = {
+    "input": ("Input records", "all records of the input VCFs"),
+    "pass_split": ("PASS filter", "only calls with FILTER PASS (or '.') are compared"),
+    "contigs": ("Compared contigs", "records on chrM, decoy, alt and unplaced contigs removed"),
+    "gvcf_blocks": ("gVCF blocks", "reference blocks (only ALT <NON_REF> or <*>) removed"),
+    "normalization": (
+        "Normalization",
+        "split per ALT, left-aligned, MNVs atomized, REF checked, deduplicated (bcftools norm)",
+    ),
+    "harmonization": (
+        "Harmonization",
+        "VAF, depth and alt reads set the same way for every caller; leftover symbolic and "
+        "'*' alleles removed",
+    ),
+    "filters": (
+        "Uniform filters and region",
+        "the same VAF, depth and alt-read thresholds for every VCF; only the comparison region",
+    ),
+}
+
+# preprocessing steps that always run but are written to the accounting tables only if they
+# removed records (variant_accounting.py): step number -> step name
+ALWAYS_STEPS = {3: "contigs", 4: "gvcf_blocks"}
+
+
+def funnel_steps(acc):
+    """The records left after every preprocessing step, summed over the given accounting
+    rows (one or more VCFs).
+
+    acc: accounting rows (variant_accounting.py: step, step_name, outcome, reason,
+    records, snv, indel). Returns a list of dicts in step order: name, records (left
+    after the step), removed ({reason: records}), added (records), and for the input and
+    the compared records snv/indel. The last entry is the compared records ('compared',
+    the kept records of the last step); 'expected' is the count from the steps before,
+    which must be the same (consistency check of the accounting).
+    """
+    if acc.empty:
+        return []
+    acc = acc.copy()
+    acc["records"] = pd.to_numeric(acc["records"], errors="coerce").fillna(0)
+    steps = []
+    left = 0
+    acc["step"] = acc["step"].astype(int)
+    # steps 3 and 4 always run, but have rows only if they removed records
+    step_nos = sorted(set(acc["step"]) | set(ALWAYS_STEPS))
+    for step_no in step_nos:
+        rows = acc[acc["step"] == step_no]
+        if rows.empty:
+            steps.append(
+                {"name": ALWAYS_STEPS[step_no], "records": left, "removed": {}, "added": 0}
+            )
+            continue
+        name = str(rows["step_name"].iloc[0])
+        # step 1: the records read from the input VCF
+        inp = rows[rows["outcome"] == "in"]
+        if not inp.empty:
+            left = int(inp["records"].sum())
+            steps.append({"name": name, "records": left, "removed": {}, "added": 0, **types(inp)})
+            continue
+        removed = rows[rows["outcome"] == "removed"].groupby("reason")["records"].sum()
+        removed = {str(k): int(v) for k, v in removed.items() if v > 0}
+        added = int(rows.loc[rows["outcome"] == "added", "records"].sum())
+        left = left - sum(removed.values()) + added
+        steps.append({"name": name, "records": left, "removed": removed, "added": added})
+    # the compared records: kept by the last step
+    last = acc[acc["step"] == acc["step"].max()]
+    kept = last[last["outcome"] == "kept"]
+    steps.append(
+        {
+            "name": "compared",
+            "records": int(kept["records"].sum()),
+            "expected": left,
+            "removed": {},
+            "added": 0,
+            **types(kept),
+        }
+    )
+    return steps
+
+
+def types(rows):
+    """SNV and indel counts of accounting rows (NA if a table gives none)."""
+    out = {}
+    for col in ("snv", "indel"):
+        values = (
+            pd.to_numeric(rows[col], errors="coerce") if col in rows else pd.Series(dtype=float)
+        )
+        out[col] = int(values.sum()) if values.notna().any() else None
+    return out
+
+
+def funnel_html(steps):
+    """The steps as a funnel of boxes: width = share of the input records (at least 18 %,
+    so that small numbers stay readable), removed records per reason next to every box."""
+    if not steps:
+        return "<p class='text-muted'>No data.</p>"
+    total = max(steps[0]["records"], 1)
+    rows = []
+    for i, s in enumerate(steps):
+        title, what = FUNNEL_STEPS.get(s["name"], ("Compared variants", ""))
+        if s["name"] == "compared":
+            what = "PASS calls in the comparison region, compared between the technologies"
+        width = max(18.0, 100.0 * s["records"] / total)
+        kind = ""
+        if s.get("snv") is not None and s.get("indel") is not None:
+            kind = f"<span class='vc-fkind'>{fmt_int(s['snv'])} SNV · {fmt_int(s['indel'])} indel</span>"
+        # what the step changed: removed per reason, added split records
+        changes = [
+            f"<span class='vc-fremoved' style='border-color:{REASON_COLOR.get(r, '#e15759')}'>"
+            f"&minus;{fmt_int(n)} <code>{esc(r)}</code></span>"
+            for r, n in sorted(s["removed"].items(), key=lambda kv: -kv[1])
+        ]
+        if s["added"]:
+            changes.append(
+                f"<span class='vc-fadded'>+{fmt_int(s['added'])} <code>split</code></span>"
+            )
+        if i and not changes and s["name"] != "compared":
+            changes.append("<span class='vc-note'>no change</span>")
+        if s["name"] == "compared" and s.get("expected") not in (None, s["records"]):
+            changes.append(
+                f"<span class='vc-fremoved'>expected {fmt_int(s['expected'])} from the steps "
+                "above: see the consistency checks</span>"
+            )
+        final = " final" if s["name"] == "compared" else ""
+        rows.append(
+            f"<div class='vc-frow'><div class='vc-fbarwrap'>"
+            f"<div class='vc-fbar{final}' style='width:{width:.1f}%' title='{esc(what)}'>"
+            f"<b>{esc(title)}</b> <span class='vc-fn'>{fmt_int(s['records'])}</span>"
+            f"<span class='vc-fpct'>{fmt_pct(s['records'], total, 1)}</span>{kind}</div></div>"
+            f"<div class='vc-fchanges'>{''.join(changes)}</div></div>"
+        )
+    return "<div class='vc-funnel'>" + "".join(rows) + "</div>"
+
+
 def section_filtering(mqc, d):
-    """Input variant sets and their filtering: records per VCF, compared and removed per
-    reason (vertical stacked bars)."""
+    """Input variant sets and their filtering: funnel of the preprocessing steps (all VCFs,
+    per technology), then the records per VCF, compared and removed per reason (vertical
+    stacked bars)."""
     acc = d["accounting"]
     if acc.empty:
         return
     acc = acc.copy()
+    # funnel: all VCFs and every technology (summed over the samples)
+    groups = [("all", "all VCFs", acc)] + [
+        (f"tech_{i}", f"{tech} VCFs", sub)
+        for i, (tech, sub) in enumerate(
+            sorted(acc.groupby("technology"), key=lambda kv: str(kv[0]))
+        )
+    ]
+    funnel = [toggle_buttons("funnel", [(k, label) for k, label, _ in groups])]
+    for key, label, sub in groups:
+        n_vcfs = sub[["sample", "technology"]].drop_duplicates().shape[0]
+        funnel.append(
+            f"<div data-vc-group='funnel' data-vc-key='{key}' class='{'' if key == 'all' else 'vc-hidden'}'>"
+            f"<p class='vc-note'>{esc(label)}: {n_vcfs} VCF(s), records summed over the samples.</p>"
+            + funnel_html(funnel_steps(sub))
+            + "</div>"
+        )
     acc["vcf"] = acc["sample"].astype(str) + " " + acc["technology"].astype(str)
     order = sorted(acc["vcf"].unique())
     sample_of = acc.drop_duplicates("vcf").set_index("vcf")["sample"].astype(str)
@@ -2219,17 +2550,16 @@ def section_filtering(mqc, d):
         )
     reasons = "".join(f"<li><code>{esc(k)}</code>: {esc(v)}</li>" for k, v in REASON_TEXT.items())
     body = [
-        "<p class='vc-note'>Every input VCF is processed the same way: only PASS calls are "
-        "compared, records outside the compared contigs and gVCF blocks are removed, "
-        "multiallelic records are split, left-aligned and deduplicated, and the uniform filters "
-        "and the comparison region are applied. The plot shows how many records of every VCF "
-        "were compared and how many were removed, and why.</p>",
+        "<div class='vc-group'>From the input records to the compared variants</div>",
+        *funnel,
+        "<div class='vc-group'>Records of every VCF</div>",
         mqc.plot(
             views,
             height=440,
-            caption="Input records per VCF (sample and technology); 'split' additions are not shown.",
+            caption="Input records per VCF (sample and technology): compared (green) and removed "
+            "per reason; 'split' additions are not shown. Buttons: records or percent.",
         ),
-        f"<details><summary>Reasons</summary><ul>{reasons}</ul></details>",
+        f"<details><summary>What the reasons mean</summary><ul>{reasons}</ul></details>",
         f"<p class='vc-note'><a href='{esc(mqc.link('preprocessing'))}' target='_blank'>Counts per "
         f"step</a> and <a href='{esc(mqc.link('removed-records'))}' target='_blank'>every removed "
         "record</a> in the table browser &rarr;</p>",
@@ -2237,7 +2567,18 @@ def section_filtering(mqc, d):
     mqc.html(
         "filtering",
         "Input variant sets and their filtering",
-        "Records of every input VCF: compared, and removed per reason.",
+        "**What is shown:** how many records of the input VCFs reach the comparison, and why "
+        "the others were removed.\n\n"
+        "- **Funnel:** one box per preprocessing step, in the order the pipeline runs them; "
+        "the box width is the share of the input records that is left (at least 18 % wide so "
+        "that small numbers stay readable). Next to every box: the records the step removed, "
+        "per reason, and the records it added (`split`: one record per ALT allele). The "
+        "buttons show all VCFs or the VCFs of one technology.\n"
+        "- **Records of every VCF:** the same counts for every input VCF as stacked bars.\n"
+        "- **How to read it:** the comparison only covers the green part. Most input records "
+        "are usually removed by the **PASS filter** (unfiltered VCFs carry many rejected "
+        "candidates) and by the **comparison region** (calls outside the common targets or the "
+        "callable bases).",
         "\n".join(body),
     )
 
@@ -2284,8 +2625,14 @@ def section_coverage(mqc, d):
     mqc.html(
         "coverage",
         "Coverage",
-        "Depth of every alignment in the common comparison region and in the target region of "
-        "its technology (the genome for WGS); mosdepth, --coverage_thresholds.",
+        "**What is shown:** the depth of every alignment (mosdepth), the main reason why a "
+        "technology misses variants.\n\n"
+        "- **Two regions per alignment:** the common comparison region (where variants are "
+        "compared) and the target region of its technology (the genome for WGS).\n"
+        "- **Buttons:** mean depth, or the percent of bases with at least the depths of "
+        "`--coverage_thresholds`.\n"
+        "- A low depth in the comparison region explains *low coverage* and *subthreshold "
+        "evidence* reasons in chapter 3.",
         mqc.plot(views, height=420)
         + f"<p class='vc-note'><a href='{esc(mqc.link('coverage'))}' target='_blank'>Coverage table "
         "in the table browser &rarr;</a></p>",
@@ -2306,10 +2653,6 @@ def section_checks(mqc, d):
     summary["failed"] = summary["checks"] - summary["passed"]
     failed = checks[checks["status"] != "ok"]
     parts = [
-        "<p class='vc-note'>The counts of all steps must add up: records per VCF and step "
-        "(input = removed + kept), metrics = variant tables, classes = discordant variants, "
-        "aggregated = sum over the samples, regions. A failed check stops the pipeline after "
-        "the reports were written.</p>",
         html_table(
             summary,
             link=mqc.link("consistency-checks"),
@@ -2321,24 +2664,191 @@ def section_checks(mqc, d):
         parts.append(
             html_table(failed, link=mqc.link("consistency-checks"), link_text="All checks")
         )
-    mqc.html("checks", "Consistency checks", "Do the counts of all steps add up?", "\n".join(parts))
+    mqc.html(
+        "checks",
+        "Consistency checks",
+        "**What is shown:** whether the counts of all steps add up, as a table of check "
+        "categories (all checks in the table browser).\n\n"
+        "- **Accounting:** records per VCF and step, input = removed + kept + added.\n"
+        "- **Metrics and tables:** the metrics equal the counts of the variant tables, the "
+        "aggregated metrics the sum over the samples, every isec status its metrics.\n"
+        "- **Discordance and reasons:** every discordant variant has exactly one main reason, "
+        "and every reason rule is recomputed; at least `--evidence_check_min_fraction` of "
+        "the TP variants have alt reads in the alignments (read evidence works).\n"
+        "- **Regions and required variants:** sizes and statuses agree between the steps.\n\n"
+        "A failed check stops the pipeline after the reports were written, so that the "
+        "failure can be inspected.",
+        "\n".join(parts),
+    )
+
+
+def chapter_intros(d, args):
+    """The introduction of every chapter (markdown): what the chapter shows, what was done,
+    and which section answers which question. Each ends with a sentence (MultiQC appends a
+    full stop to a module introduction)."""
+    pairs = comparisons(d["per_pair"])
+    truth = pairs[0][0] if pairs else param(d["params"], "truth_technology")
+    queries = ", ".join(sorted({q for _, q in pairs})) or "NA"
+    n_samples = d["per_pair"]["sample"].nunique() if not d["per_pair"].empty else 0
+    known = not (d["required_summary"].empty and d["known_benchmark"].empty)
+    pass_only = args.filter_pass_only != "false"
+    return {
+        "summary": (
+            "This chapter gives the **main result of the run**: how well every query technology "
+            f"(**{queries}**) finds the somatic variants of the truth technology **{truth}** in "
+            f"the same tumor/normal pairs ({n_samples} samples).\n\n"
+            "- **Recall** = TP / (TP + FN): the share of the truth variants that the query "
+            "technology also called.\n"
+            "- **Precision** = TP / (TP + FP): the share of the query calls that the truth "
+            "technology confirms.\n"
+            "- **F1**: the harmonic mean of recall and precision.\n"
+            "- **Matching methods**: RTG vcfeval (haplotype-aware, the main result), bcftools "
+            "isec with the same allele and with the same position; the buttons switch between "
+            "them. Different numbers show variants that the technologies represent "
+            "differently.\n\n"
+            "Read **1.1** for the overall numbers and the key findings, **1.2** for what was "
+            "compared, **1.3-1.5** for every sample and **1.6-1.7** for the overlap of the "
+            "variant sets. Chapter 3 explains the variants found by one technology only."
+        ),
+        "known": (
+            (
+                "Validation with **variants known beforehand**, independent of the comparison "
+                "of the technologies (`--known_variants`):\n\n"
+                "- **Required variants** (a clinical checklist): every variant must be called "
+                "with FILTER PASS inside the comparison region by every technology in every "
+                "sample; FAIL states why not.\n"
+                "- **Benchmark** (an external truth set such as SEQC2 or GIAB): recall and "
+                "precision of every technology within the confident regions of the set.\n\n"
+                "These results are as important for a validation as the comparison of the "
+                "technologies."
+            )
+            if known
+            else (
+                "Validation with **variants known beforehand** (a clinical checklist of "
+                "required variants, or an external truth set such as SEQC2 or GIAB). No "
+                "known-variant list was given in this run; see `--known_variants` in the "
+                "documentation."
+            )
+        ),
+        "discordance": (
+            "Variants called by only one technology are **discordant**: **FN** are in the "
+            f"truth technology {truth} only (missed by the query), **FP** are in the query "
+            "technology only. Every discordant variant is explained from the view of the "
+            "technology that **misses** it:\n\n"
+            "- **Main reason** (exactly one): called there but not compared (FILTER not PASS, "
+            "or removed by the uniform filters or the region), or not called: no alignment "
+            "given, low coverage, alt reads below the caller's threshold, or no alt reads.\n"
+            "- **Further reasons** (any number): germline evidence in the normal, and the "
+            "context: indel, low VAF, repeat region, GIAB and further stratifications.\n"
+            "- **Read evidence**: reads with the variant allele are counted in the alignments "
+            "of the technology that misses it (indels by their haplotype sequence).\n\n"
+            "**3.1** shows the reasons per sample, **3.2** the variants themselves and what "
+            "characterizes them (type, VAF, genes, enriched features)."
+        ),
+        "filtering": (
+            "Before the comparison, **every input VCF runs through the same steps**, so that "
+            "differences between the technologies come from the data and not from the formats "
+            "of the callers:\n\n"
+            + (
+                "1. **PASS filter**: only PASS calls are compared; the other calls are kept "
+                "aside to explain discordant variants.\n"
+                if pass_only
+                else "1. **No PASS filter** (`--filter_pass_only false`): all calls are compared.\n"
+            )
+            + "2. **Contigs and gVCF blocks**: only the compared reference contigs (no chrM, "
+            "decoy or alt contigs); reference blocks are not variants.\n"
+            "3. **Normalization** (bcftools norm): one record per ALT allele, left-aligned, "
+            "MNVs split into SNVs, REF checked against the FASTA, duplicates removed.\n"
+            "4. **Harmonization**: VAF, depth and alt reads computed the same way for every "
+            "caller; leftover symbolic and '*' alleles removed.\n"
+            f"5. **Uniform filters and region**: VAF &ge; {args.min_vaf}, depth &ge; "
+            f"{args.min_depth}, alt reads &ge; {args.min_alt_reads} (0 = off), and only the "
+            "comparison region (chapter 5).\n\n"
+            "**4.1** shows how many records every step removed, **4.2-4.3** the normalization "
+            "and harmonization of every VCF, **4.4** the annotation of the compared variants "
+            "by Ensembl VEP (if it was run)."
+        ),
+        "regions": (
+            "Variants are only compared **where every technology could have called them**:\n\n"
+            "- the **intersection of the target BEDs** of all targeted technologies "
+            "(whole-genome sequencing has none), optionally only `--regions_bed` and without "
+            "`--exclude_bed`;\n"
+            + (
+                "- per sample, only the **callable bases**: enough depth in the tumor (and "
+                "normal) alignment of every technology (mosdepth).\n\n"
+                if args.callable_regions == "true"
+                else "- callable regions were not used in this run (`--callable_regions false`).\n\n"
+            )
+            + "**5.1** shows how the region was built and how large it is, **5.2** the depth of "
+            "every alignment in the compared and in its target region, **5.3** the depth "
+            "distributions (mosdepth)."
+        ),
+        "methods": (
+            "How the results were produced, and **whether the counts can be trusted**:\n\n"
+            "- **6.1 Consistency checks**: the counts of all steps must add up; a failed check "
+            "stops the run after the reports were written.\n"
+            "- **6.2 Input checks**: every input was checked against the reference at the start "
+            "(contig names and lengths, genome build, REF alleles).\n"
+            "- **6.3 Methods description** with the tools and their citations, **6.4 software "
+            "versions** of every step, **6.5 workflow summary** with the parameters of the "
+            "run.\n\n"
+            "Cite the tools of 6.3 when you use these results."
+        ),
+    }
+
+
+def section_known_placeholder(mqc):
+    """Known variants without a list: a short note, so that the chapter numbers stay the
+    same in every run."""
+    mqc.html(
+        "known",
+        "Required variants and external truth sets",
+        "No known-variant list was given (`--known_variants`).",
+        "<p class='vc-note'>A known-variant sheet adds a clinical checklist of required "
+        "variants (PASS/FAIL per sample and technology) or a benchmark against an external "
+        "truth set (docs/usage.md, section Known variants).</p>",
+    )
+
+
+def section_coverage_placeholder(mqc):
+    """Coverage without alignments: a short note (stable chapter numbers)."""
+    mqc.html(
+        "coverage",
+        "Coverage",
+        "No alignments were given, so the coverage was not computed.",
+        "<p class='vc-note'>With tumor (and normal) alignments in the samplesheet, the "
+        "pipeline computes the depth of every alignment, the callable regions and the read "
+        "evidence of discordant variants.</p>",
+    )
 
 
 def write_multiqc(args, d):
-    """Write all variantcomp MultiQC sections."""
-    mqc = Mqc(args.multiqc, args.tables_link)
+    """Write all variantcomp MultiQC sections, chapter by chapter."""
+    mqc = Mqc(args.multiqc, args.tables_link, chapter_intros(d, args))
+    # 1 Summary
     section_summary(mqc, d)
     section_introduction(mqc, d, args)
     section_recall_precision(mqc, d)
+    section_metrics(mqc, d)
     section_overlap(mqc, d)
     section_truth_found(mqc, d)
-    section_known(mqc, d)
+    # 2 Known variants
+    if d["required_summary"].empty and d["known_benchmark"].empty:
+        section_known_placeholder(mqc)
+    else:
+        section_known(mqc, d)
+    # 3 Discordance
     section_why(mqc, d)
     section_characterization(mqc, d, args.fdr)
-    section_metrics(mqc, d)
-    section_regions(mqc, d)
+    # 4 Variant filtering
     section_filtering(mqc, d)
-    section_coverage(mqc, d)
+    # 5 Coverage and genomic regions
+    section_regions(mqc, d)
+    if d["coverage"].empty:
+        section_coverage_placeholder(mqc)
+    else:
+        section_coverage(mqc, d)
+    # 6 Methods and quality control
     section_checks(mqc, d)
     n = len([f for f in os.listdir(args.multiqc) if f.endswith(("_mqc.html", "_mqc.json"))])
     print(f"INFO: MultiQC: {n} sections, {mqc.n_plots} plots in {args.multiqc}/", file=sys.stderr)
