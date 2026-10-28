@@ -1,6 +1,6 @@
 # Roadmap: further improvements
 
-This file collects work that is planned or proposed after v0.15.0-dev. The implemented
+This file collects work that is planned or proposed after v0.16.0-dev. The implemented
 versions and agreed decisions are in [`pipeline-plan.md`](pipeline-plan.md) (§9, §11).
 Items are grouped by topic, roughly in priority order; nothing here is agreed yet.
 
@@ -13,10 +13,18 @@ Items are grouped by topic, roughly in priority order; nothing here is agreed ye
 - GIAB HG008 tumor/normal truth set as a second external benchmark (`--known_variants`,
   mode `benchmark`).
 
-## 2. Interactive reports
+## 2. Report and statistics precision
 
-- datavzrd tables of the discordant variants (filterable, linked to genes and classes), as
-  in variantinterpretation. Planned since v0.9.0; MultiQC custom content is used for now.
+- Exact precision in the strata and gene tables: they count the TP rows of the variant
+  table, which are in the truth representation; with vcfeval matching one truth record to
+  several query records, their precision differs from the metrics. Add the query-side
+  matches (vcfeval `tp.vcf`) as rows of their own (documented limitation in
+  `docs/output.md`).
+- Read evidence of indels near read ends: a read counts only if it contains the whole
+  haplotype window (`--evidence_indel_flank` bases around the indel), so the alt reads of
+  long indels are a lower bound. Local realignment of the reads against the REF and ALT
+  haplotypes would count partial overlaps too.
+- (Done in 0.16.0-dev: datavzrd tables of all variant tables, MultiQC as the main report.)
 
 ## 3. `all_pairs` comparison
 
@@ -43,10 +51,11 @@ Items are grouped by topic, roughly in priority order; nothing here is agreed ye
 ## 7. VEP extensions
 
 - VEP plugins: REVEL, SpliceAI, AlphaMissense.
-- ClinVar / COSMIC lookup of the discordant variants.
+- ClinVar / COSMIC: IDs and significance come from the VEP cache since 0.16.0-dev; a
+  local ClinVar/COSMIC VCF as a VEP custom annotation would also work with a GTF.
 - HGVS notation as input for the required known variants.
 
-## 8. Discordance class `outside_callable`
+## 8. Discordance reason `outside_callable`
 
 - Open since v0.13: the class can't occur, because both technologies of a sample are
   compared in the same region. Decide whether to drop it for good or to define it per
@@ -69,7 +78,7 @@ Items are grouped by topic, roughly in priority order; nothing here is agreed ye
 
 - UMI- and amplicon-specific settings (e.g. consensus reads, primer trimming checks).
 - FASTQ entry point (out of scope for v1).
-- Tumor-only mode (no normal sample, no germline class).
+- Tumor-only mode (no normal sample, no germline reason).
 
 ## 12. Output schema and provenance
 

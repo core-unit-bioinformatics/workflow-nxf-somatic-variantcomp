@@ -120,6 +120,10 @@ pseudo-technology: a VCF with its confident-region BED and no BAM.
 
 ## 5. Workflow
 
+This section is the design of 2026-10-07, corrected where the implementation differs. The
+implemented steps are listed in the README (generated step table), the outputs in
+`docs/output.md`, and every later decision in §11 (D11-D38).
+
 ```
 INPUT_CHECK (nf-schema + cross-row checks)
 │
@@ -156,16 +160,18 @@ INPUT_CHECK (nf-schema + cross-row checks)
 │     position-only match (bcftools isec -c all)
 │     metrics: recall, precision, F1 — overall, SNV vs indel, VAF bins, strata
 │     power-adjusted recall: truth variants where the query had ≥ detection_power to see them,
-│       from query depth (bcftools mpileup / mosdepth) + binomial model (Python/scipy)
+│       from query depth (read_evidence.py) + binomial model (Python)
 │     comparison_mode=all_pairs: concordance matrix (Jaccard) + multi-way bcftools isec → UpSet
 │     aggregation over samples: micro (summed counts) and macro (mean ± sd)
 │
 ├─ 5.6 DISCORDANCE ───── for every FP/FN record:
 │     type (SNV/MNV/ins/del), indel length, VAF/DP in both technologies
-│     status in the other technology:
-│       absent | present_but_filtered (from *.norm.vcf.gz) | outside_callable
-│     read evidence (if BAMs): bcftools mpileup -a AD,DP on the other technology's tumor & normal
-│       → no_evidence | subthreshold_evidence | germline_in_normal | low_coverage
+│     main reason (exactly one, D38), from the other technology's view:
+│       called: filtered_non_pass | present_but_filtered (from the normalized VCF)
+│       not called, read evidence (read_evidence.py on its tumor alignment, allele-specific,
+│       indels by haplotype sequence): absent | low_coverage | subthreshold_evidence | no_evidence
+│     further reasons: germline_in_normal (normal reads), context: indel, low_vaf,
+│       in_repeat, giab_<name>, stratifications
 │     annotation: bcftools annotate with gene BED (or VEP), stratification BEDs
 │       (homopolymer/STR/segdup/low-mappability), technology target-edge distance
 │     export: bcftools query → TSV
@@ -185,12 +191,15 @@ results/
 ├── regions/           common_targets.bed, callable_<sample>.bed, region_summary.tsv
 ├── coverage/          mosdepth outputs, coverage QC plots
 ├── vcf_preprocessed/  <sample>_<tech>.{norm,filtered,callable}.vcf.gz(.tbi)
-├── benchmark/<sample>/<truth>_vs_<query>/   vcfeval TP/FP/FN VCFs, isec outputs
-├── stats/             metrics_per_pair.tsv, metrics_aggregated.tsv, metrics_by_vaf.tsv,
-│                      metrics_by_stratum.tsv, concordance_matrix.tsv, upset_<sample>.png
-├── discordance/       discordant_variants.tsv, enrichment_tests.tsv, gene_summary.tsv
-├── report/            datavzrd/, multiqc_report.html
+├── benchmark/         rtgtools_vcfeval/, bcftools_isec_exact/, bcftools_isec_position/
+│                      (per sample and pair), metrics/ (all methods, column method)
+├── discordance/       variants.annotated.tsv (reasons), read_evidence/ per alignment
+├── annotation/, known_variants/, input_checks/
+├── report/            tables/ (datavzrd), variantcomp_report.zip, statistics tables
+├── multiqc/           multiqc_report.html (main report)
+├── main.html          start page (table browser with the MultiQC report)
 └── pipeline_info/
+(implemented layout: docs/output.md)
 ```
 
 ## 6. Tooling principles
@@ -205,7 +214,8 @@ results/
    executable, use argparse, and contain no workflow-engine logic.
 2. **nf-core modules to install:**
    - bcftools: `index`, `reheader`, `annotate`, `view`, `norm`, `isec`,
-     `query`, `mpileup`, `pluginsetgt`/`plugin*` where available, `stats`
+     `query`, `pluginsetgt`/`plugin*` where available, `stats` (`mpileup` was used
+     for the read evidence until 0.16.0-dev, D38)
    - bedtools: `sort`, `merge`, `intersect`, `subtract`
    - `mosdepth`
    - rtgtools: `format`, `vcfeval`
@@ -227,7 +237,7 @@ results/
   comes from both the sequencing and the caller. The report shows the caller
   for each pair.
 - **Tumor-only calling produces germline false positives.** The
-  `germline_in_normal` evidence class and an optional population-AF filter
+  `germline_in_normal` reason and an optional population-AF filter
   (VEP/gnomAD) make this visible.
 - **Separate DNA aliquots and subclonality.** Low-VAF discordance is not
   automatically a technical error.
@@ -337,13 +347,19 @@ Everything needed to run offline elsewhere:
 
 Versions `0.12.0-dev` to `0.14.0-dev` refactored the modules and sheet reading (see
 CHANGELOG); `0.15.0-dev` implements the feedback of 2026-10-13
-([`plan-feedback-20261013.md`](plan-feedback-20261013.md)). Further work is collected in
-[`roadmap.md`](roadmap.md).
+([`plan-feedback-20261013.md`](plan-feedback-20261013.md)). `0.16.0-dev` (2026-10-28)
+brings the report (MultiQC as the main report, datavzrd tables, start page and zip;
+D33, D37), the consistency checks (D34), GIAB file parameters (D30), seqc2-toolkit
+test data (D31), strict syntax (D32), atom-overlap handling (D35), runtime optimizations
+(D36) and the correctness fixes of matching and discordance (D38). Further work is
+collected in [`roadmap.md`](roadmap.md).
 
-Status (2026-10-08): `0.1.0-dev` to `0.11.0-dev` implemented and tested on the Raspberry Pi
-(pytest, nf-test, synthetic and SEQC2 small data with `-profile conda`). Not yet done:
-the T2 run on the HPC with Singularity, and datavzrd reports (MultiQC custom content is used
-for now).
+Status (2026-10-28, `0.16.0-dev`): implemented and tested on the Raspberry Pi with
+`-profile conda`: pytest (173 tests), nf-test of the subworkflows, the pipeline on the
+synthetic edge-case data (`-profile test`, design.tsv E01-E15, F01-F05) and on the SEQC2
+small data (`-profile test_seqc2`: chr22 slices of three WES + WGS pairs, MuTect2 calls).
+Not yet done: the T2 run on the HPC with Singularity (full SEQC2), and the real use case
+(DRAGEN v4.4.4, 8 samples × 3 technologies).
 
 ## 10. Workspace layout (agreed)
 

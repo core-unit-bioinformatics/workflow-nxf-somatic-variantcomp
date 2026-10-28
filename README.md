@@ -1,8 +1,9 @@
 # core-unit-bioinformatics/workflow-nxf-somatic-variantcomp
 
 > [!WARNING]
-> Development version. Not yet validated on a full dataset (see the roadmap in
-> [`docs/pipeline-plan.md`](docs/pipeline-plan.md)).
+> Development version **0.16.0-dev** ([`CHANGELOG.md`](CHANGELOG.md)). Tested on synthetic
+> edge cases and small SEQC2 data; not yet validated on a full dataset (see
+> [Tested inputs](#tested-inputs) and [`docs/roadmap.md`](docs/roadmap.md)).
 
 ## Introduction
 
@@ -21,9 +22,11 @@ therefore require:
    harmonization) and identical filtering
 3. Restriction to the intersection of all target regions and, if BAMs are given, to
    regions callable in all technologies
-4. VAF-stratified, detection-power-aware metrics
-5. Classification and annotation of every discordant variant (type, gene, repeat
-   context, coverage, filter status, read evidence)
+4. VAF-stratified, detection-power-aware metrics, with three matching methods
+   (haplotype-aware `rtg vcfeval`; `bcftools isec` by allele and by position)
+5. Reasons for every discordant variant from the view of the technology that misses it
+   (call status, read evidence, germline evidence, genomic context) and its annotation
+   (gene, HGVS, consequence, repeats, GIAB stratifications)
 
 ## Pipeline summary
 
@@ -107,7 +110,7 @@ every step are set in `conf/modules/<subworkflow>.config`.
 | 8.1 | **Match calls haplotype-aware: TP, FN, FP.** Each technology is matched with the truth technology of the same sample, haplotype-aware, so different representations of one variant still match (TP, FN = missed, FP = only in the query). | `rtg vcfeval` | VCFs of all technologies |
 | 8.2 | **Same-allele and same-position matches with their own metrics.** Record-by-record comparison by CHROM/POS/REF/ALT and by position only, with recall, precision and F1 of each method and the isec status of every variant (`benchmark/bcftools_isec_*`, `benchmark/metrics/`). | `bcftools isec` | VCFs of all technologies |
 | 8.3 | **Recall, precision, F1 per sample (overall, type, VAF).** Recall, precision and F1 per sample and technology: overall, SNV vs. indel, by truth VAF (detection limit) and query VAF (low-VAF false positives), exact and position matches. | `benchmark_metrics.py` | VCFs of all technologies |
-| 8.4 | **Combine samples: summed (micro) and mean (macro).** Over all samples: from the summed counts (micro) and as mean ± sd of the per-sample values (macro). Main result: `benchmark/metrics.aggregated.tsv`. | `aggregate_metrics.py` | VCFs of all technologies |
+| 8.4 | **Combine samples: summed (micro) and mean (macro).** Over all samples: from the summed counts (micro) and as mean ± sd of the per-sample values (macro). Main result: `benchmark/metrics/metrics.aggregated.tsv` (all methods, column `method`; one table per method next to it). | `aggregate_metrics.py` | VCFs of all technologies |
 | **DISCORDANCE** | _explain why variants differ_ | | |
 | 9.1 | **Read counts of every alignment at the compared variants.** With `--read_evidence` (default): reads supporting REF, ALT or another allele of every compared variant in every tumor and normal alignment (MQ ≥ `--evidence_min_mapq`; SNV bases with BQ ≥ `--evidence_min_baseq`; indels by their haplotype sequence, wherever the aligner placed them). | `bcftools query, read_evidence.py` | Alignments |
 | 9.2 | **Reason for every FN/FP; detection power.** Each FN/FP gets exactly one main reason from the other technology's view: called but non-PASS, called but filtered by the uniform filters, or not called with low coverage, with alt reads, without alt reads, or without alignment; then germline evidence in the normal as a further reason. For truth variants, the binomial detection power gives the power-adjusted recall. | `classify_discordance.py` | VCFs of all technologies |
@@ -141,10 +144,34 @@ Outputs are described in [`docs/output.md`](docs/output.md), parameters in
 in [`docs/testing.md`](docs/testing.md). Planned further work is collected in
 [`docs/roadmap.md`](docs/roadmap.md).
 
+## Results
+
+Open **`<outdir>/main.html`**: it shows the MultiQC report inside the table browser, and the
+menu at the top switches to the variant tables.
+
+- **MultiQC report** (`multiqc/multiqc_report.html`, the main report): summary cards of
+  recall, precision and F1 per matching method, per-sample plots (recall vs. precision,
+  Venn diagrams of truth and query, truth variants found), known variants, why variants
+  differ, the discordant variants in detail, region, filtering and coverage, then the QC of
+  every step.
+- **Table browser** (`report/tables/`, datavzrd): every truth, compared and discordant
+  variant with gene and HGVS.p first, reasons, links to GeneCards, Ensembl, dbSNP and
+  COSMIC.
+- **To send:** `report/variantcomp_report.zip` (start page, MultiQC report and tables with
+  working links).
+- **Tables:** `benchmark/metrics/` (recall/precision of every method),
+  `benchmark/<tool>/` (rtg vcfeval and bcftools isec outputs per pair),
+  `discordance/variants.annotated.tsv` (every compared variant with its status per method,
+  reasons and annotation), `report/consistency_checks.tsv` (do all counts add up?).
+
+All outputs are described in [`docs/output.md`](docs/output.md).
+
 ## Usage
 
 The samplesheet is a comma-separated file with one row per sample and technology,
-described in [`docs/usage.md`](docs/usage.md).
+described in [`docs/usage.md`](docs/usage.md). The pipeline runs offline: prepare the VEP
+cache (or a GENCODE GTF) and the optional GIAB stratifications beforehand with
+`scripts/download_resources.py` ([`docs/hpc.md`](docs/hpc.md)).
 
 ```bash
 nextflow run core-unit-bioinformatics/workflow-nxf-somatic-variantcomp \
@@ -152,8 +179,13 @@ nextflow run core-unit-bioinformatics/workflow-nxf-somatic-variantcomp \
    --input samplesheet.csv \
    --fasta genome.fa \
    --truth_technology wgs \
+   --vep_cache /path/to/vep_cache \
    --outdir <OUTDIR>
 ```
+
+`--vep_cache` (or `--vep_gtf genes.gtf.gz`) is needed for the annotation; without either,
+set `--vep false`. Alignments (`tumor_bam`, `normal_bam`) enable the callable regions and
+the read evidence; without them, set `--callable_regions false --read_evidence false`.
 
 > [!WARNING]
 > Please provide pipeline parameters via the CLI or the Nextflow `-params-file` option.
@@ -161,13 +193,29 @@ nextflow run core-unit-bioinformatics/workflow-nxf-somatic-variantcomp \
 > to provide any configuration _**except for parameters**_; see the
 > [docs](https://nf-co.re/docs/running/run-pipelines#using-parameter-files).
 
+## Tested inputs
+
+| Input | Tested | Data |
+| --- | --- | --- |
+| Synthetic DRAGEN-like VCFs (WGS, WES, panel; 2 samples) | `-profile test` | edge cases of `design.tsv` (E01-E15, F01-F05): MNVs, shifted indels, multiallelic sites, gVCF blocks, contig naming, a haplotype called as different events |
+| SEQC2 HCC1395/HCC1395BL, MuTect2 (GATK 3.8) on BWA, WGS + WES, with alignments | `-profile test_seqc2` | chr22 slices of three center pairs (IL_1, FD_1, NV_1), SEQC2 truth set v1.2.1 |
+| Full SEQC2 WGS + WES | `-profile test_full` | prepared for the HPC, not run yet |
+| DRAGEN v4.4.4 (the real use case) | – | expected to work (FORMAT/AF and AD), not tested on real data yet |
+
+Formal input requirements (VCF version, FORMAT/INFO fields, sample columns, contig naming)
+are listed in [`docs/usage.md`](docs/usage.md).
+
 ## Development
 
 - Development environment: `conda env create -f envs/variantcomp-dev.yaml`
 - Branches: `main` (releases), `dev` (development), `feat-*` (features, branched from
-  `dev`). The history is kept linear.
-- Test data (synthetic edge cases; SEQC2 HCC1395/HCC1395BL, WES + WGS) live in a separate
-  repository and are prepared reproducibly with the scripts in `tests/`.
+  `dev`). The history is kept linear; dev releases are tagged `vX.Y.Z-dev`.
+- Before a commit: `scripts/check_syntax.py` (strict syntax), `nf-core pipelines lint`,
+  `black bin scripts tests`, `ruff check`, `pytest`, and the relevant `nf-test test`
+  ([`docs/testing.md`](docs/testing.md)).
+- Test data live in the separate repository `workflow-nxf-somatic-variantcomp-testdata`:
+  the synthetic edge cases are written by `tests/synthetic/make_synthetic_data.py`, the
+  SEQC2 data are prepared with **seqc2-toolkit** (separate repository).
 - Offline bundle for an HPC: `scripts/make_offline_bundle.py` (see `docs/hpc.md`).
 
 ## Credits

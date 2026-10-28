@@ -31,10 +31,10 @@ The explanations of the discordance classes, filtering reasons and columns (CLAS
 REASON_TEXT, COLUMN_TEXT) are used by both outputs and kept in line with docs/output.md.
 
 INPUT (all tables are TSV with header; optional inputs may be left out)
-  --per-pair, --metrics       benchmark/metrics.per_pair.tsv, metrics.aggregated.tsv
+  --per-pair, --metrics       benchmark/metrics/metrics.per_pair.tsv, metrics.aggregated.tsv
                               (stratum_type overall = RTG vcfeval; match/exact and
                               match/position = bcftools isec)
-  --power                     benchmark/power.aggregated.tsv (optional)
+  --power                     benchmark/metrics/power.aggregated.tsv (optional)
   --variants                  discordance/variants.annotated.tsv (every compared variant)
   --truth-variants            report/<prefix>.truth_variants.tsv (variantcomp_report.py)
   --classes, --enrichment, --genes, --annotation-counts   report tables

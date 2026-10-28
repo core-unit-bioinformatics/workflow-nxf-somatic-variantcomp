@@ -106,5 +106,5 @@ nextflow run /path/to/pipelines/workflow-nxf-somatic-variantcomp \
 
 `data.bam: true` in the dataset config also downloads the full BAMs (10-160 GB each), which
 enables coverage-based callable regions and read evidence (set both params to true). Expected results: WGS against the SEQC2 truth set
-(`known_variants/benchmark/known_benchmark.aggregated.tsv`) should be close to the
+(`known_variants/benchmark/metrics/known_benchmark.aggregated.tsv`, method `rtgtools_vcfeval`) should be close to the
 published values for MuTect2 on BWA alignments (Xiao et al. 2021).

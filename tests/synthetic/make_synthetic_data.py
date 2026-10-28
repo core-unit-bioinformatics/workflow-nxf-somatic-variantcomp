@@ -199,7 +199,14 @@ def design_variants(d):
     d.add(s, "wgs", c, p, d.base(c, p), [alt])
     d.add(s, "wes", c, p, d.base(c, p), [alt], filt="weak_evidence")
     d.add(s, "panel", c, p, d.base(c, p), [alt])
-    d.note(s, "E08", c, p, "FILTER=weak_evidence in wes", "FN wes (present_but_filtered); TP panel")
+    d.note(
+        s,
+        "E08",
+        c,
+        p,
+        "FILTER=weak_evidence in wes",
+        "FN wes (filtered_non_pass: called, FILTER not PASS); TP panel",
+    )
 
     # E10: gVCF reference block in wes
     c, p = "chr1", 4800
@@ -240,6 +247,29 @@ def design_variants(d):
     d.add(s, "wgs", c, p, d.base(c, p), [alt])
     d.add(s, "wes", c, p, d.base(c, p), [alt])
     d.note(s, "E14", c, p, "between panel intervals", "excluded")
+
+    # E15: one haplotype called as two different event sets: X T G Y -> X G T Y as two
+    # SNVs (wgs = truth, panel) and as deletion of T + insertion of T after G (wes).
+    # Normalization can't unify them; vcfeval matches them, bcftools isec doesn't.
+    c, p = "chr2", 5047
+    x, t_base, g_base, y = (d.base(c, p + i) for i in range(4))
+    # the context the event needs: T G, flanked by other bases (no shifted placement)
+    assert (t_base, g_base) == ("T", "G") and x != "T" and y != "T", "E15 context changed"
+    for t in ("wgs", "panel"):
+        d.add(s, t, c, p + 1, t_base, [g_base])
+        d.add(s, t, c, p + 2, g_base, [t_base])
+    d.add(s, "wes", c, p, x + t_base, [x])
+    d.add(s, "wes", c, p + 2, g_base, [g_base + t_base])
+    d.note(
+        s,
+        "E15",
+        c,
+        p,
+        "same haplotype (C C T G C -> C C G T C): two SNVs in wgs/panel, deletion CT>C + "
+        "insertion G>GT in wes",
+        "vcfeval: TP wes (2 truth, 2 calls); isec exact: FN 2 + FP 2; isec position: TP 1 "
+        "(5049), FN 1 (5048), FP 1 (5047); TP panel",
+    )
 
     # ---------------------------------------------------------------- S2 ---
     s = "S2"

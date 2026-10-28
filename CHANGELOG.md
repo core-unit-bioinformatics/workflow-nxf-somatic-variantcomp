@@ -6,30 +6,64 @@ Dates follow ISO 8601 (`YYYY-MM-DD`).
 
 ## Unreleased
 
+Report, correctness and test-data release: MultiQC is the main report with a start page,
+linked datavzrd tables and a zip to send; the read evidence of indels, the reasons of
+discordant variants and the known-variant benchmark were corrected; every matching method
+(RTG vcfeval, bcftools isec same allele, same position) has its own published outputs and
+metrics. Output paths changed (see Changed). Decisions D30-D38 in
+`docs/pipeline-plan.md`.
+
 ### `Added`
 
-- Benchmark outputs per tool (decision D38): `benchmark/rtgtools_vcfeval/`, `benchmark/bcftools_isec_exact/`, `benchmark/bcftools_isec_position/` (the bcftools isec outputs were not published before) and `benchmark/metrics/` with the column `method` and one pair of tables per method (`metrics.<method>.per_pair/aggregated.tsv`); the same layout under `known_variants/benchmark/`
-- Status of every variant with both bcftools isec methods (`isec_exact`, `isec_position` in `*.variants.tsv` and the variant tables): shows where the matching methods disagree
-- Reasons of discordant variants (decision D38): exactly one main reason (the call and the reads of the technology that misses the variant; `class`), then the further reasons `germline_in_normal` and the context reasons `indel`, `low_vaf`, `in_repeat`, `giab_<name>` and every stratification (`annotate_variants.py merge --context-reasons`)
-- Consistency checks of the reason model (every rule recomputed from the variant table; no exclusive reasons together), of the isec status against the isec metrics, and of the read evidence (share of TP variants with alt reads in the query tumor alignment, SNVs and indels separately, `--evidence_check_min_fraction`)
-- Synthetic test event E15: one haplotype called as two SNVs (wgs, panel) and as a deletion + insertion (wes): matched by vcfeval only; the pipeline test asserts the counts of every method
-- MultiQC section "Overlap of the technologies per sample": a Venn diagram per sample (truth only, both, query only) for every matching method; "Why variants differ" shows the main reasons (stacked) and the further reasons (grouped)
-- Parameters `--evidence_indel_flank`, `--evidence_max_read_length`, `--evidence_check_min_fraction`
-
-- MultiQC report as the main report (decision D37, `bin/report_content.py`, `REPORT_CONTENT`): Summary with cards of recall, precision, F1, FN and FP per query technology and buttons for the matching method (RTG vcfeval, bcftools isec same allele, same position), run cards, key findings and links to the tables; Introduction as lists (this run; how the technologies are compared) with one row per technology; recall vs. precision per sample as a MultiQC scatter plot (axes 0 to 1, hover shows the sample, one dataset per matching method); truth variants found per sample (vertical bars, label `found/total`); known variants (cards and PASS/FAIL matrix of the required variants, benchmark cards and bars); why variants differ (discordant variants per sample by class; FN + FP, FN, FP); discordant variants in detail (lists per direction, category profiles of TP/FN/FP, VAF, combinations of reasons, protein-altering variants, genes, enrichment; at most 15 rows per table); metrics per sample (by variant type, recall by VAF, table of all methods); compared region in Mbp with a card and a bar per target BED; filtering per VCF; coverage; consistency checks. Vertical bar plots with the samples on the x-axis use the Plotly library bundled in MultiQC and follow the toolbox (hide, highlight, rename samples)
-- datavzrd table browser: a description at the top of every view (what, how to read, links to the MultiQC report and related tables, column glossary); variant name (gene + HGVS.p) and gene, HGVS.p, consequence, impact as the first columns; coloured status, class, reasons, yes/no, impact, metric and q-value columns; links to GeneCards, Ensembl (gene and genome browser), dbSNP and COSMIC; detail view for the less important columns; one table of all discordant variants (with the class explanations) instead of one per class; known-variant benchmark and samplesheet tables; Excel download of the variant tables; the MultiQC report as a page (`multiqc_page.js`, datavzrd `render-html`)
-- `report/variantcomp_report.zip` (`bin/report_bundle.py`, `REPORT_BUNDLE`): MultiQC report and table browser in the layout of the output folder plus the start page, to send or archive the reports
-- Start page `main.html` at the top of the output folder (and of the zip): opens the table browser on its first page, the MultiQC report, so the report and every table are in one window; the datavzrd default view is now the MultiQC page
-- Venn diagrams of the discordance reasons (three most frequent reasons of the FN and of the FP; overlaps = variants with several reasons) in the section Discordant variants in detail
-- VEP options that open a database connection (`--database`, `--host`, `--port`, `--user`, `--password`, `--registry`, `--genomes`) stop the run at the start: VEP always runs offline (cache: `--offline`; GTF: VEP's own offline mode)
-- `classify_discordance.py`: column `reasons`: every discordance reason that applies to a variant (the first one is `class`)
-- Annotation: HGVS.c and HGVS.p (`--hgvs` added to the default `--vep_args`, computed with the reference FASTA, also without a cache), transcript, and with a VEP cache dbSNP and COSMIC IDs and ClinVar significance (`Existing_variation`, `CLIN_SIG`): columns `transcript`, `hgvsc`, `hgvsp`, `dbsnp`, `cosmic`, `clin_sig` of `variants.annotated.tsv` and of the truth variant table; `+split-vep` asks only for the fields VEP writes
-- datavzrd table browser `report/tables/` (nf-core `datavzrd`): truth variants, all compared variants, one table per discordance class, removed records, accounting, region steps, coverage, enrichment, genes, required variants, checks; linked by `variant_id`
+- **Report** (decisions D33, D37): the MultiQC report is the main report
+  (`bin/report_content.py`, `REPORT_CONTENT`), ordered by importance: summary cards of
+  recall, precision, F1, FN and FP per query technology with buttons for the matching
+  method; introduction as lists; recall vs. precision per sample (axes 0 to 1, hover shows
+  the sample, one dataset per method); Venn diagrams of truth and query per sample and
+  method; truth variants found per sample (`found/total`); known variants (PASS/FAIL matrix
+  of the required variants, benchmark cards and bars); why variants differ (main reasons
+  stacked, further reasons grouped); the discordant variants in detail (lists per direction,
+  category profiles of TP/FN/FP, VAF, combinations of reasons, protein-altering variants,
+  genes, enrichment; at most 15 rows per table); metrics per sample; compared region in Mbp
+  with every target BED; filtering per VCF; coverage; consistency checks. Vertical bar plots
+  (samples on the x-axis) use the Plotly library of MultiQC and follow its toolbox.
+- **Table browser** (nf-core `datavzrd`, `report/tables/`): truth, discordant and compared
+  variants, genes, enrichment, metrics, required variants, known-variant benchmark, removed
+  records, accounting, region steps, coverage, checks, samplesheet; a description at the
+  top of every view; gene + HGVS.p first; coloured status, reasons, yes/no, impact, metric
+  and q-value columns; links to GeneCards, Ensembl, dbSNP and COSMIC; detail views; Excel
+  download; the MultiQC report as the first page.
+- **Start page** `main.html` (top of the output folder) and `report/variantcomp_report.zip`
+  (`bin/report_bundle.py`): the reports with working links, to open or send.
+- **Benchmark outputs per tool** (D38): `benchmark/rtgtools_vcfeval/`,
+  `benchmark/bcftools_isec_exact/`, `benchmark/bcftools_isec_position/` (the isec outputs
+  were not published before) and `benchmark/metrics/` with a column `method` and one table
+  pair per method; the same under `known_variants/benchmark/`. Every variant has its status
+  with both isec methods (`isec_exact`, `isec_position`).
+- **Reasons of discordant variants** (D38): exactly one main reason (the call and the reads
+  of the technology that misses the variant), then the further reasons `germline_in_normal`,
+  `indel`, `low_vaf`, `in_repeat`, `giab_<name>` and every stratification (column
+  `reasons`).
+- **Read evidence** `bin/read_evidence.py` (`READ_EVIDENCE`): allele-specific read counts
+  of every compared variant; indels by haplotype sequence, independent of where the
+  aligner placed them (replaces `bcftools mpileup`, see Fixed).
+- **Annotation**: HGVS.c and HGVS.p (`--hgvs` in the default `--vep_args`, also with a
+  GTF), transcript, and with a VEP cache dbSNP and COSMIC IDs and ClinVar significance.
+- **Consistency checks at the end of the run** (D34, `consistency_checks.py`,
+  `CHECKS_GATE`): accounting, metrics vs. variant tables, aggregation, discordance, regions,
+  required variants, the reason model (every rule recomputed), the isec status vs. the
+  isec metrics, and the read evidence of TP variants (`--evidence_check_min_fraction`); a
+  failed check stops the run after the reports were written.
 - Variant accounting per VCF (`variant_accounting.py`, `VARIANT_ACCOUNTING`): records kept, removed (with the reason) and added per preprocessing step, every removed record, and checks (`vcf_preprocessed/accounting/`); MultiQC section
 - Region steps (`region_summary.py steps`, `REGION_STEPS`): size of the comparison region after every step (`regions/common_targets.steps.tsv`); MultiQC section
 - Coverage in the common region and the target region of every alignment (`coverage_summary.py`, second mosdepth run on the target BED, `--coverage_thresholds`, default `10,20,30,50,100`): `coverage/coverage.coverage.tsv` and MultiQC General Statistics columns
-- Report tables `variantcomp.truth_variants.tsv` (every truth variant, found / class per query technology) and `variantcomp.annotation_counts.tsv` (annotation per sample, technology and set: truth variants, query calls, FN, FP)
-- Consistency checks at the end of the run (`consistency_checks.py`, `CONSISTENCY_CHECKS`, `report/consistency_checks.tsv`): accounting, metrics vs. variant tables, aggregation, discordance classes, regions, required variants; a failed check stops the run after the reports were written (`CHECKS_GATE`, decision D34)
+- VEP always runs offline: options that open a database connection in `--vep_args` /
+  `--vep_cache_args` stop the run at the start.
+- New parameters: `--evidence_indel_flank`, `--evidence_max_read_length`,
+  `--evidence_check_min_fraction`.
+- Synthetic test events E15 (one haplotype as two SNVs and as deletion + insertion:
+  matched by vcfeval only); the pipeline tests assert the counts of every matching method,
+  the reasons, the tool folders and the read evidence of the SEQC2 37-bp deletion.
 - Overview metro map in the style of the nf-core/rnaseq map (`scripts/make_metro_map_overview.py`, `docs/images/variantcomp_metro_map_overview.{svg,png}`): seven stages with one-word names, main tools only, one line colour; inputs enter in the stage that uses them (dashed for files read by one step); Benchmark (fork into rtg vcfeval and bcftools isec) and Known variants in the centre as the key step; shown in the README above the detailed map
 - `scripts/check_syntax.py`: strict-syntax check before commits: `nextflow inspect` with the profiles of `nf-core pipelines download` (minimum and current Nextflow), `nextflow lint` without errors or unaccepted warnings
 
@@ -37,17 +71,40 @@ Dates follow ISO 8601 (`YYYY-MM-DD`).
 
 - Further reasons for concordant variants too (decision D39): TP rows get `concordant` followed by `germline_in_normal` and the context reasons (`indel`, `low_vaf` from the truth VAF, `in_repeat`, `giab_<name>`, stratifications), so the tables show which low-VAF variants or variants in difficult regions were still found by both technologies; `reasons_<query>` of the truth-variant table is filled for found variants too; the consistency checks verify the reasons of TP rows with the same rules. The MultiQC section "Why variants differ" still counts discordant variants only
 - datavzrd variant tables: column order `sample`, `gene`, `hgvsp`, `status`, `truth`, `query`, VAF and depth of truth, query and normal (`normal_dp` moved from the detail view to the table), `reasons`, then `consequence`, `impact` and the rest; the column `variant` (gene + HGVS.p in one text) moved to the end
-
-- The narrative report `report/variantcomp_report.html` (`bin/report_html.py`, `REPORT_HTML`, decision D33) is replaced by the MultiQC report (decision D37); its texts (`CLASS_TEXT`, `REASON_TEXT`, `COLUMN_TEXT`) moved to `bin/report_content.py`
-- `assets/multiqc_config.yml`: title and introduction, section order (results first, QC of the steps after them), fixed output names, no General Statistics table (MultiQC puts it above all sections; coverage is in the section Coverage)
-- The MultiQC sections of `variantcomp_report.py` (metrics, per sample, classes, recall by VAF, strata) and the `mqc_tables.py` sections regions, region steps, accounting, callable regions and consistency checks are replaced by the `report_content.py` sections
-- Dev env: Nextflow 26.10.2 (was 26.04.4)
+- **Output layout (breaking):** `benchmark/metrics.*.tsv` → `benchmark/metrics/`; per-pair
+  metrics and variant tables → `benchmark/metrics/<sample>/`; vcfeval outputs →
+  `benchmark/rtgtools_vcfeval/<sample>/<pair>/`; power tables → `benchmark/metrics/`;
+  known-variant benchmark likewise under `known_variants/benchmark/`; read evidence →
+  `discordance/<sample>/read_evidence/`; metrics tables start with the column `method`.
+- **Discordance (breaking):** `germline_in_normal` is a further reason, no longer a class;
+  the class (main reason) is one of `filtered_non_pass`, `present_but_filtered`, `absent`,
+  `low_coverage`, `subthreshold_evidence`, `no_evidence`; the truth-variant table has
+  `reasons_<query>` instead of `class_<query>`; `variants.annotated.tsv` gets the columns
+  `reasons`, `other_tumor_other`, `transcript`, `hgvsc`, `hgvsp`, `dbsnp`, `cosmic`,
+  `clin_sig`, `isec_exact`, `isec_position`.
+- **Known-variant benchmark:** one region per pair for every method (the list's confident
+  regions intersected with the comparison region; vcfeval `--bed-regions`, isec `-R`).
+- `assets/multiqc_config.yml`: title and introduction, section order (results first, QC
+  after them), fixed output names, no General Statistics table (coverage has its own
+  section).
+- GIAB genome stratifications: one file parameter per stratification (`--giab_homopolymer`, `--giab_tandem_repeat`, `--giab_segmental_duplication`, `--giab_low_mappability`, `--giab_all_difficult`); a given file switches its annotation on, no file (the default) means no GIAB annotation. Replaces `--giab_stratifications`, `--giab_dir` and `--giab_files` (decision D30). `download_resources.py` and the SEQC2 dataset script write one parameter per file.
 - SEQC2 test data are prepared with the separate **seqc2-toolkit** (dataset configs `variantcomp_small` / `variantcomp_full`, workflow profile `variantcomp`) instead of `tests/seqc2/seqc2_testdata.py`, which is removed (decision D31). The test data layout changed: the samplesheet and known-variant sheet are in `seqc2/small/variantcomp/`, VCFs are named `<pair>_<technology>.<aligner>.<caller>.vcf.gz`, the GTF `gencode.v46.basic.annotation.gtf.gz`; the file contents are unchanged
 - Runtime (decision D36; outputs unchanged):
   - `COVERAGE`: the callable bins of every alignment are clipped to the common region in `mosdepth_callable.py` (`--clip`) before `bedtools sort` / `multiinter` / `gawk` / `merge`, which therefore work on the common region instead of the whole-genome `mosdepth --quantize` bins (millions of intervals per WGS alignment). The final `<sample>.callable.bed` is the same, because the result was restricted to the common region afterwards anyway
   - `MOSDEPTH`, `MOSDEPTH_TARGETS`: 4 CPUs and 8 GB (× attempt) instead of `process_medium` (6 CPUs, 36 GB); mosdepth uses threads only for decompression (≤ 4 recommended), so more alignments can run at the same time on a cluster
   - `PREPARE_ALIGNMENTS` no longer holds back all entries until every missing alignment index is created (`join(remainder: true)` waited for the end of the channel): entries with indices pass at once, the others as soon as their own indices exist. VCF preprocessing, the regions and the known-variant preparation don't wait for `samtools index` at all (they don't read alignments)
-- GIAB genome stratifications: one file parameter per stratification (`--giab_homopolymer`, `--giab_tandem_repeat`, `--giab_segmental_duplication`, `--giab_low_mappability`, `--giab_all_difficult`); a given file switches its annotation on, no file (the default) means no GIAB annotation. Replaces `--giab_stratifications`, `--giab_dir` and `--giab_files` (decision D30). `download_resources.py` and the SEQC2 dataset script write one parameter per file.
+- Dev env: Nextflow 26.10.2 (was 26.04.4)
+
+### `Removed`
+
+- The narrative report `report/variantcomp_report.html` (`bin/report_html.py`, D33),
+  replaced by the MultiQC report (D37).
+- `bcftools mpileup` (+ `call`, + evidence `norm`) for the read evidence, replaced by
+  `read_evidence.py`.
+- The MultiQC sections of `variantcomp_report.py` and the `mqc_tables.py` sections regions,
+  region steps, accounting, callable regions and consistency checks (now sections of the
+  report).
+- Parameters `--giab_stratifications`, `--giab_dir`, `--giab_files` (see Changed).
 
 ### `Fixed`
 
@@ -57,7 +114,6 @@ Dates follow ISO 8601 (`YYYY-MM-DD`).
 - **Known-variant benchmark**: vcfeval used the confident regions of the list as `--evaluation-regions`, which drops calls that overlap them only partly, while bcftools isec counted them; all three methods now use one region per pair (list regions intersected with the comparison region)
 - A PASS and a non-PASS record with the same allele (e.g. after atomizing): the PASS call wins in the discordance classification and the required check (before: the last record read)
 - The read depth of a variant is its own (before: the largest depth of all alleles at the position)
-
 - Normalization: `bcftools norm --atomize` (step 6) wrote records with two ALTs (e.g. `G GGTATAAGAGGT,*` from a DRAGEN complex insertion + SNV call), because it atomizes after splitting and marks the overlapping part with `*` by default; `HARMONIZE_VCF` then stopped (`2 ALT alleles; split multiallelic records first`). `--atom-overlaps .` now keeps one ALT per atomized record, for calls and known-variant lists (decision D35)
 - `harmonize_vcf.py`: records whose ALT is the overlapping allele `*` (left as `REF>*` after splitting, e.g. inside a spanning deletion) were kept and typed as SNV/COMPLEX; they are now dropped and counted (`records_dropped_overlap` in the harmonization summary, reason `overlap_allele` in step 6 of the variant accounting and the reports)
 - `region_summary.py`: overlapping intervals of a BED are merged (and counted in the log) instead of stopping the run

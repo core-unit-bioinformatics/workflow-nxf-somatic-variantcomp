@@ -147,9 +147,10 @@ Only with `--callable_regions` (default; needs alignments for every samplesheet 
   merged (see [usage](usage.md#coverage-and-callable-regions)).
 - `coverage/callable_summary.tsv`: one row per sample (columns below).
 - `coverage/coverage.coverage.tsv`: depth of every alignment in the common region and in
-  the target region of its technology (columns below). The same values are columns of the
-  MultiQC General Statistics table (`Depth common`, `Depth target`, `<t>X common`, `<t>X
-  target`; the third threshold is shown, the others can be switched on).
+  the target region of its technology (columns below); plotted in the MultiQC section
+  Coverage (mean depth and % of bases ≥ each threshold per alignment). The General
+  Statistics columns are still written (`*_generalstats_mqc.tsv`), but the table is
+  switched off in `assets/multiqc_config.yml` (`skip_generalstats`).
 - `coverage/<sample>/<sample>_<technology>_<tumor|normal>.*`: mosdepth outputs per
   alignment: `*.mosdepth.summary.txt` (mean depth per contig), `*.mosdepth.global.dist.txt`
   and `*.mosdepth.region.dist.txt` (cumulative depth distributions), `*.regions.bed.gz`

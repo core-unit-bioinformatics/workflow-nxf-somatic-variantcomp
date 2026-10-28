@@ -172,7 +172,7 @@
                     "type": "string",
                     "default": "10,20,30,50,100",
                     "pattern": "^\\d+(,\\d+)*$",
-                    "description": "Depths for the coverage summary: % of the bases with at least this depth in the common region and in the target region of every alignment (mosdepth --thresholds; report and MultiQC General Statistics).",
+                    "description": "Depths for the coverage summary: % of the bases with at least this depth in the common region and in the target region of every alignment (mosdepth --thresholds; MultiQC section Coverage and coverage/coverage.coverage.tsv).",
                     "fa_icon": "fas fa-layer-group"
                 },
                 "callable_mode": {
@@ -297,21 +297,21 @@
                 "read_evidence": {
                     "type": "boolean",
                     "default": true,
-                    "description": "Count the reads of every alignment at the positions of all compared variants (bcftools mpileup) to explain missed and extra calls (germline_in_normal, low_coverage, subthreshold_evidence, no_evidence) and to compute the detection power. Needs a tumor_bam for every samplesheet row. If false, no alignment is read and the evidence columns are left out.",
+                    "description": "Count the reads of every alignment at every compared variant (read_evidence.py: SNVs by base, indels by haplotype sequence) to explain missed and extra calls (low_coverage, subthreshold_evidence, no_evidence, germline_in_normal) and to compute the detection power. Needs a tumor_bam for every samplesheet row. If false, no alignment is read and the evidence columns are left out.",
                     "fa_icon": "fas fa-search"
                 },
                 "evidence_min_mapq": {
                     "type": "integer",
                     "default": 20,
                     "minimum": 0,
-                    "description": "Read evidence: minimum mapping quality of a read (bcftools mpileup --min-MQ).",
+                    "description": "Read evidence: minimum mapping quality of a counted read.",
                     "fa_icon": "fas fa-filter"
                 },
                 "evidence_min_baseq": {
                     "type": "integer",
                     "default": 13,
                     "minimum": 0,
-                    "description": "Read evidence: minimum base quality (bcftools mpileup --min-BQ).",
+                    "description": "Read evidence: minimum base quality of the bases of an SNV/MNV in a read.",
                     "fa_icon": "fas fa-filter"
                 },
                 "evidence_max_depth": {

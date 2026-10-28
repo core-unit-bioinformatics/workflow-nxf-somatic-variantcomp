@@ -24,7 +24,7 @@ is in the [README](README.md#pipeline-summary).
 
 ## Pipeline tools
 
-- [BCFtools, SAMtools and HTSlib](https://pubmed.ncbi.nlm.nih.gov/33590861/) (sample selection, PASS split, contig renaming, cleaning, reheader, normalization, concatenation, filtering, exact/position matching, read evidence, VEP field extraction with `+split-vep`; alignment indexing; reference index)
+- [BCFtools, SAMtools and HTSlib](https://pubmed.ncbi.nlm.nih.gov/33590861/) (sample selection, PASS split, contig renaming, cleaning, reheader, normalization, concatenation, filtering, exact/position matching (`isec`), the variant positions of the read evidence (`query`), VEP field extraction with `+split-vep`; alignment indexing; reference index)
 
   > Danecek P, Bonfield JK, Liddle J, Marshall J, Ohan V, Pollard MO, Whitwham A, Keane T, McCarthy SA, Davies RM, Li H. Twelve years of SAMtools and BCFtools. GigaScience. 2021 Feb 16;10(2):giab008. doi: 10.1093/gigascience/giab008. PubMed PMID: 33590861.
 
@@ -62,7 +62,7 @@ is in the [README](README.md#pipeline-summary).
 
 ## Python libraries used by the pipeline scripts (`bin/`)
 
-- [pysam](https://github.com/pysam-developers/pysam) (VCF, alignment and FASTA reading in the reference checks; VCF reading and writing in all VCF scripts; wraps HTSlib, see above)
+- [pysam](https://github.com/pysam-developers/pysam) (VCF, alignment and FASTA reading in the reference checks; allele-specific read evidence of every compared variant in `read_evidence.py`; VCF reading and writing in all VCF scripts; wraps HTSlib, see above)
 
   > pysam developers. pysam: a Python module for reading and manipulating SAM/BAM/VCF/BCF files. https://github.com/pysam-developers/pysam
 

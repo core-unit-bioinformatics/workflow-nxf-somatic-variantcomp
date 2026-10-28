@@ -41,7 +41,7 @@ Checks of `check` (scope = the sample/technology or comparison the check is abou
 
 INPUT
   --accounting      <x>.checks.tsv and <x>.accounting.tsv of variant_accounting.py (several)
-  --per-pair        benchmark/metrics.per_pair.tsv     --aggregated  metrics.aggregated.tsv
+  --per-pair        benchmark/metrics/metrics.per_pair.tsv  --aggregated  metrics.aggregated.tsv
   --variants        discordance/variants.annotated.tsv --classes     report classes table
   --region-steps    regions/common_targets.steps.tsv   --targets     common_targets.summary.tsv
   --callable        coverage/callable_summary.tsv (optional)

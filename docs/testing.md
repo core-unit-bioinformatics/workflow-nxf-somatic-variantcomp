@@ -48,6 +48,9 @@ the intended outcome of every designed variant. The variants cover:
 - duplicated records
 - filtered true variants
 - variants outside the common target region
+- one haplotype called as two SNVs (truth) and as a deletion + insertion (wes, E15):
+  matched by RTG vcfeval only, so the pipeline test can check that the three matching
+  methods (vcfeval, bcftools isec same allele, same position) are computed separately
 
 The VCF headers also include problems the pipeline must fix:
 
@@ -59,6 +62,16 @@ The VCF headers also include problems the pipeline must fix:
 tests/synthetic/make_synthetic_data.py --outdir ../workflow-nxf-somatic-variantcomp-testdata/synthetic
 nextflow run . -profile test,conda --outdir results_test
 ```
+
+The generator is the only source of the synthetic data: change the design there (not in
+the VCFs), regenerate, and commit the result in the test-data repository. The pipeline
+test (`tests/default.nf.test`) asserts the designed counts of every matching method, the
+reasons of discordant variants and the tool output folders.
+
+The read evidence (`bin/read_evidence.py`) has its own unit tests with a test alignment of
+known answers (`tests/python/test_read_evidence.py`: an indel placed at either end of a
+repeat by the aligner, soft-clipped reads, another indel at the same site, filtered
+reads). The SEQC2 pipeline test checks that the TP 37-bp deletion of NV_1 has alt reads.
 
 ## SEQC2 HCC1395/HCC1395BL (WES + WGS)
 

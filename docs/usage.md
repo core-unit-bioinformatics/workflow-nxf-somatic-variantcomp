@@ -268,7 +268,7 @@ a memory kill); set `process.withName` in your own config to change them.
 | `--callable_regions` | `true` | Restrict the comparison to callable bases (needs BAMs). |
 | `--min_coverage_tumor` | `10` | Minimum depth of a tumor alignment. Also the threshold of the `low_coverage` class. |
 | `--min_coverage_normal` | `10` | Minimum depth of a normal alignment. |
-| `--coverage_thresholds` | `10,20,30,50,100` | Depths of the coverage summary: % of the bases with at least this depth in the common region and in the target region of every alignment (genome for WGS); report and MultiQC General Statistics. |
+| `--coverage_thresholds` | `10,20,30,50,100` | Depths of the coverage summary: % of the bases with at least this depth in the common region and in the target region of every alignment (genome for WGS); MultiQC section Coverage and `coverage/coverage.coverage.tsv`. |
 | `--callable_mode` | `base` | `base` (per base, `mosdepth --quantize`) or `region` (mean depth per interval). |
 | `--require_normal_coverage` | `true` | Normals must be callable too (needs normal BAMs). |
 | `--amplicon_keep_duplicates` | `true` | Keep duplicate-flagged reads of amplicon libraries. |
