@@ -8,6 +8,9 @@ from pathlib import Path
 import pytest
 
 BIN = Path(__file__).resolve().parents[2] / "bin"
+sys.path.insert(0, str(BIN))
+import benchmark_metrics  # noqa: E402
+
 HEADER = """##fileformat=VCFv4.2
 ##contig=<ID=chr1,length=10000>
 ##INFO=<ID=VC_T_VAF,Number=1,Type=Float,Description="vaf">
@@ -134,6 +137,25 @@ def test_variant_table(metrics):
     ]
     tp = rows[0]
     assert (tp["truth_vaf"], tp["query_vaf"]) == ("0.3000", "0.2800")
+    # status of every record with the bcftools isec methods: chr1:200 has different
+    # alleles in truth (A>G) and query (A>T): FN/FP exactly, but found by position
+    assert [(r["pos"], r["status"], r["isec_exact"], r["isec_position"]) for r in rows] == [
+        ("100", "TP", "TP", "TP"),
+        ("200", "FN", "FN", "TP"),
+        ("200", "FP", "FP", "TP"),
+        ("300", "FN", "FN", "FN"),
+        ("400", "FP", "FP", "FP"),
+    ]
+
+
+def test_isec_status_can_differ_from_vcfeval():
+    # vcfeval TP (e.g. the same haplotype as SNVs and as deletion + insertion) that isec
+    # can't match exactly; a record unknown to isec (decomposed by vcfeval) is NA
+    flags = {("chr2", 5048, "T", "G"): [True, False], ("chr2", 5047, "CT", "C"): [False, True]}
+    status = benchmark_metrics.isec_status
+    assert status(flags, ("chr2", 5048, "T", "G"), truth_side=True) == "FN"
+    assert status(flags, ("chr2", 5047, "CT", "C"), truth_side=False) == "FP"
+    assert status(flags, ("chr2", 9, "A", "C"), truth_side=True) == "NA"
 
 
 def test_aggregate(metrics, tmp_path):
@@ -154,6 +176,15 @@ def test_aggregate(metrics, tmp_path):
     )
     agg = read_tsv(f"{prefix}.aggregated.tsv")
     overall = row(agg, "overall", "all")
+    # the method of every row: vcfeval strata, isec match strata
+    assert overall["method"] == "rtgtools_vcfeval"
+    assert row(agg, "match", "exact")["method"] == "bcftools_isec_exact"
+    assert row(agg, "match", "position")["method"] == "bcftools_isec_position"
+    # one pair of files per method, each with only its rows
+    for method in ("rtgtools_vcfeval", "bcftools_isec_exact", "bcftools_isec_position"):
+        part = read_tsv(f"{prefix}.{method}.aggregated.tsv")
+        assert part and {r["method"] for r in part} == {method}
+        assert {r["method"] for r in read_tsv(f"{prefix}.{method}.per_pair.tsv")} == {method}
     assert overall["n_samples"] == "2"
     assert (overall["tp_baseline"], overall["fn"]) == ("2", "4")
     assert overall["micro_recall"] == "0.3333"

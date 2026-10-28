@@ -20,8 +20,13 @@ Outputs (--prefix):
       truth_vaf     [lo,hi)            TP_baseline, FN   -> recall only
       query_vaf     [lo,hi)            TP_call, FP       -> precision only
       match         exact | position   bcftools isec counts (see below)
-  <prefix>.variants.tsv  one row per variant: status (TP, FN, FP), type, length,
-                         VAF/depth/alt reads in truth and query (where called)
+  <prefix>.variants.tsv  one row per variant: status (TP, FN, FP; RTG vcfeval), the
+                         status of the same record with bcftools isec (isec_exact: same
+                         CHROM, POS, REF, ALT; isec_position: same CHROM, POS; TP, FN,
+                         FP, or NA for a record vcfeval decomposed, which isec doesn't
+                         know), type, length, VAF/depth/alt reads in truth and query (where
+                         called). Rows where vcfeval and isec disagree show where the
+                         matching methods differ.
 
 vcfeval matching is haplotype-aware, so different representations of the same
 variant match. The `match` strata compare the two VCFs record by record instead:
@@ -62,6 +67,8 @@ VARIANT_COLUMNS = [
     "truth",
     "query",
     "status",
+    "isec_exact",
+    "isec_position",
     "chrom",
     "pos",
     "ref",
@@ -235,6 +242,33 @@ def read_isec_sites(folder, region_sets, by_position=False):
     return truth_only, query_only, both
 
 
+def read_isec_flags(folder, by_position):
+    """{key: [in truth, in query]} of a bcftools isec sites.txt; key (CHROM, POS, REF, ALT),
+    or (CHROM, POS) with by_position (flags of all lines at the position combined)."""
+    flags = {}
+    with open(Path(folder) / "sites.txt") as fh:
+        for line in fh:
+            fields = line.rstrip("\n").split("\t")
+            pos = int(fields[1])
+            key = (fields[0], pos) if by_position else (fields[0], pos, fields[2], fields[3])
+            entry = flags.setdefault(key, [False, False])
+            entry[0] |= fields[4][0] == "1"
+            entry[1] |= fields[4][1] == "1"
+    return flags
+
+
+def isec_status(flags, key, truth_side):
+    """isec status of one vcfeval record: a truth record (TP/FN of vcfeval) is TP if the
+    query has it too, else FN; a query record (FP of vcfeval) is TP if the truth has it,
+    else FP; NA if isec doesn't know the record (decomposed by vcfeval)."""
+    entry = flags.get(key)
+    if entry is None or not entry[0 if truth_side else 1]:
+        return "NA"
+    if truth_side:
+        return "TP" if entry[1] else "FN"
+    return "TP" if entry[0] else "FP"
+
+
 def parse_bins(text):
     """VAF bin edges '0,0.05,...' -> [(lo, hi), ...]; strictly increasing."""
     try:
@@ -360,6 +394,10 @@ def main():
         writer.writeheader()
         writer.writerows(rows)
 
+    # isec presence flags of every record, to give each variant row its isec status
+    exact_flags = read_isec_flags(args.isec_exact, by_position=False)
+    position_flags = read_isec_flags(args.isec_position, by_position=True)
+
     # per-variant table; a TP is reported in the truth representation, with the query
     # values of the query call at the same position (same ALT if possible)
     calls_by_pos = {}
@@ -381,6 +419,11 @@ def main():
                 dict(
                     keys,
                     status=status,
+                    # the same truth record with the bcftools isec methods
+                    isec_exact=isec_status(
+                        exact_flags, (r["chrom"], r["pos"], r["ref"], r["alt"]), True
+                    ),
+                    isec_position=isec_status(position_flags, (r["chrom"], r["pos"]), True),
                     chrom=r["chrom"],
                     pos=r["pos"],
                     ref=r["ref"],
@@ -401,6 +444,11 @@ def main():
             dict(
                 keys,
                 status="FP",
+                # the same query record with the bcftools isec methods
+                isec_exact=isec_status(
+                    exact_flags, (r["chrom"], r["pos"], r["ref"], r["alt"]), False
+                ),
+                isec_position=isec_status(position_flags, (r["chrom"], r["pos"]), False),
                 chrom=r["chrom"],
                 pos=r["pos"],
                 ref=r["ref"],
@@ -420,6 +468,15 @@ def main():
         print(
             f"INFO: {name}: {n_tp_unpaired} TP in the truth representation without a query call "
             "at the same position (other representation); query values NA",
+            file=sys.stderr,
+        )
+    # how often vcfeval and isec disagree (logged; the rows show where)
+    for column in ("isec_exact", "isec_position"):
+        differ = sum(1 for r in out if r[column] not in ("NA", r["status"]))
+        unknown = sum(1 for r in out if r[column] == "NA")
+        print(
+            f"INFO: {name}: {column}: {differ} rows with another status than vcfeval, "
+            f"{unknown} records unknown to isec (decomposed by vcfeval)",
             file=sys.stderr,
         )
     out.sort(key=lambda r: (r["chrom"], r["pos"], r["ref"], r["alt"], r["status"]))

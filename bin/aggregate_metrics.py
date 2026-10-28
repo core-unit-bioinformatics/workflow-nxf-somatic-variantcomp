@@ -6,9 +6,14 @@ Input: any number of metrics tables with the columns of benchmark_metrics.py
 sample, truth, query, stratum_type, stratum, tp_baseline, fn, tp_call, fp, recall,
 precision, f1. Counts and metrics are integers / numbers or NA.
 
-Outputs (--prefix):
+Outputs (--prefix); every table starts with the column method, the tool whose matching
+the counts come from: bcftools_isec_exact (stratum match/exact), bcftools_isec_position
+(match/position), rtgtools_vcfeval (all other strata, power-adjusted recall included):
   <prefix>.per_pair.tsv     all input rows, sorted (truth, query, stratum type, stratum, sample)
-  <prefix>.aggregated.tsv   one row per truth/query technology and stratum:
+  <prefix>.aggregated.tsv   one row per truth/query technology and stratum (see below)
+  <prefix>.<method>.per_pair.tsv, <prefix>.<method>.aggregated.tsv
+                            the same, one pair of files per method
+Columns of the aggregated table:
       n_samples   number of samples with a row
       tp_baseline, fn, tp_call, fp
                   counts summed over the samples (NA if no sample has a count)
@@ -34,6 +39,9 @@ KEYS = ["truth", "query", "stratum_type", "stratum"]
 COUNTS = ["tp_baseline", "fn", "tp_call", "fp"]
 METRICS = ["recall", "precision", "f1"]
 REQUIRED = ["sample", *KEYS, *COUNTS, *METRICS]
+# matching method of every stratum (the bcftools isec counts are the match strata)
+ISEC_METHOD = {"exact": "bcftools_isec_exact", "position": "bcftools_isec_position"}
+VCFEVAL = "rtgtools_vcfeval"
 # order of the stratum types in the outputs; unknown types go last
 ORDER = {
     "overall": 0,
@@ -116,15 +124,25 @@ def main():
             f"{first['stratum']}; was a metrics file given twice?"
         )
 
+    # matching method of every row (first column of every output)
+    method = [
+        ISEC_METHOD.get(stratum, VCFEVAL) if stype == "match" else VCFEVAL
+        for stype, stratum in zip(data["stratum_type"], data["stratum"], strict=True)
+    ]
+    if "method" in data.columns:
+        data = data.drop(columns="method")
+    data.insert(0, "method", method)
+
     # per-pair table, sorted by the stratum type order above
     data["_order"] = data["stratum_type"].map(ORDER).fillna(len(ORDER))
     data = data.sort_values(["truth", "query", "_order", "stratum", "sample"], kind="stable")
-    data.drop(columns="_order").to_csv(f"{args.prefix}.per_pair.tsv", sep="\t", index=False)
+    data = data.drop(columns="_order")
+    data.to_csv(f"{args.prefix}.per_pair.tsv", sep="\t", index=False)
 
     rows = []
     for key, group in data.groupby(KEYS, sort=False):
         sums, micro_values = micro(group)
-        row = dict(zip(KEYS, key, strict=True))
+        row = {"method": group["method"].iloc[0], **dict(zip(KEYS, key, strict=True))}
         row["n_samples"] = group["sample"].nunique()
         for c in COUNTS:
             row[c] = "NA" if pd.isna(sums[c]) else int(sums[c])
@@ -135,9 +153,20 @@ def main():
             row[f"macro_{m}_mean"] = values.mean() if len(values) else math.nan
             row[f"macro_{m}_sd"] = values.std(ddof=1) if len(values) > 1 else math.nan
         rows.append(row)
-    pd.DataFrame(rows).to_csv(
+    aggregated = pd.DataFrame(rows)
+    aggregated.to_csv(
         f"{args.prefix}.aggregated.tsv", sep="\t", index=False, na_rep="NA", float_format="%.4f"
     )
+    # one pair of files per matching method (named by the tool)
+    for name, part in data.groupby("method", sort=True):
+        part.to_csv(f"{args.prefix}.{name}.per_pair.tsv", sep="\t", index=False)
+        aggregated[aggregated["method"] == name].to_csv(
+            f"{args.prefix}.{name}.aggregated.tsv",
+            sep="\t",
+            index=False,
+            na_rep="NA",
+            float_format="%.4f",
+        )
     print(
         f"INFO: {len(args.metrics)} files, {len(data)} rows, {data['sample'].nunique()} samples "
         f"-> {len(rows)} aggregated rows",

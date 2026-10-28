@@ -4,6 +4,7 @@
 
 include { KNOWN_CHECK                                } from '../../../modules/local/known_check/main'
 include { RTGTOOLS_VCFEVAL as KNOWN_VCFEVAL          } from '../../../modules/nf-core/rtgtools/vcfeval/main'
+include { BEDTOOLS_INTERSECT as KNOWN_REGIONS        } from '../../../modules/nf-core/bedtools/intersect/main'
 include { BCFTOOLS_ISEC as KNOWN_ISEC_EXACT           } from '../../../modules/nf-core/bcftools/isec/main'
 include { BCFTOOLS_ISEC as KNOWN_ISEC_POSITION        } from '../../../modules/nf-core/bcftools/isec/main'
 include { BENCHMARK_METRICS as KNOWN_METRICS         } from '../../../modules/local/benchmark_metrics/main'
@@ -68,9 +69,31 @@ workflow KNOWN_VARIANTS {
             ]
             [meta, comp, ctbi, kvcf, ktbi, kbed, region]
         }
-    KNOWN_VCFEVAL(ch_bench, ch_sdf)
-    // record matching (truth list first, then the technology's calls)
-    def ch_isec_input = ch_bench.map { meta, comp, ctbi, kvcf, ktbi, _kbed, _region -> [meta, [kvcf, comp], [ktbi, ctbi], [], [], []] }
+    // one region per pair for every method: the confident regions of the list intersected
+    // with the comparison region of the sample (only the comparison region if the list has
+    // none). vcfeval gets it as --bed-regions: every record overlapping it is evaluated
+    // (--evaluation-regions would drop calls that overlap it only partly)
+    KNOWN_REGIONS(
+        ch_bench
+            .filter { _meta, _comp, _ctbi, _kvcf, _ktbi, kbed, _region -> kbed }
+            .map { meta, _comp, _ctbi, _kvcf, _ktbi, kbed, region -> [meta, kbed, region] },
+        [[], []]
+    )
+    def ch_bench_regions = KNOWN_REGIONS.out.intersect.mix(
+        ch_bench
+            .filter { _meta, _comp, _ctbi, _kvcf, _ktbi, kbed, _region -> !kbed }
+            .map { meta, _comp, _ctbi, _kvcf, _ktbi, _kbed, region -> [meta, region] }
+    )
+    // [ meta, calls, calls index, list VCF, list index, region of the pair ]
+    def ch_bench_input = ch_bench
+        .map { meta, comp, ctbi, kvcf, ktbi, _kbed, _region -> [meta, comp, ctbi, kvcf, ktbi] }
+        .join(ch_bench_regions)
+    KNOWN_VCFEVAL(
+        ch_bench_input.map { meta, comp, ctbi, kvcf, ktbi, bed -> [meta, comp, ctbi, kvcf, ktbi, [], bed] },
+        ch_sdf
+    )
+    // record matching (truth list first, then the technology's calls) inside the same region
+    def ch_isec_input = ch_bench_input.map { meta, comp, ctbi, kvcf, ktbi, bed -> [meta, [kvcf, comp], [ktbi, ctbi], [], [], bed] }
     KNOWN_ISEC_EXACT(ch_isec_input)
     KNOWN_ISEC_POSITION(ch_isec_input)
     KNOWN_METRICS(
@@ -80,8 +103,8 @@ workflow KNOWN_VARIANTS {
             .join(KNOWN_VCFEVAL.out.fp_vcf)
             .join(KNOWN_ISEC_EXACT.out.results)
             .join(KNOWN_ISEC_POSITION.out.results)
-            // the isec counts are restricted to the list regions and the comparison region
-            .join(ch_bench.map { meta, _comp, _ctbi, _kvcf, _ktbi, kbed, region -> [meta, [kbed, region].flatten()] })
+            // the isec counts are restricted to the same region as vcfeval
+            .join(ch_bench_regions.map { meta, bed -> [meta, [bed]] })
     )
     KNOWN_AGGREGATE(
         KNOWN_METRICS.out.metrics

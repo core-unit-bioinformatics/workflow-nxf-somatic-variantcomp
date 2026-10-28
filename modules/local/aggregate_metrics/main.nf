@@ -13,6 +13,8 @@ process AGGREGATE_METRICS {
     output:
     tuple val(meta), path("${prefix}.per_pair.tsv"), emit: per_pair
     tuple val(meta), path("${prefix}.aggregated.tsv"), emit: aggregated
+    // the same tables split by matching method (<prefix>.<method>.per_pair/aggregated.tsv)
+    tuple val(meta), path("${prefix}.*.{per_pair,aggregated}.tsv"), emit: by_method
     tuple val("${task.process}"), val('python'), eval("python --version | sed 's/Python //'"), topic: versions, emit: versions_python
     tuple val("${task.process}"), val('pandas'), eval("python -c 'import pandas; print(pandas.__version__)'"), topic: versions, emit: versions_pandas
 
@@ -33,6 +35,6 @@ process AGGREGATE_METRICS {
     stub:
     prefix = task.ext.prefix ?: "${meta.id}"
     """
-    touch ${prefix}.per_pair.tsv ${prefix}.aggregated.tsv
+    touch ${prefix}.per_pair.tsv ${prefix}.aggregated.tsv ${prefix}.rtgtools_vcfeval.per_pair.tsv ${prefix}.rtgtools_vcfeval.aggregated.tsv
     """
 }
