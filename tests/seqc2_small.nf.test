@@ -20,7 +20,9 @@ nextflow_pipeline {
             def stable_path = getAllFilesFromDir(params.outdir, relative: true, includeDir: true, ignore: ['pipeline_info/*.{html,json,txt}', 'multiqc/multiqc_plots/**', 'report/tables/**'])
             def stable_content = getAllFilesFromDir(params.outdir, ignoreFile: 'tests/.nftignore')
             def validated = path("$outputDir/pipeline_info/samplesheet.validated.csv").readLines()
-            def annotatedHeader = path("$outputDir/discordance/variants.annotated.tsv").readLines()[0].tokenize('\t')
+            def annotatedLines = path("$outputDir/discordance/variants.annotated.tsv").readLines()
+            def annotatedHeader = annotatedLines[0].tokenize('\t')
+            def annotated = annotatedLines[1..-1].collect { line -> [annotatedHeader, line.split('\t', -1).toList()].transpose().collectEntries() }
             def callable = path("$outputDir/coverage/callable_summary.tsv").readLines()
             assert workflow.success
             assertAll(
@@ -44,6 +46,11 @@ nextflow_pipeline {
                 { assert path("$outputDir/main.html").text.contains("report/tables/multiqc-report/index_1.html") },
                 // VEP --hgvs: protein changes in the annotated table
                 { assert 'hgvsp' in annotatedHeader },
+                // read evidence of indels (regression: the pileup found no alt read of called
+                // indels): the 37-bp deletion called by both technologies has alt reads in
+                // the wes tumor alignment; every TP has alt reads (evidence check)
+                { assert annotated.find { r -> r.sample == 'SEQC2_NV_1' && r.pos == '23958385' && r.status == 'TP' }.other_tumor_alt.toInteger() > 0 },
+                { assert path("$outputDir/report/consistency_checks.tsv").readLines().count { line -> line.startsWith('evidence\t') } >= 3 },
                 { assert snapshot(
                     removeNextflowVersion("$outputDir/pipeline_info/variantcomp_software_mqc_versions.yml"),
                     stable_path,

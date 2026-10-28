@@ -27,21 +27,43 @@ nextflow_pipeline {
             def overallCounts = { metrics ->
                 path(metrics).readLines().find { line -> line.contains('\toverall\tall\t') }.tokenize('\t')[5..8]
             }
+            // counts of a bcftools isec method (stratum match/exact or match/position)
+            def matchCounts = { metrics, method ->
+                path(metrics).readLines().find { line -> line.contains("\tmatch\t${method}\t") }.tokenize('\t')[5..8]
+            }
+            def m = "$outputDir/benchmark/metrics"
             assert workflow.success
             assertAll(
                 { assert validated.size() == 7 },
                 { assert validated[0].startsWith('sample,technology,library_type') },
                 // VCF headers contain bcftools command lines with dates: check records instead
-                { assert path("$outputDir/vcf_preprocessed/S1/S1_wes.compare.vcf.gz").linesGzip.count { line -> !line.startsWith('#') } == 10 },
-                { assert path("$outputDir/vcf_preprocessed/S1/S1_panel.compare.vcf.gz").linesGzip.count { line -> !line.startsWith('#') } == 9 },
+                { assert path("$outputDir/vcf_preprocessed/S1/S1_wes.compare.vcf.gz").linesGzip.count { line -> !line.startsWith('#') } == 12 },
+                { assert path("$outputDir/vcf_preprocessed/S1/S1_panel.compare.vcf.gz").linesGzip.count { line -> !line.startsWith('#') } == 11 },
                 // benchmark counts as designed in design.tsv (tp_baseline, fn, tp_call, fp)
-                { assert overallCounts("$outputDir/benchmark/S1/S1_wgs_vs_wes.metrics.tsv") == ['9', '1', '9', '1'] },
-                { assert overallCounts("$outputDir/benchmark/S1/S1_wgs_vs_panel.metrics.tsv") == ['8', '2', '8', '1'] },
-                { assert overallCounts("$outputDir/benchmark/S2/S2_wgs_vs_wes.metrics.tsv") == ['2', '1', '2', '1'] },
-                { assert overallCounts("$outputDir/benchmark/S2/S2_wgs_vs_panel.metrics.tsv") == ['3', '0', '3', '1'] },
+                { assert overallCounts("$m/S1/S1_wgs_vs_wes.metrics.tsv") == ['11', '1', '11', '1'] },
+                { assert overallCounts("$m/S1/S1_wgs_vs_panel.metrics.tsv") == ['10', '2', '10', '1'] },
+                { assert overallCounts("$m/S2/S2_wgs_vs_wes.metrics.tsv") == ['2', '1', '2', '1'] },
+                { assert overallCounts("$m/S2/S2_wgs_vs_panel.metrics.tsv") == ['3', '0', '3', '1'] },
+                // the matching methods differ as designed: E15 (same haplotype as two SNVs in
+                // wgs and as deletion + insertion in wes) matches with vcfeval only, E06 (extra
+                // wes allele at a TP position) and E15's position 5049 with isec by position
+                { assert matchCounts("$m/S1/S1_wgs_vs_wes.metrics.tsv", 'exact') == ['9', '3', '9', '3'] },
+                { assert matchCounts("$m/S1/S1_wgs_vs_wes.metrics.tsv", 'position') == ['10', '2', '10', '1'] },
+                { assert matchCounts("$m/S1/S1_wgs_vs_panel.metrics.tsv", 'exact') == ['10', '2', '10', '1'] },
+                // per variant: vcfeval TP, but not found by exact allele (isec)
+                { assert annotated.findAll { r -> r.query == 'wes' && r.pos in ['5048', '5049'] && r.status == 'TP' }.collect { r -> r.isec_exact } == ['FN', 'FN'] },
+                // the tool outputs are published per tool
+                { assert path("$outputDir/benchmark/bcftools_isec_exact/S1/S1_wgs_vs_wes/sites.txt").exists() },
+                { assert path("$outputDir/benchmark/bcftools_isec_position/S1/S1_wgs_vs_wes/sites.txt").exists() },
+                { assert path("$outputDir/benchmark/rtgtools_vcfeval/S1/S1_wgs_vs_wes/S1_wgs_vs_wes.summary.txt").exists() },
+                { assert path("$m/metrics.bcftools_isec_exact.aggregated.tsv").readLines().size() == 3 },
                 // discordance: E08 called with a non-PASS FILTER in wes; E12 insertion in the tandem
                 // repeat; genes assigned by VEP (synthetic GTF)
                 { assert annotated.find { r -> r.query == 'wes' && r.pos == '4700' }.class == 'filtered_non_pass' },
+                // reasons: the main reason first; E12 (insertion in the CA repeat) as FN of the
+                // panel: no alignment, an indel in a repeat and in the tandem-repeat strata
+                { assert annotated.find { r -> r.query == 'wes' && r.pos == '4700' }.reasons == 'filtered_non_pass' },
+                { assert annotated.find { r -> r.query == 'panel' && r.pos == '2999' }.reasons == 'absent,indel,in_repeat,giab_tandem_repeat,tandem_repeat' },
                 { assert annotated.find { r -> r.query == 'panel' && r.pos == '2999' }.tandem_repeat == 'yes' },
                 { assert annotated.find { r -> r.query == 'panel' && r.pos == '4999' }.homopolymer == 'yes' },
                 // GIAB stratifications (synthetic stand-ins): same overlap as the strata above
@@ -56,8 +78,10 @@ nextflow_pipeline {
                 { assert path("$outputDir/input_checks/vcf/S2_wes.vcf.reference_check.tsv").readLines().contains('records_on_mito\t1') },
                 { assert path("$outputDir/known_variants/required_variants.tsv").text.contains('chr1\t4700\tG\tT\tFAIL_filtered') },
                 // external truth = designed truth: wgs is perfect, wes/panel as against wgs
-                { assert overallCounts("$outputDir/known_variants/benchmark/S1/S1_designed_truth_vs_wgs.metrics.tsv") == ['10', '0', '10', '0'] },
-                { assert overallCounts("$outputDir/known_variants/benchmark/S1/S1_designed_truth_vs_panel.metrics.tsv") == ['8', '2', '8', '1'] },
+                { assert overallCounts("$outputDir/known_variants/benchmark/metrics/S1/S1_designed_truth_vs_wgs.metrics.tsv") == ['12', '0', '12', '0'] },
+                { assert overallCounts("$outputDir/known_variants/benchmark/metrics/S1/S1_designed_truth_vs_panel.metrics.tsv") == ['10', '2', '10', '1'] },
+                // the same truth set and region for every method: isec agrees where it must
+                { assert matchCounts("$outputDir/known_variants/benchmark/metrics/S1/S1_designed_truth_vs_wgs.metrics.tsv", 'exact') == ['12', '0', '12', '0'] },
                 { assert validated.count { line -> line.contains(',wgs,wgs,') && line.contains(',true,') } == 2 },
                 // end-of-run checks: every count adds up; the reports were written
                 { assert path("$outputDir/report/consistency_checks.tsv").readLines().size() > 40 },
