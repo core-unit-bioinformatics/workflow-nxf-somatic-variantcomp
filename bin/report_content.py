@@ -1457,7 +1457,7 @@ def section_why(mqc, d):
                         "s": samples,
                         "renameX": True,
                         "marker": {"color": CLASS_COLOR[cls]},
-                        "hovertemplate": f"%{{x}}: %{{y}} variants<br>{cls}<extra></extra>",
+                        "hovertemplate": "%{x}: %{y} variants<br>" + cls + "<extra></extra>",
                     }
                 )
             # total above every bar
@@ -1514,7 +1514,9 @@ def section_why(mqc, d):
                     "s": samples,
                     "renameX": True,
                     "marker": {"color": CLASS_COLOR.get(name, PALETTE[i % len(PALETTE)])},
-                    "hovertemplate": f"%{{x}}: %{{y}} discordant variants<br>{name}<extra></extra>",
+                    "hovertemplate": "%{x}: %{y} discordant variants<br>"
+                    + name
+                    + "<extra></extra>",
                 }
             )
         further_views.append(
@@ -1689,7 +1691,9 @@ def section_characterization(mqc, d, fdr):
                         "y": share[cat].round(1).tolist(),
                         "customdata": table[cat].astype(int).tolist(),
                         "marker": {"color": color},
-                        "hovertemplate": f"%{{x}}<br>{esc(cat)}: %{{customdata}} variants (%{{y}} %)<extra></extra>",
+                        "hovertemplate": "%{x}<br>"
+                        + esc(cat)
+                        + ": %{customdata} variants (%{y} %)<extra></extra>",
                     }
                 )
             views.append(
@@ -1963,7 +1967,8 @@ def section_metrics(mqc, d):
                         for a, b in zip(sub["tp_baseline"], sub["fn"], strict=True)
                     ],
                     "line": {"color": PALETTE[i % len(PALETTE)]},
-                    "hovertemplate": f"{esc(name)}<br>VAF %{{x}}: recall %{{y:.3f}} (%{{customdata}})<extra></extra>",
+                    "hovertemplate": esc(name)
+                    + "<br>VAF %{x}: recall %{y:.3f} (%{customdata})<extra></extra>",
                 }
             )
         parts.append("<div class='vc-group'>Recall by truth VAF</div>")
@@ -2198,7 +2203,7 @@ def section_filtering(mqc, d):
                 "y": table[col].round(2).tolist(),
                 "s": [sample_of[v] for v in order],
                 "marker": {"color": REASON_COLOR.get(col, PALETTE[i % len(PALETTE)])},
-                "hovertemplate": f"%{{x}}<br>{esc(col)}: %{{y}}<extra></extra>",
+                "hovertemplate": "%{x}<br>" + esc(col) + ": %{y}<extra></extra>",
             }
             for i, col in enumerate(table.columns)
         ]
@@ -2476,13 +2481,13 @@ def column_specs(df, genome):
                     "GeneCards": {
                         "url": "https://www.genecards.org/cgi-bin/carddisp.pl?gene={value}"
                     },
-                    "Ensembl": {"url": f"{ensembl}/Homo_sapiens/Gene/Summary?g={{value}}"},
+                    "Ensembl": {"url": ensembl + "/Homo_sapiens/Gene/Summary?g={value}"},
                 }
             }
         elif col == "locus":
             specs[col] = {
                 "link-to-url": {
-                    "Ensembl": {"url": f"{ensembl}/Homo_sapiens/Location/View?r={{value}}"},
+                    "Ensembl": {"url": ensembl + "/Homo_sapiens/Location/View?r={value}"},
                 }
             }
         elif col == "dbsnp":
