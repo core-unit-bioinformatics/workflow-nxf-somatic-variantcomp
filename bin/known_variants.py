@@ -434,7 +434,12 @@ def load_calls(path):
             )
         for rec in vcf:
             for alt in rec.alts or ():
-                calls[(rec.chrom, rec.pos, rec.ref, alt)] = {
+                key = (rec.chrom, rec.pos, rec.ref, alt)
+                # the same allele in a PASS and a non-PASS record (e.g. after atomizing):
+                # the PASS call wins
+                if key in calls and calls[key]["filter"] in ("PASS", "."):
+                    continue
+                calls[key] = {
                     "filter": ";".join(rec.filter.keys()) or ".",
                     "vaf": rec.info.get("VC_T_VAF"),
                     "dp": rec.info.get("VC_T_DP"),
@@ -458,25 +463,24 @@ def in_regions(regions, chrom, pos, ref):
 
 
 def load_evidence(path):
-    """Pileup evidence of one alignment: ({(chrom, pos, ref, alt): alt reads}, {(chrom, pos): depth})."""
+    """Read evidence of one alignment (read_evidence.py): ({(chrom, pos, ref, alt): alt
+    reads}, {(chrom, pos, ref, alt): depth of the variant})."""
     if not path:
         return None
     alts, depth = {}, {}
     with pysam.VariantFile(path) as vcf:
-        # one alignment = one sample with FORMAT/AD (bcftools mpileup -a AD,DP)
+        # one alignment = one sample with FORMAT/AD (read_evidence.py)
         if len(vcf.header.samples) != 1 or "AD" not in vcf.header.formats:
-            sys.exit(
-                f"ERROR: {path}: expected one sample with FORMAT/AD (bcftools mpileup -a AD,DP)"
-            )
+            sys.exit(f"ERROR: {path}: expected one sample with FORMAT/AD (read_evidence.py output)")
         sample = next(iter(vcf.header.samples))
         for rec in vcf:
             fmt = rec.samples[sample]
             ad = fmt.get("AD") if "AD" in rec.format else None
             dp = fmt.get("DP") if "DP" in rec.format else None
-            # several records at one position: keep the largest depth
-            if dp is not None:
-                depth[(rec.chrom, rec.pos)] = max(depth.get((rec.chrom, rec.pos), 0), dp)
             for i, alt in enumerate(rec.alts or (), start=1):
+                # depth of this variant (one ALT per record in read_evidence.py)
+                if dp is not None:
+                    depth[(rec.chrom, rec.pos, rec.ref, alt)] = dp
                 if ad is not None and i < len(ad) and ad[i] is not None:
                     alts[(rec.chrom, rec.pos, rec.ref, alt)] = ad[i]
     return alts, depth
@@ -578,7 +582,7 @@ def check_technology(sample, tech, paths, known):
         # read evidence in the tumor alignment (NA without alignment)
         ev_dp = ev_alt = None
         if evidence is not None:
-            ev_dp = evidence[1].get((chrom, pos), 0)
+            ev_dp = evidence[1].get(key, 0)
             ev_alt = evidence[0].get(key, 0)
         others = [a for a in by_position.get((chrom, pos), []) if a != f"{ref}>{alt}"]
         rows.append(

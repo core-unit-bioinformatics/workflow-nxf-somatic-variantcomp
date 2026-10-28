@@ -1,18 +1,17 @@
 //
 // Explain discordant variants
 //
-//  1. read evidence: positions of all compared variants of a sample (bcftools query),
-//     pileup of every alignment of the sample at these positions (bcftools mpileup |
-//     call -m --keep-alts, nf-core module), split and left-aligned like the calls
-//     (bcftools norm)
+//  1. read evidence: the alleles of all compared variants of a sample (bcftools query),
+//     reads supporting REF, ALT or another allele of each of them in every alignment of
+//     the sample (read_evidence.py; indels by haplotype sequence, independent of the
+//     placement of the indel in the alignment)
 //  2. classification of every FN/FP and power-adjusted recall (classify_discordance.py)
 //  3. one table with every compared variant of every comparison (annotated next by
 //     the subworkflow ANNOTATE_VARIANTS)
 //
 
 include { BCFTOOLS_QUERY as BCFTOOLS_QUERY_SITES        } from '../../../modules/nf-core/bcftools/query/main'
-include { BCFTOOLS_MPILEUP                              } from '../../../modules/nf-core/bcftools/mpileup/main'
-include { BCFTOOLS_NORM as BCFTOOLS_NORM_EVIDENCE       } from '../../../modules/nf-core/bcftools/norm/main'
+include { READ_EVIDENCE                                 } from '../../../modules/local/read_evidence/main'
 include { CLASSIFY_DISCORDANCE                          } from '../../../modules/local/classify_discordance/main'
 include { AGGREGATE_METRICS as AGGREGATE_POWER          } from '../../../modules/local/aggregate_metrics/main'
 
@@ -36,14 +35,14 @@ workflow DISCORDANCE {
     // [ meta(alignment: id, entry_id, role, ...), vcf, tbi ]
     def ch_evidence = channel.empty()
     if (read_evidence) {
-        // positions (CHROM, POS) of every compared variant and of the extra sites
+        // alleles (CHROM, POS, REF, ALT) of every compared variant and of the extra sites
         BCFTOOLS_QUERY_SITES(
             ch_compare.mix(ch_extra_sites.map { meta, vcf -> [meta, vcf, []] }),
             [],
             [],
             []
         )
-        // one sites file per sample (concatenation; mpileup accepts unsorted, duplicate sites)
+        // one sites file per sample (concatenation; read_evidence.py removes duplicates)
         def ch_sites = BCFTOOLS_QUERY_SITES.out.output
             .collectFile { meta, sites -> ["${meta.sample}.sites.tsv", sites] }
             .map { sites -> [sites.name.replaceAll(/\.sites\.tsv$/, ''), sites] }
@@ -61,21 +60,15 @@ workflow DISCORDANCE {
             alignments
         }
 
-        // allele counts of each alignment at the positions of its sample
-        BCFTOOLS_MPILEUP(
+        // allele-specific read counts of each alignment at the variants of its sample
+        READ_EVIDENCE(
             ch_alignments
-                .map { meta, bam, _index -> [meta.sample, meta, bam] }
+                .map { meta, bam, index -> [meta.sample, meta, bam, index] }
                 .combine(ch_sites, by: 0)
-                .map { _sample, meta, bam, sites -> [meta, bam, sites, []] },
-            ch_reference.map { meta, fasta, fai, _gzi -> [meta, fasta, fai] },
-            false
+                .map { _sample, meta, bam, index, sites -> [meta, bam, index, sites] },
+            ch_reference
         )
-        // split and left-align like the calls, so alleles match by CHROM/POS/REF/ALT
-        BCFTOOLS_NORM_EVIDENCE(
-            BCFTOOLS_MPILEUP.out.vcf.join(BCFTOOLS_MPILEUP.out.index),
-            ch_reference.map { meta, fasta, _fai, _gzi -> [meta, fasta] }
-        )
-        ch_evidence = BCFTOOLS_NORM_EVIDENCE.out.vcf.join(BCFTOOLS_NORM_EVIDENCE.out.index)
+        ch_evidence = READ_EVIDENCE.out.vcf
     }
 
     //

@@ -278,23 +278,29 @@ distinguished from real discordance.
 
 ## Discordance analysis
 
-Every variant found in only one technology gets a class that explains why the other
-technology misses it (see [`output.md`](output.md#discordance)). With `--read_evidence`
-(default `true`), the reads of every alignment are counted at the compared positions
-(`bcftools mpileup`); every row then needs a `tumor_bam`. With `--read_evidence false`
-the evidence columns and the evidence-based classes are omitted.
+Every variant found in only one technology gets reasons that explain why the other
+technology misses it (see [`output.md`](output.md#discordance)): exactly one main reason
+(the call and the reads of that technology), then the further reasons (germline evidence
+in the normal; indel, low VAF, repeat and stratifications as context). With
+`--read_evidence` (default `true`), the reads of every alignment are counted at every
+compared variant (`read_evidence.py`; indels by their haplotype sequence, independent of
+where the aligner placed them); every row then needs a `tumor_bam`. With
+`--read_evidence false` the evidence columns and the read-evidence reasons are omitted.
 
 | Parameter | Default | Description |
 | --- | --- | --- |
 | `--read_evidence` | `true` | Count reads at the discordant positions (needs BAMs). |
 | `--evidence_min_mapq` | `20` | Minimum mapping quality of a counted read. |
 | `--evidence_min_baseq` | `13` | Minimum base quality of a counted base. |
-| `--evidence_max_depth` | `100000` | Maximum reads per position and alignment (`bcftools mpileup --max-depth`). |
-| `--germline_vaf` | `0.1` | Normal VAF from which a discordant variant is classified as `germline_in_normal`. |
+| `--evidence_max_depth` | `100000` | Maximum reads counted per variant and alignment. |
+| `--evidence_indel_flank` | `10` | Indels: reference bases on each side of the window of all placements of the indel in a repeat; a read supports the indel if its sequence (soft clips included) contains the window with the indel applied, the reference if it contains the reference window. |
+| `--evidence_check_min_fraction` | `0.8` | End-of-run check: minimum share of TP variants (called by both technologies) with alt reads in the query tumor alignment, per comparison, separately for SNVs and indels. A lower share stops the run after the reports were written: it points to a read-counting problem. |
+| `--evidence_max_read_length` | `500` | Indels: reads are taken up to this many bases from the window (soft-clipped reads align next to the indel); at least the read length. |
+| `--germline_vaf` | `0.1` | Normal VAF from which a discordant variant gets the further reason `germline_in_normal`. |
 | `--evidence_min_alt_reads` | `2` | Alt reads in a normal needed for `germline_in_normal`. |
 | `--power_min_alt_reads` | `3` | Alt reads a caller needs (power model). |
 | `--detection_power` | `0.95` | Power from which a truth variant counts as detectable. |
-| `--low_vaf` | `0.1` | VAF threshold of the low-VAF feature in the enrichment tests. |
+| `--low_vaf` | `0.1` | VAF threshold of the further reason `low_vaf` (VAF of the call that exists) and of the low-VAF feature in the enrichment tests. |
 | `--enrichment_fdr` | `0.05` | False discovery rate (Benjamini–Hochberg) of the enrichment tests. |
 
 ## Annotation

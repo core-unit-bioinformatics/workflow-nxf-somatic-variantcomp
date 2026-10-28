@@ -318,7 +318,29 @@
                     "type": "integer",
                     "default": 100000,
                     "minimum": 1,
-                    "description": "Read evidence: maximum depth per position (bcftools mpileup --max-depth); high for deep panels.",
+                    "description": "Read evidence: maximum reads counted per variant and alignment (read_evidence.py --max-depth); high for deep panels.",
+                    "fa_icon": "fas fa-filter"
+                },
+                "evidence_indel_flank": {
+                    "type": "integer",
+                    "default": 10,
+                    "minimum": 1,
+                    "description": "Read evidence of indels: reference bases on each side of the window of all placements of the indel; a read supports the indel if its sequence contains this window with the indel applied.",
+                    "fa_icon": "fas fa-filter"
+                },
+                "evidence_check_min_fraction": {
+                    "type": "number",
+                    "default": 0.8,
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "End-of-run check: minimum share of TP variants (called by both technologies) with alt reads in the query tumor alignment, per comparison, separately for SNVs and indels; below it the run stops (read counting problem).",
+                    "fa_icon": "fas fa-check"
+                },
+                "evidence_max_read_length": {
+                    "type": "integer",
+                    "default": 500,
+                    "minimum": 1,
+                    "description": "Read evidence of indels: reads are taken up to this many bases from the indel window (soft-clipped reads with the indel align next to it); at least the read length.",
                     "fa_icon": "fas fa-filter"
                 },
                 "stratification": {
