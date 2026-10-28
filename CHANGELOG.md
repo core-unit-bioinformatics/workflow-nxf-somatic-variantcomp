@@ -4,7 +4,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Dates follow ISO 8601 (`YYYY-MM-DD`).
 
-## Unreleased
+## v0.16.0-dev - [2026-10-28]
 
 Report, correctness and test-data release: MultiQC is the main report with a start page,
 linked datavzrd tables and a zip to send; the read evidence of indels, the reasons of
