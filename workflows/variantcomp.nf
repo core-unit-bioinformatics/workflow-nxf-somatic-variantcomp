@@ -23,6 +23,7 @@ include { CHECKS_GATE            } from '../modules/local/checks_gate/main'
 include { REPORT_BUNDLE          } from '../modules/local/report_bundle/main'
 include { PREPARE_KNOWN_VARIANTS } from '../subworkflows/local/prepare_known_variants'
 include { KNOWN_VARIANTS         } from '../subworkflows/local/known_variants'
+include { IGV_REPORT             } from '../subworkflows/local/igv_report'
 include { paramsSummaryMap       } from 'plugin/nf-schema'
 include { paramsSummaryMultiqc   } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { softwareVersionsToYAML } from '../subworkflows/nf-core/utils_nfcore_pipeline'
@@ -57,9 +58,9 @@ workflow VARIANTCOMP {
     def ch_versions = channel.empty()
     def ch_multiqc_files = channel.empty()
 
-    // alignments are only used for callable regions and read evidence; without both,
-    // they are ignored (not checked, not indexed, not read)
-    def use_alignments = params.callable_regions || params.read_evidence
+    // alignments are only used for callable regions, read evidence and the IGV views;
+    // without these, they are ignored (not checked, not indexed, not read)
+    def use_alignments = params.callable_regions || params.read_evidence || params.igv_report
     def ch_entries = use_alignments
         ? ch_samplesheet_input
         : ch_samplesheet_input.map { entry -> [entry[0], entry[1], entry[2], [], [], [], [], entry[7]] }
@@ -255,6 +256,34 @@ workflow VARIANTCOMP {
     def ch_known_benchmark_per_pair = KNOWN_VARIANTS.out.benchmark_per_pair.map { _meta, tsv -> tsv }.ifEmpty([]).map { tsv -> [tsv] }
 
     //
+    // SUBWORKFLOW: IGV views of every compared variant and every required known variant
+    // (--igv_report): one page per sample and part, with the tumor and normal alignments
+    // and the normalized calls of every technology
+    //
+    // links table variant_id -> IGV page and the pages ([] without --igv_report)
+    def ch_igv_links = channel.value([[]])
+    def ch_igv_pages = channel.value([[]])
+    if (params.igv_report) {
+        IGV_REPORT(
+            ch_samplesheet,
+            PREPROCESS_VCF.out.normalized,
+            ANNOTATE_VARIANTS.out.annotated.map { _meta, tsv -> tsv },
+            KNOWN_VARIANTS.out.required_variants.map { _meta, tsv -> tsv }.ifEmpty([]),
+            ch_samplesheet_validated,
+            PREPARE_REFERENCE.out.reference,
+            file("${projectDir}/assets/igv/variant_template.html", checkIfExists: true),
+            file(params.igv_js ?: "${projectDir}/assets/igv/igv.min.js", checkIfExists: true)
+        )
+        ch_igv_links = IGV_REPORT.out.links.map { _meta, tsv -> [tsv] }
+        // every page and the overview, as one list
+        ch_igv_pages = IGV_REPORT.out.reports
+            .map { _meta, html -> html }
+            .mix(IGV_REPORT.out.index.map { _meta, html -> html })
+            .collect()
+            .map { files -> [files] }
+    }
+
+    //
     // MODULE: consistency checks at the end of the run: do the counts of all steps add up
     // (bin/consistency_checks.py check)? Failed checks are shown in the report; CHECKS_GATE
     // stops the run after the reports were written
@@ -269,6 +298,7 @@ workflow VARIANTCOMP {
             .combine(PREPARE_REGIONS.out.summary.map { _meta, tsv -> tsv })
             .combine(ch_callable_table)
             .combine(ch_required_summary)
+            .combine(ch_igv_links)
             .map { items -> [[id: 'consistency_checks']] + items }
     )
 
@@ -329,6 +359,7 @@ workflow VARIANTCOMP {
         CONSISTENCY_CHECKS.out.checks.map { _meta, tsv -> tsv }
             .combine(ch_samplesheet_validated)
             .combine(ch_params_table)
+            .combine(ch_igv_links)
     )
     ch_multiqc_files = ch_multiqc_files.mix(REPORT_CONTENT.out.multiqc.map { _meta, files -> files }.flatten())
 
@@ -393,24 +424,27 @@ workflow VARIANTCOMP {
     DATAVZRD(REPORT_CONTENT.out.datavzrd)
 
     //
-    // MODULE: one zip with the MultiQC report and the table browser, to send or archive
-    // (report/variantcomp_report.zip)
+    // MODULE: one zip with the MultiQC report, the table browser and the IGV pages, to
+    // send or archive (report/variantcomp_report.zip)
     //
     REPORT_BUNDLE(
         MULTIQC.out.report.map { _meta, report -> report }
             .combine(DATAVZRD.out.report.map { _meta, folder -> folder })
-            .map { report, folder -> [[id: 'variantcomp'], report, folder] }
+            .combine(ch_igv_pages)
+            .map { report, folder, igv -> [[id: 'variantcomp'], report, folder, igv] }
     )
 
     //
-    // MODULE: stop the run if a consistency check failed, after all reports were written
+    // MODULE: stop the run if a consistency check failed, after all reports (and the IGV
+    // pages) were written
     //
     CHECKS_GATE(
         CONSISTENCY_CHECKS.out.checks
             .combine(REPORT_BUNDLE.out.zip.map { _meta, zip -> zip })
             .combine(DATAVZRD.out.report.map { _meta, folder -> folder })
             .combine(MULTIQC.out.report.map { _meta, report -> report })
-            .map { meta, checks, zip, tables, multiqc -> [meta, checks, [zip, tables, multiqc]] }
+            .combine(ch_igv_pages)
+            .map { meta, checks, zip, tables, multiqc, igv -> [meta, checks, [zip, tables, multiqc] + igv] }
     )
 
     emit:

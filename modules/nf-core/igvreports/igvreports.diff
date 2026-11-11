@@ -1,0 +1,257 @@
+Changes in component 'nf-core/igvreports'
+Changes in 'igvreports/main.nf':
+--- modules/nf-core/igvreports/main.nf
++++ modules/nf-core/igvreports/main.nf
+@@ -7,16 +7,21 @@
+ 
+     conda "${moduleDir}/environment.yml"
+     container "${ workflow.containerEngine in ['singularity', 'apptainer'] && !task.ext.singularity_pull_docker_container ?
+-        'https://depot.galaxyproject.org/singularity/igv-reports:1.12.0--pyh7cba7a3_0':
+-        'quay.io/biocontainers/igv-reports:1.12.0--pyh7cba7a3_0' }"
++        'https://depot.galaxyproject.org/singularity/igv-reports:1.16.0--pyh7e72e81_0':
++        'quay.io/biocontainers/igv-reports:1.16.0--pyh7e72e81_0' }"
+ 
+     input:
+-    tuple val(meta), path(sites), path(tracks), path(tracks_indices)
++    // variantcomp patch: every track is staged in its own folder (tracks/<n>/), next to its
++    // index (same position in tracks_indices), so tracks of the same name don't collide;
++    // optional track configuration (--track-config, [] if none) and template ([] if none)
++    tuple val(meta), path(sites), path(tracks, stageAs: 'tracks/??/*'), path(tracks_indices, stageAs: 'tracks/??/*'), path(track_config)
+     tuple val(meta2), path(fasta), path(fai)
++    path(template)
+ 
+     output:
+     tuple val(meta), path("*.html") , emit: report
+-    tuple val("${task.process}"), val("igvreports"), eval("python -c 'import igv_reports; print(igv_reports.__version__)'"), topic: versions, emit: versions_igvreports
++    // variantcomp patch: igv_reports.__version__ is not maintained (0.1.0); the package version is
++    tuple val("${task.process}"), val("igvreports"), eval("python -c \"import importlib.metadata; print(importlib.metadata.version('igv-reports'))\""), topic: versions, emit: versions_igvreports
+ 
+     when:
+     task.ext.when == null || task.ext.when
+@@ -25,8 +30,12 @@
+     def args = task.ext.args ?: ''
+     def prefix = task.ext.prefix ?: "${meta.id}"
+     def fasta_opt = fasta ? "--fasta ${fasta}" : ""
++    // variantcomp patch: the tracks are named in the track configuration, if one is given
++    def config_opt = track_config ? "--track-config ${track_config}" : ""
++    def template_opt = template ? "--template ${template}" : ""
+     // If tracks is not null, create a string of the track paths
+-    def track_arg = tracks ? "--tracks "+ tracks.collect { track -> track.toString() }.join(' ') : ""
++    // variantcomp patch: [ ].flatten(): a single staged track is a path, not a list
++    def track_arg = tracks && !track_config ? "--tracks "+ [tracks].flatten().collect { track -> track.toString() }.join(' ') : ""
+     // if "--tracks" is in the args, then add track_string immediately after it in
+     // the args string and set the track_arg to ""
+     if (args.contains("--tracks") && track_arg) {
+@@ -39,6 +48,8 @@
+         ${args} \\
+         ${fasta_opt} \\
+         ${track_arg} \\
++        ${config_opt} \\
++        ${template_opt} \\
+         --output ${prefix}_report.html
+     """
+ 
+
+Changes in 'igvreports/meta.yml':
+--- modules/nf-core/igvreports/meta.yml
++++ modules/nf-core/igvreports/meta.yml
+@@ -36,7 +36,14 @@
+     - tracks_indices:
+         type: file
+         description: |
+-          List of indices for the tracks
++          List of indices for the tracks (same order as the tracks)
++        ontologies: []
++    - track_config:
++        type: file
++        description: |
++          Optional igv.js track configuration (JSON array, create_report --track-config);
++          if given, the tracks are named in it and not passed with --tracks
++        pattern: "*.json"
+         ontologies: []
+   - - meta2:
+         type: map
+@@ -53,6 +60,11 @@
+         description: Reference fasta file index
+         pattern: "*.{fai}"
+         ontologies: []
++  - template:
++      type: file
++      description: Optional HTML template of the report (create_report --template)
++      pattern: "*.html"
++      ontologies: []
+ output:
+   report:
+     - - meta:
+@@ -76,7 +88,7 @@
+       - igvreports:
+           type: string
+           description: The name of the tool
+-      - python -c 'import igv_reports; print(igv_reports.__version__)':
++      - "python -c \"import importlib.metadata; print(importlib.metadata.version('igv-reports'))\"":
+           type: eval
+           description: The expression to obtain the version of the tool
+ topics:
+@@ -87,7 +99,7 @@
+       - igvreports:
+           type: string
+           description: The name of the tool
+-      - python -c 'import igv_reports; print(igv_reports.__version__)':
++      - "python -c \"import importlib.metadata; print(importlib.metadata.version('igv-reports'))\"":
+           type: eval
+           description: The expression to obtain the version of the tool
+ authors:
+
+Changes in 'igvreports/environment.yml':
+--- modules/nf-core/igvreports/environment.yml
++++ modules/nf-core/igvreports/environment.yml
+@@ -4,4 +4,4 @@
+   - conda-forge
+   - bioconda
+ dependencies:
+-  - bioconda::igv-reports=1.12.0
++  - bioconda::igv-reports=1.16.0
+
+'modules/nf-core/igvreports/tests/nextflow.config' is unchanged
+Changes in 'igvreports/tests/main.nf.test.snap':
+--- modules/nf-core/igvreports/tests/main.nf.test.snap
++++ modules/nf-core/igvreports/tests/main.nf.test.snap
+@@ -14,15 +14,15 @@
+                     [
+                         "IGVREPORTS",
+                         "igvreports",
+-                        "0.1.0"
++                        "1.16.0"
+                     ]
+                 ]
+             }
+         ],
+-        "timestamp": "2026-06-03T12:02:07.676104607",
++        "timestamp": "2026-11-11T10:23:56.435442557",
+         "meta": {
+             "nf-test": "0.9.5",
+-            "nextflow": "26.04.1"
++            "nextflow": "26.10.2"
+         }
+     },
+     "variants with fasta - vcf": {
+@@ -40,15 +40,15 @@
+                     [
+                         "IGVREPORTS",
+                         "igvreports",
+-                        "0.1.0"
++                        "1.16.0"
+                     ]
+                 ]
+             }
+         ],
+-        "timestamp": "2026-06-03T12:01:58.942250582",
++        "timestamp": "2026-11-11T10:23:04.009736212",
+         "meta": {
+             "nf-test": "0.9.5",
+-            "nextflow": "26.04.1"
++            "nextflow": "26.10.2"
+         }
+     },
+     "variants with genome - vcf": {
+@@ -66,15 +66,15 @@
+                     [
+                         "IGVREPORTS",
+                         "igvreports",
+-                        "0.1.0"
++                        "1.16.0"
+                     ]
+                 ]
+             }
+         ],
+-        "timestamp": "2026-06-03T12:02:39.187451926",
++        "timestamp": "2026-11-11T10:25:47.148979846",
+         "meta": {
+             "nf-test": "0.9.5",
+-            "nextflow": "26.04.1"
++            "nextflow": "26.10.2"
+         }
+     },
+     "variant with genome - vcf - stub": {
+@@ -92,15 +92,15 @@
+                     [
+                         "IGVREPORTS",
+                         "igvreports",
+-                        "0.1.0"
++                        "1.16.0"
+                     ]
+                 ]
+             }
+         ],
+-        "timestamp": "2026-06-03T11:56:38.658577403",
++        "timestamp": "2026-11-11T10:26:50.963687741",
+         "meta": {
+             "nf-test": "0.9.5",
+-            "nextflow": "26.04.1"
++            "nextflow": "26.10.2"
+         }
+     }
+ }
+Changes in 'igvreports/tests/main.nf.test':
+--- modules/nf-core/igvreports/tests/main.nf.test
++++ modules/nf-core/igvreports/tests/main.nf.test
+@@ -20,13 +20,14 @@
+                 input[0] = [
+                     [ id:'test' ],
+                     file(params.modules_testdata_base_path + 'genomics/sarscov2/illumina/vcf/test.vcf', checkIfExists: true),
+-                    [], []
++                    [], [], []
+                 ]
+                 input[1] = [
+                     [ id: 'test_genome' ],
+                     file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta', checkIfExists: true),
+                     file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta.fai', checkIfExists: true)
+                 ]
++                input[2] = []
+                 """
+             }
+         }
+@@ -53,13 +54,15 @@
+                     [ id:'test' ],
+                     file(params.modules_testdata_base_path + 'genomics/sarscov2/illumina/vcf/test.vcf', checkIfExists: true),
+                     file(params.modules_testdata_base_path + 'genomics/sarscov2/illumina/bam/test.paired_end.sorted.bam', checkIfExists: true),
+-                    file(params.modules_testdata_base_path + 'genomics/sarscov2/illumina/bam/test.paired_end.sorted.bam.bai', checkIfExists: true)
++                    file(params.modules_testdata_base_path + 'genomics/sarscov2/illumina/bam/test.paired_end.sorted.bam.bai', checkIfExists: true),
++                    []
+                 ]
+                 input[1] = [
+                     [ id: 'test_genome' ],
+                     file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta', checkIfExists: true),
+                     file(params.modules_testdata_base_path + 'genomics/sarscov2/genome/genome.fasta.fai', checkIfExists: true)
+                 ]
++                input[2] = []
+                 """
+             }
+         }
+@@ -84,10 +87,11 @@
+                 input[0] = [
+                     [ id:'test' ],
+                     file("https://raw.githubusercontent.com/igvteam/igv-reports/master/test/data/variants/variants.vcf"),
+-                    [], []
++                    [], [], []
+                 ]
+                 // Need to specify the empty optional fasta input
+                 input[1] = [ [:], [], [] ]
++                input[2] = []
+                 """
+             }
+         }
+@@ -113,9 +117,10 @@
+                 input[0] = [
+                     [ id:'test' ],
+                     file("https://raw.githubusercontent.com/igvteam/igv-reports/master/test/data/variants/variants.vcf"),
+-                    [], []
++                    [], [], []
+                 ]
+                 input[1] = [ [:], [], [] ]
++                input[2] = []
+                 """
+             }
+         }
+
+************************************************************

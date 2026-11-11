@@ -1,0 +1,19 @@
+{
+    "seqc2 small - one sample, wgs + wes, three sites in two pages": {
+        "content": [
+            [
+                [
+                    {
+                        "id": "igv"
+                    },
+                    "igv_links.tsv:md5,3c78fb7ba15adfde4ffc177ab595c3b3"
+                ]
+            ]
+        ],
+        "timestamp": "2026-11-11T10:10:04.408183376",
+        "meta": {
+            "nf-test": "0.9.5",
+            "nextflow": "26.10.2"
+        }
+    }
+}

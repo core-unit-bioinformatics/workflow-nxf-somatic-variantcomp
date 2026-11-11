@@ -13,12 +13,15 @@ INPUT
   --multiqc   the MultiQC report (multiqc_report.html)
   --tables    the datavzrd output folder (with index.html)
   --name      name of the top folder in the zip (default variantcomp_report)
+  --igv       the IGV pages (--igv_report; optional): <sample>_<part>_report.html and
+              index.html of report/igv/
 OUTPUT
   --start-page  the start page, e.g. main.html (for the top of the output folder)
   --output      zip file, e.g. variantcomp_report.zip, with
                   <name>/main.html                      start page
                   <name>/multiqc/multiqc_report.html    the MultiQC report
                   <name>/report/tables/...              the datavzrd table browser
+                  <name>/report/igv/...                 the IGV pages (with --igv)
 
 Why a script: zip is not available in every container and its options differ between
 systems; Python's zipfile writes the same archive everywhere (no tool packs this layout
@@ -32,22 +35,34 @@ import zipfile
 
 # path of the MultiQC page of the table browser, relative to the start page
 START_TARGET = "report/tables/multiqc-report/index_1.html"
-MAIN_HTML = f"""<!doctype html>
+MAIN_HTML = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
-<meta http-equiv="refresh" content="0; url={START_TARGET}">
+<meta http-equiv="refresh" content="0; url={start}">
 <title>variantcomp report</title></head>
 <body style="font-family: sans-serif; margin: 40px">
 <h1>variantcomp report</h1>
 <p>Opening the report ... If nothing happens, use a link:</p>
 <ul>
-<li><a href="{START_TARGET}">Report with the variant tables</a>: the MultiQC report inside the
+<li><a href="{start}">Report with the variant tables</a>: the MultiQC report inside the
 table browser (datavzrd); the menu at the top switches to the tables</li>
 <li><a href="multiqc/multiqc_report.html">MultiQC report</a> on its own</li>
 <li><a href="report/tables/index.html">Variant tables</a> on their own</li>
-</ul>
+{igv_item}</ul>
 <p>Keep the folders multiqc/ and report/ next to this page: the reports link to each other.</p>
 </body></html>
 """
+
+
+# the IGV overview in the list of the start page (only with IGV pages)
+IGV_ITEM = (
+    '<li><a href="report/igv/index.html">IGV views</a> of every compared variant (reads of '
+    "every technology)</li>\n"
+)
+
+
+def main_html(with_igv):
+    """The start page; with a link to the IGV overview if there are IGV pages."""
+    return MAIN_HTML.format(start=START_TARGET, igv_item=IGV_ITEM if with_igv else "")
 
 
 def check_inputs(multiqc, tables):
@@ -58,12 +73,12 @@ def check_inputs(multiqc, tables):
         sys.exit(f"ERROR: --tables {tables}: no index.html; give the datavzrd output folder")
 
 
-def write_zip(multiqc, tables, name, output):
+def write_zip(multiqc, tables, name, output, igv=()):
     """Write the zip; returns the number of files packed."""
     n = 0
     with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as zf:
         # start page and MultiQC report
-        zf.writestr(f"{name}/main.html", MAIN_HTML)
+        zf.writestr(f"{name}/main.html", main_html(bool(igv)))
         zf.write(multiqc, f"{name}/multiqc/multiqc_report.html")
         n += 2
         # every file of the datavzrd folder, with its path relative to the folder
@@ -73,6 +88,10 @@ def write_zip(multiqc, tables, name, output):
                 rel = os.path.relpath(path, tables)
                 zf.write(path, f"{name}/report/tables/{rel}")
                 n += 1
+        # the IGV pages next to the tables (they link to ../tables/ and back)
+        for path in sorted(igv, key=os.path.basename):
+            zf.write(path, f"{name}/report/igv/{os.path.basename(path)}")
+            n += 1
     return n
 
 
@@ -84,12 +103,19 @@ def main():
     parser.add_argument("--name", default="variantcomp_report", help="top folder in the zip")
     parser.add_argument("--output", required=True, help="output zip file")
     parser.add_argument("--start-page", required=True, help="output: start page (main.html)")
+    parser.add_argument("--igv", nargs="*", default=[], help="IGV pages (HTML), optional")
     args = parser.parse_args()
     check_inputs(args.multiqc, args.tables)
+    # IGV pages: every given file must exist, and the overview must be among them
+    missing = [p for p in args.igv if not os.path.isfile(p)]
+    if missing:
+        sys.exit(f"ERROR: --igv: file(s) not found: {', '.join(missing)}")
+    if args.igv and "index.html" not in {os.path.basename(p) for p in args.igv}:
+        sys.exit("ERROR: --igv: no index.html among the IGV pages; give report/igv/index.html")
     # the start page for the output folder, then the zip with the same page at its top
     with open(args.start_page, "w") as fh:
-        fh.write(MAIN_HTML)
-    n = write_zip(args.multiqc, args.tables, args.name, args.output)
+        fh.write(main_html(bool(args.igv)))
+    n = write_zip(args.multiqc, args.tables, args.name, args.output, args.igv)
     size = os.path.getsize(args.output) / 1e6
     print(f"INFO: {args.output}: {n} files, {size:.1f} MB", file=sys.stderr)
 

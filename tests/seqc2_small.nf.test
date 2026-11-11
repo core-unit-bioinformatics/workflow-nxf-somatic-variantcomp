@@ -44,6 +44,13 @@ nextflow_pipeline {
                 { assert path("$outputDir/report/tables/multiqc-report/index_1.html").exists() },
                 { assert path("$outputDir/report/variantcomp_report.zip").exists() },
                 { assert path("$outputDir/main.html").text.contains("report/tables/multiqc-report/index_1.html") },
+                // IGV views (--igv_report): one page per sample (at most 100 sites each), one
+                // link per compared variant (the required variants are all compared here)
+                { assert annotated.collect { r -> "${r.sample}:${r.chrom}:${r.pos}:${r.ref}>${r.alt}".toString() }.unique().size() ==
+                    path("$outputDir/report/igv/igv_links.tsv").readLines().size() - 1 },
+                { assert ['SEQC2_FD_1', 'SEQC2_IL_1', 'SEQC2_NV_1'].every { s -> path("$outputDir/report/igv/${s}_001_report.html").text.contains("${s} part 001") } },
+                { assert path("$outputDir/report/igv/index.html").text.contains("href='SEQC2_NV_1_001_report.html'") },
+                { assert path("$outputDir/report/consistency_checks.tsv").readLines().count { line -> line.startsWith('igv\t') } == 9 },
                 // VEP --hgvs: protein changes in the annotated table
                 { assert 'hgvsp' in annotatedHeader },
                 // read evidence of indels (regression: the pileup found no alt read of called

@@ -126,6 +126,22 @@
                     "pysam": "0.24.1",
                     "python": "3.12.15"
                 },
+                "IGVREPORTS": {
+                    "igvreports": "1.16.0"
+                },
+                "IGV_INDEX": {
+                    "python": "3.12.15"
+                },
+                "IGV_SITES": {
+                    "pandas": "2.2.3",
+                    "python": "3.12.15"
+                },
+                "IGV_TEMPLATE": {
+                    "python": "3.12.15"
+                },
+                "IGV_TRACKS": {
+                    "python": "3.12.15"
+                },
                 "KNOWN_AGGREGATE": {
                     "pandas": "2.2.1",
                     "python": "3.12.15"
@@ -836,6 +852,12 @@
                 "regions/targets/wes.bed",
                 "report",
                 "report/consistency_checks.tsv",
+                "report/igv",
+                "report/igv/SEQC2_FD_1_001_report.html",
+                "report/igv/SEQC2_IL_1_001_report.html",
+                "report/igv/SEQC2_NV_1_001_report.html",
+                "report/igv/igv_links.tsv",
+                "report/igv/index.html",
                 "report/plots",
                 "report/plots/discordance_by_annotation.png",
                 "report/plots/discordance_classes.png",
@@ -1204,7 +1226,7 @@
                 "required_demo_SEQC2_IL_1.known_variants.tsv:md5,f58ea4ad8a96c01f87e6d9192035ee1a",
                 "required_summary.tsv:md5,dd32d3b4e070d3430cdaee3a94b41790",
                 "required_variants.tsv:md5,57f117e5e0c12dde28a13fa4021d3238",
-                "main.html:md5,601fb641d71ebb4a9cc8d68443841b4d",
+                "main.html:md5,1acc9afe22eff9dbbaa024b46222c0ac",
                 "consequences_all__plot_Coding_consequences.txt:md5,1715a582bf22bd1cc73b487774e22d07",
                 "consequences_all__plot_Consequences_all_.txt:md5,4dc8d121bc5e075acfc5e39c826bd7a2",
                 "consequences_all__plot_Consequences_most_severe_.txt:md5,84dacdff4e4e172592c2617796736345",
@@ -1230,7 +1252,9 @@
                 "common_targets.steps.tsv:md5,11c9ea0d33522e54b216e40eb1443e6b",
                 "common_targets.summary.tsv:md5,b7c3aea36ddd9c70a0c05915281ef339",
                 "wes.bed:md5,41eeb51455f418377a735ecde07a9cd3",
-                "consistency_checks.tsv:md5,93078fd7782718500953db940882233e",
+                "consistency_checks.tsv:md5,842a242380c99326af213669f1642277",
+                "igv_links.tsv:md5,32130a75f0fd80c57313d518baa7cc91",
+                "index.html:md5,7c6235b31fb140baa8557c6d982a0b86",
                 "variantcomp.annotation_counts.tsv:md5,efdf6bbf3e7dd93841e08783d9b5ef4d",
                 "variantcomp.classes.tsv:md5,b178f3ebec8c2532da2caebe906f6321",
                 "variantcomp.enrichment.tsv:md5,1ee77cfd7e0d36381647c8e1f3f9a91c",
@@ -1281,7 +1305,7 @@
                 "SEQC2_NV_1_wgs.pass.norm.norm.log:md5,40cffae0543c95f31b0a80dd9ae723e4"
             ]
         ],
-        "timestamp": "2026-10-28T20:25:06.033569865",
+        "timestamp": "2026-11-11T10:40:50.432005469",
         "meta": {
             "nf-test": "0.9.5",
             "nextflow": "26.10.2"

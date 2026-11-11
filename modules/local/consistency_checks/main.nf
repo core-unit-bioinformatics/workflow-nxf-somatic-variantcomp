@@ -10,8 +10,8 @@ process CONSISTENCY_CHECKS {
     input:
     // accounting and check tables of every VCF (variant_accounting.py), metrics, variant
     // table, discordance classes, region steps and summary; callable summary and required
-    // known-variant summary are optional ([])
-    tuple val(meta), path(accounting, stageAs: 'accounting/*'), path(per_pair, stageAs: 'in/per_pair.tsv'), path(aggregated, stageAs: 'in/aggregated.tsv'), path(variants, stageAs: 'in/variants.tsv'), path(classes, stageAs: 'in/classes.tsv'), path(region_steps, stageAs: 'in/region_steps.tsv'), path(targets, stageAs: 'in/targets.tsv'), path(callable, stageAs: 'in/callable.tsv'), path(required, stageAs: 'in/required.tsv')
+    // known-variant summary and the IGV links table (--igv_report) are optional ([])
+    tuple val(meta), path(accounting, stageAs: 'accounting/*'), path(per_pair, stageAs: 'in/per_pair.tsv'), path(aggregated, stageAs: 'in/aggregated.tsv'), path(variants, stageAs: 'in/variants.tsv'), path(classes, stageAs: 'in/classes.tsv'), path(region_steps, stageAs: 'in/region_steps.tsv'), path(targets, stageAs: 'in/targets.tsv'), path(callable, stageAs: 'in/callable.tsv'), path(required, stageAs: 'in/required.tsv'), path(igv_links, stageAs: 'in/igv_links.tsv')
 
     output:
     tuple val(meta), path("${prefix}.tsv"), emit: checks
@@ -25,6 +25,7 @@ process CONSISTENCY_CHECKS {
     prefix = task.ext.prefix ?: "consistency_checks"
     def callable_arg = callable ? "--callable ${callable}" : ''
     def required_arg = required ? "--required ${required}" : ''
+    def igv_arg = igv_links ? "--igv-links ${igv_links}" : ''
     """
     # do the counts of the steps add up? (accounting, metrics, variant table, classes,
     # regions, required variants); failed checks are listed, the run is stopped later
@@ -39,6 +40,7 @@ process CONSISTENCY_CHECKS {
         --targets ${targets} \\
         ${callable_arg} \\
         ${required_arg} \\
+        ${igv_arg} \\
         --output ${prefix}.tsv \\
         ${args}
     """

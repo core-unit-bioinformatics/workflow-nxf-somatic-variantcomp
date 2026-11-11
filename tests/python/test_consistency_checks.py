@@ -247,3 +247,29 @@ def test_concordant_with_main_reason_fails(tmp_path):
     assert run("check", *inputs(tmp_path, tp_row=bad), "--output", str(out)).returncode == 0
     failed = [c for c in rows(out) if c["status"] != "ok"]
     assert len(failed) == 1 and "TP with a main reason: 9" in failed[0]["check"]
+
+
+def test_igv_checks_one_page_per_compared_variant():
+    sys.path.insert(0, str(SCRIPT.parent))
+    import consistency_checks
+
+    def variant(sample, pos, query="wes"):
+        return {"sample": sample, "query": query, "chrom": "chr1", "pos": str(pos)}
+
+    rows = [variant("S1", 1), variant("S1", 1, "panel"), variant("S1", 2), variant("S2", 3)]
+    for r in rows:
+        r.update(ref="A", alt="C")
+    links = [
+        {"variant_id": "S1:chr1:1:A>C", "igv_file": "S1_001_report.html"},
+        {"variant_id": "S1:chr1:2:A>C", "igv_file": "S1_001_report.html"},
+        {"variant_id": "S1:chr1:2:A>C", "igv_file": "S1_002_report.html"},
+    ]
+    checks = consistency_checks.Checks()
+    consistency_checks.igv_checks(rows, links, 1, checks)
+    result = {(r[1], r[2]): (r[4], r[5]) for r in checks.rows}
+    # S1: every variant has a page, one of them two; S2: no page; S1_001 has 2 > 1 sites
+    assert result[("S1", "compared variants without IGV page")] == ("0", "ok")
+    assert result[("S1", "compared variants with more than one IGV link")] == ("1", "FAIL")
+    assert result[("S2", "compared variants without IGV page")] == ("1", "FAIL")
+    assert result[("S1_001_report.html", "sites per IGV page")] == ("2", "FAIL")
+    assert result[("S1_002_report.html", "sites per IGV page")] == ("1", "ok")

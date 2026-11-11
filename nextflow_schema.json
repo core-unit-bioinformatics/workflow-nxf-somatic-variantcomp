@@ -425,6 +425,64 @@
                 }
             }
         },
+        "igv_options": {
+            "title": "IGV options",
+            "type": "object",
+            "fa_icon": "fas fa-eye",
+            "description": "IGV views (igv-reports) of every compared variant and every required known variant, with the tumor and normal alignments of every technology.",
+            "properties": {
+                "igv_report": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Write IGV views (report/igv/): one HTML page per sample and part of at most --igv_max_sites sites, with the tumor and normal alignments and the normalized calls of every technology. Needs tumor and normal alignments (BAM/CRAM) in every samplesheet row.",
+                    "fa_icon": "fas fa-eye"
+                },
+                "igv_max_sites": {
+                    "type": "integer",
+                    "default": 100,
+                    "minimum": 1,
+                    "description": "Maximum number of sites per IGV page (all read data are embedded, so the page size grows with the sites).",
+                    "fa_icon": "fas fa-layer-group"
+                },
+                "igv_flanking": {
+                    "type": "integer",
+                    "default": 200,
+                    "minimum": 0,
+                    "description": "Bases around a site whose reads and sequence are embedded (half on either side; igv-reports --flanking).",
+                    "fa_icon": "fas fa-arrows-alt-h"
+                },
+                "igv_window": {
+                    "type": "integer",
+                    "default": 100,
+                    "minimum": 0,
+                    "description": "Width (bp) of the initial view around a site (igv-reports --window); at most --igv_flanking. 0: the igv.js default (41 bp around an SNV).",
+                    "fa_icon": "fas fa-search"
+                },
+                "igv_subsample": {
+                    "type": "number",
+                    "default": 1,
+                    "exclusiveMinimum": 0,
+                    "maximum": 1,
+                    "description": "Fraction of the reads embedded (samtools view --subsample; igv-reports --subsample). 1: all reads.",
+                    "fa_icon": "fas fa-percentage"
+                },
+                "igv_sampling_depth": {
+                    "type": "integer",
+                    "default": 500,
+                    "minimum": 1,
+                    "description": "Maximum number of reads shown per sampling window (100 bp) and alignment track (igv.js samplingDepth); the embedded reads are not affected.",
+                    "fa_icon": "fas fa-sort-amount-down"
+                },
+                "igv_js": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "pattern": "^\\S+\\.js$",
+                    "description": "igv.js (igv.min.js) inlined into every page, so the pages work offline. Default: assets/igv/igv.min.js of the pipeline (igv.js 3.5.2, MIT).",
+                    "fa_icon": "fas fa-file-code"
+                }
+            }
+        },
         "institutional_config_options": {
             "title": "Institutional config options",
             "type": "object",
@@ -707,6 +765,9 @@
         },
         {
             "$ref": "#/$defs/known_variant_options"
+        },
+        {
+            "$ref": "#/$defs/igv_options"
         },
         {
             "$ref": "#/$defs/region_options"

@@ -68,3 +68,26 @@ def test_missing_tables_folder_is_an_error(tmp_path):
         str(tmp_path / "m.html"),
     )
     assert proc.returncode == 1 and "no index.html" in proc.stderr
+
+
+def test_igv_pages_are_packed_next_to_the_tables(tmp_path):
+    multiqc, tables = reports(tmp_path)
+    igv = tmp_path / "igv"
+    igv.mkdir()
+    (igv / "index.html").write_text("index")
+    (igv / "S1_001_report.html").write_text("page")
+    zip_path, main = tmp_path / "r.zip", tmp_path / "main.html"
+    args = ["--multiqc", multiqc, "--tables", tables, "--output", str(zip_path)]
+    args += ["--start-page", str(main)]
+    proc = run(*args, "--igv", str(igv / "S1_001_report.html"), str(igv / "index.html"))
+    assert proc.returncode == 0, proc.stderr
+    names = set(zipfile.ZipFile(zip_path).namelist())
+    assert {
+        "variantcomp_report/report/igv/index.html",
+        "variantcomp_report/report/igv/S1_001_report.html",
+    } <= names
+    # the start page links to the IGV overview
+    assert 'href="report/igv/index.html"' in main.read_text()
+    # without the overview page: error
+    proc = run(*args, "--igv", str(igv / "S1_001_report.html"))
+    assert proc.returncode == 1 and "no index.html among the IGV pages" in proc.stderr

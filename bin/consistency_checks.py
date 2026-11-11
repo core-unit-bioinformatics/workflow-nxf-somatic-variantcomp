@@ -38,6 +38,8 @@ Checks of `check` (scope = the sample/technology or comparison the check is abou
   regions      the last region step = the common region of the target summary; every
                sample's callable region <= the common region
   known        per required list, sample and technology: passed + failed = required
+  igv          (--igv-links) per sample: every compared variant has exactly one IGV page
+               (links table of igv_inputs.py sites); per page: sites <= --igv-max-sites
 
 INPUT
   --accounting      <x>.checks.tsv and <x>.accounting.tsv of variant_accounting.py (several)
@@ -46,6 +48,7 @@ INPUT
   --region-steps    regions/common_targets.steps.tsv   --targets     common_targets.summary.tsv
   --callable        coverage/callable_summary.tsv (optional)
   --required        known_variants/required_summary.tsv (optional)
+  --igv-links       report/igv/igv_links.tsv (optional; --igv_report)
 OUTPUT
   --output          TSV: category, scope, check, expected, observed, status (ok / FAIL)
 
@@ -86,6 +89,11 @@ class Checks:
         """A check that two values are equal."""
         status = "ok" if str(expected) == str(observed) else "FAIL"
         self.rows.append((category, scope, name, str(expected), str(observed), status))
+
+    def at_most(self, category, scope, name, maximum, observed):
+        """A check that a value is at most a maximum."""
+        status = "ok" if int(observed) <= int(maximum) else "FAIL"
+        self.rows.append((category, scope, name, f"<= {maximum}", str(observed), status))
 
     def at_least(self, category, scope, name, minimum, observed):
         """A check that a value is at least a minimum."""
@@ -409,6 +417,37 @@ def known_checks(required, checks):
         )
 
 
+def igv_checks(variants, links, max_sites, checks):
+    """IGV views: every compared variant has exactly one page; pages have at most
+    max_sites sites."""
+    # pages per variant_id (sample:chrom:pos:ref>alt, as in the report tables) and sites
+    # per page
+    pages = defaultdict(set)
+    sites_per_page = Counter()
+    for r in links:
+        pages[r["variant_id"]].add(r["igv_file"])
+        sites_per_page[r["igv_file"]] += 1
+    # rows per variant_id in the links table (a variant must be listed once)
+    listed = Counter(r["variant_id"] for r in links)
+    # the variant_ids of every sample's compared variants (one per allele, all comparisons)
+    by_sample = defaultdict(set)
+    for r in variants:
+        by_sample[r["sample"]].add(f"{r['sample']}:{r['chrom']}:{r['pos']}:{r['ref']}>{r['alt']}")
+    for sample, ids in sorted(by_sample.items()):
+        checks.equal(
+            "igv", sample, "compared variants without IGV page", 0, sum(not pages[i] for i in ids)
+        )
+        checks.equal(
+            "igv",
+            sample,
+            "compared variants with more than one IGV link",
+            0,
+            sum(listed[i] > 1 or len(pages[i]) > 1 for i in ids),
+        )
+    for page, n in sorted(sites_per_page.items()):
+        checks.at_most("igv", page, "sites per IGV page", max_sites, n)
+
+
 def check(args):
     """Evaluate all checks and write the table."""
     checks = Checks()
@@ -424,6 +463,8 @@ def check(args):
         read_tsv(args.region_steps), read_tsv(args.targets), read_tsv(args.callable), checks
     )
     known_checks(read_tsv(args.required), checks)
+    if args.igv_links:
+        igv_checks(variants, read_tsv(args.igv_links), args.igv_max_sites, checks)
     with open(args.output, "w") as fh:
         fh.write("category\tscope\tcheck\texpected\tobserved\tstatus\n")
         fh.writelines("\t".join(row) + "\n" for row in checks.rows)
@@ -463,6 +504,8 @@ def main():
         c.add_argument(f"--{name}", required=True)
     c.add_argument("--callable")
     c.add_argument("--required")
+    c.add_argument("--igv-links", help="igv_links.tsv (--igv_report)")
+    c.add_argument("--igv-max-sites", type=int, default=100, help="--igv_max_sites")
     c.add_argument("--output", required=True)
     # thresholds of the reason model (pipeline params of the same name)
     c.add_argument("--min-coverage", type=float, default=10, help="--min_coverage_tumor")

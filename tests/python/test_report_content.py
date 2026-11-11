@@ -394,6 +394,42 @@ def test_datavzrd_tables_and_links(tmp_path):
     assert rows[1].endswith("\tTP53 p.Arg175fs\tS1:chr1:300:AT>A")  # fmt: skip
 
 
+def test_igv_links_in_the_variant_tables_and_chapter_3(tmp_path):
+    links = tmp_path / "igv_links.tsv"
+    links.write_text(
+        "variant_id\tsample\tpart\tigv_file\n"
+        "S1:chr1:100:A>C\tS1\t001\tS1_001_report.html\n"
+        "S1:chr1:200:G>T\tS1\t001\tS1_001_report.html\n"
+        "S1:chr1:300:AT>A\tS1\t001\tS1_001_report.html\n"
+        "S1:chr1:400:C>G\tS1\t002\tS1_002_report.html\n"
+    )
+    args = [*inputs(tmp_path), "--igv-links", str(links)]
+    result = run(tmp_path, *args, "--datavzrd", "dv", "--multiqc", "mqc")
+    assert result.returncode == 0, result.stderr
+    config = json.loads((tmp_path / "dv" / "datavzrd.yaml").read_text())
+    for view in ("compared-variants", "discordant-variants", "truth-variants", "removed-records"):
+        header = (tmp_path / "dv" / f"{view}.tsv").read_text().splitlines()[0].split("\t")
+        # right after the gene (or the sample if the table has no gene)
+        before = "gene" if "gene" in header else "sample"
+        assert header.index("igv") == header.index(before) + 1
+        spec = config["views"][view]["render-table"]["columns"]["igv"]["link-to-url"]
+        assert spec["IGV"]["url"] == "../../igv/{value}#{variant_id}"
+    rows = (tmp_path / "dv" / "discordant-variants.tsv").read_text().splitlines()
+    assert "S1_002_report.html" in rows[2]
+    # the removed record has no IGV page: empty cell
+    removed = (tmp_path / "dv" / "removed-records.tsv").read_text().splitlines()
+    header = removed[0].split("\t")
+    assert removed[1].split("\t")[header.index("igv")] == ""
+    # chapter 3 links to the IGV overview
+    intro = (tmp_path / "mqc" / "vc_why_mqc.html").read_text()
+    assert "../report/igv/index.html" in intro
+    # without --igv-links: no igv column, no link
+    result = run(tmp_path, *inputs(tmp_path), "--datavzrd", "dv2", "--multiqc", "mqc2")
+    assert result.returncode == 0, result.stderr
+    assert "igv" not in (tmp_path / "dv2" / "compared-variants.tsv").read_text().split("\n")[0]
+    assert "report/igv" not in (tmp_path / "mqc2" / "vc_why_mqc.html").read_text()
+
+
 def test_variant_label():
     row = {"chrom": "chr1", "pos": 5, "ref": "A", "alt": "C"}
     assert report_content.variant_label({**row, "gene": "KRAS", "hgvsp": "p.G12V"}) == "KRAS p.G12V"

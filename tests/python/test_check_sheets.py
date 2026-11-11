@@ -188,3 +188,40 @@ def test_required_alignments_are_listed(tmp_path):
         "line 2: no normal_bam for S1 wgs (normal_id N), but --require_normal_coverage"
         in result.stderr
     )
+
+
+def test_alignments_required_by_several_options_name_each(tmp_path):
+    sheet = tmp_path / "s.csv"
+    for name in ("a.vcf.gz", "b.vcf.gz", "t.bam", "u.bam"):
+        (tmp_path / name).write_text("")
+    sheet.write_text(
+        "sample,technology,library_type,tumor_id,normal_id,caller,vcf,tumor_bam,normal_bam,target_bed\n"
+        "S1,wgs,wgs,T,N,x,a.vcf.gz,t.bam,n/a,n/a\n"
+        "S1,wes,wgs,T,N,x,b.vcf.gz,u.bam,n/a,n/a\n"
+    )
+    args = [sys.executable, str(SCRIPT), "samplesheet", "--sheet", str(sheet)]
+    args += ["--base-dir", str(tmp_path), "--output", str(tmp_path / "o.csv")]
+    args += ["--truth-technology", "wgs"]
+    # --callable_regions with --require_normal_coverage and --igv_report need normals
+    result = subprocess.run(
+        [
+            *args,
+            "--require-tumor-bam",
+            "callable_regions",
+            "--require-tumor-bam",
+            "igv_report",
+            "--require-normal-bam",
+            "require_normal_coverage",
+            "--require-normal-bam",
+            "igv_report",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 1
+    assert (
+        "line 3: no normal_bam for S1 wes (normal_id N), but --require_normal_coverage and "
+        "--igv_report needs it" in result.stderr
+    )
+    # every tumor alignment is given: no tumor error
+    assert "no tumor_bam" not in result.stderr

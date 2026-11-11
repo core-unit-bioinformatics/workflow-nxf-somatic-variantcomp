@@ -14,7 +14,9 @@ process REPORT_CONTENT {
     tuple val(meta), path(per_pair, stageAs: 'in/per_pair.tsv'), path(metrics, stageAs: 'in/metrics.tsv'), path(power, stageAs: 'in/power.tsv'), path(variants, stageAs: 'in/variants.tsv'), path(truth_variants, stageAs: 'in/truth_variants.tsv'), path(classes, stageAs: 'in/classes.tsv'), path(enrichment, stageAs: 'in/enrichment.tsv'), path(genes, stageAs: 'in/genes.tsv'), path(annotation_counts, stageAs: 'in/annotation_counts.tsv')
     tuple path(accounting, stageAs: 'accounting/*'), path(removed, stageAs: 'removed/*'), path(region_steps, stageAs: 'in/region_steps.tsv'), path(targets, stageAs: 'in/targets.tsv'), path(callable, stageAs: 'in/callable.tsv'), path(coverage, stageAs: 'in/coverage.tsv')
     tuple path(required_summary, stageAs: 'in/required_summary.tsv'), path(required_variants, stageAs: 'in/required_variants.tsv'), path(known_benchmark, stageAs: 'in/known_benchmark.tsv'), path(known_benchmark_per_pair, stageAs: 'in/known_benchmark_per_pair.tsv')
-    tuple path(checks, stageAs: 'in/checks.tsv'), path(samplesheet, stageAs: 'in/samplesheet.csv'), path(params_table, stageAs: 'in/params.tsv')
+    // consistency checks, samplesheet, parameters; links table of the IGV views
+    // (--igv_report; [] without)
+    tuple path(checks, stageAs: 'in/checks.tsv'), path(samplesheet, stageAs: 'in/samplesheet.csv'), path(params_table, stageAs: 'in/params.tsv'), path(igv_links, stageAs: 'in/igv_links.tsv')
 
     output:
     // MultiQC sections (vc_*_mqc.html / .json) and the tables, configuration and MultiQC
@@ -36,6 +38,7 @@ process REPORT_CONTENT {
     def coverage_arg = coverage ? "--coverage ${coverage}" : ''
     def required_arg = required_summary ? "--required-summary ${required_summary} --required-variants ${required_variants}" : ''
     def known_arg = known_benchmark ? "--known-benchmark ${known_benchmark} --known-benchmark-per-pair ${known_benchmark_per_pair}" : ''
+    def igv_arg = igv_links ? "--igv-links ${igv_links}" : ''
     """
     # MultiQC sections of the variantcomp report and the tables and configuration of the
     # datavzrd table browser
@@ -60,6 +63,7 @@ process REPORT_CONTENT {
         --checks ${checks} \\
         --samplesheet ${samplesheet} \\
         --params ${params_table} \\
+        ${igv_arg} \\
         --multiqc multiqc \\
         --datavzrd datavzrd \\
         ${args}

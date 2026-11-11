@@ -18,6 +18,7 @@ known_variants/**/*.vcf.gz
 known_variants/**/*.vcf.gz.tbi
 report/variantcomp_report.zip
 report/tables/**
+report/igv/*_report.html
 benchmark/rtgtools_vcfeval/**
 known_variants/benchmark/rtgtools_vcfeval/**
 benchmark/bcftools_isec_*/**/*.vcf

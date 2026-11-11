@@ -45,6 +45,12 @@ INPUT (all tables are TSV with header; optional inputs may be left out)
   --callable, --coverage      coverage/callable_summary.tsv, coverage/coverage.coverage.tsv
   --required-summary, --required-variants, --known-benchmark   known_variants/ (optional)
   --checks                    report/consistency_checks.tsv
+  --igv-links                 report/igv/igv_links.tsv (--igv_report; optional): variant_id,
+                              sample, part, igv_file; adds the column igv (link to the IGV
+                              view of the variant) to every datavzrd table with a variant_id
+                              and a link to the IGV overview to chapter 3
+  --igv-link                  path of the IGV overview (report/igv/index.html) relative to the
+                              MultiQC report
   --samplesheet               pipeline_info/samplesheet.validated.csv
   --params                    parameter table (group, parameter, value)
   --pipeline-version, --run-name, --start   run information
@@ -231,6 +237,7 @@ COLUMN_TEXT = {
     "in_repeat": "inside a repeat (microsatellite) region of the reference",
     "found_by": "number of query technologies that found the truth variant",
     "variant_id": "sample:chrom:pos:ref>alt (link key between the tables)",
+    "igv": "IGV view of the variant (igv-reports): reads of the tumor and normal alignments and the normalized calls of every technology of the sample (--igv_report)",
     "tp_baseline": "truth variants found by the query",
     "fn": "truth variants missed by the query",
     "tp_call": "query calls matching a truth variant",
@@ -2744,6 +2751,13 @@ def chapter_intros(d, args):
             "of the technology that misses it (indels by their haplotype sequence).\n\n"
             "**3.1** shows the reasons per sample, **3.2** the variants themselves and what "
             "characterizes them (type, VAF, genes, enriched features)."
+            + (
+                f"\n\n**IGV views**: every compared variant can be inspected in the reads of the "
+                f"tumor and normal alignments of every technology ([IGV views]({args.igv_link}); "
+                "column *igv* of the variant tables)."
+                if args.igv_links
+                else ""
+            )
         ),
         "filtering": (
             "Before the comparison, **every input VCF runs through the same steps**, so that "
@@ -2998,6 +3012,15 @@ def column_specs(df, genome):
                     "Ensembl": {"url": ensembl + "/Homo_sapiens/Gene/Summary?g={value}"},
                 }
             }
+        elif col == "igv":
+            # the IGV page of the variant, opened at its row (#variant_id); the cell shows
+            # 'IGV' instead of the file name (empty for rows without a page)
+            specs[col] = {
+                "link-to-url": {
+                    "IGV": {"url": "../../igv/{value}#{variant_id}", "new-window": True},
+                    "custom-content": "function(value, row) { return value ? 'IGV' : ''; }",
+                }
+            }
         elif col == "locus":
             specs[col] = {
                 "link-to-url": {
@@ -3088,6 +3111,22 @@ canvas.innerHTML =
 """
 
 
+def add_igv_column(df, links):
+    """The column igv (IGV page of the variant, from the links table of --igv_report) after
+    the gene (or the sample); unchanged without links or without a variant_id column. Rows whose
+    variant_id has no page (e.g. removed records) get an empty cell."""
+    if links.empty or "variant_id" not in df.columns:
+        return df
+    pages = dict(zip(links["variant_id"].astype(str), links["igv_file"].astype(str), strict=True))
+    df = df.copy()
+    igv = df["variant_id"].astype(str).map(pages).fillna("")
+    # right after the gene (or the sample), so that it is visible without scrolling
+    after = [c for c in ("sample", "gene") if c in df.columns]
+    pos = df.columns.get_loc(after[-1]) + 1 if after else 0
+    df.insert(pos, "igv", igv)
+    return df
+
+
 def write_datavzrd(args, d):
     """Write the datavzrd tables, the MultiQC page script and the configuration."""
     tables, datasets, views = {}, {}, {}
@@ -3110,6 +3149,7 @@ def write_datavzrd(args, d):
         if df.empty:
             return
         df = order_columns(df, front, back=VARIANT_BACK)
+        df = add_igv_column(df, d["igv_links"])
         # the main reason is the first entry of reasons: no separate column class
         df = df.drop(columns=[c for c in ("class",) if c in df.columns and "reasons" in df.columns])
         for col in df.columns:
@@ -3393,6 +3433,7 @@ def load(args):
         "checks": read(args.checks),
         "samplesheet": read(args.samplesheet, sep=","),
         "params": read(args.params),
+        "igv_links": read(args.igv_links),
     }
     # VAFs and metric values as numbers
     for col in ("truth_vaf", "query_vaf"):
@@ -3425,6 +3466,7 @@ def main():
         "checks",
         "samplesheet",
         "params",
+        "igv-links",
     ):
         parser.add_argument(f"--{name}")
     parser.add_argument("--accounting", nargs="*", default=[])
@@ -3452,6 +3494,11 @@ def main():
         "--multiqc-link",
         default="../../../multiqc/multiqc_report.html",
         help="MultiQC report relative to a datavzrd view page (tables/<view>/index_1.html)",
+    )
+    parser.add_argument(
+        "--igv-link",
+        default="../report/igv/index.html",
+        help="IGV overview page relative to the MultiQC report (with --igv-links)",
     )
     args = parser.parse_args()
     if not args.multiqc and not args.datavzrd:

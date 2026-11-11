@@ -1,0 +1,106 @@
+{
+    "variants with fasta and tracks - vcf": {
+        "content": [
+            {
+                "report": [
+                    [
+                        {
+                            "id": "test"
+                        },
+                        "test_report.html"
+                    ]
+                ],
+                "versions_igvreports": [
+                    [
+                        "IGVREPORTS",
+                        "igvreports",
+                        "1.16.0"
+                    ]
+                ]
+            }
+        ],
+        "timestamp": "2026-11-11T10:23:56.435442557",
+        "meta": {
+            "nf-test": "0.9.5",
+            "nextflow": "26.10.2"
+        }
+    },
+    "variants with fasta - vcf": {
+        "content": [
+            {
+                "report": [
+                    [
+                        {
+                            "id": "test"
+                        },
+                        "test_report.html"
+                    ]
+                ],
+                "versions_igvreports": [
+                    [
+                        "IGVREPORTS",
+                        "igvreports",
+                        "1.16.0"
+                    ]
+                ]
+            }
+        ],
+        "timestamp": "2026-11-11T10:23:04.009736212",
+        "meta": {
+            "nf-test": "0.9.5",
+            "nextflow": "26.10.2"
+        }
+    },
+    "variants with genome - vcf": {
+        "content": [
+            {
+                "report": [
+                    [
+                        {
+                            "id": "test"
+                        },
+                        "test_report.html"
+                    ]
+                ],
+                "versions_igvreports": [
+                    [
+                        "IGVREPORTS",
+                        "igvreports",
+                        "1.16.0"
+                    ]
+                ]
+            }
+        ],
+        "timestamp": "2026-11-11T10:25:47.148979846",
+        "meta": {
+            "nf-test": "0.9.5",
+            "nextflow": "26.10.2"
+        }
+    },
+    "variant with genome - vcf - stub": {
+        "content": [
+            {
+                "report": [
+                    [
+                        {
+                            "id": "test"
+                        },
+                        "test_report.html:md5,d41d8cd98f00b204e9800998ecf8427e"
+                    ]
+                ],
+                "versions_igvreports": [
+                    [
+                        "IGVREPORTS",
+                        "igvreports",
+                        "1.16.0"
+                    ]
+                ]
+            }
+        ],
+        "timestamp": "2026-11-11T10:26:50.963687741",
+        "meta": {
+            "nf-test": "0.9.5",
+            "nextflow": "26.10.2"
+        }
+    }
+}

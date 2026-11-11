@@ -1,0 +1,85 @@
+nextflow_workflow {
+
+    name "Test Subworkflow IGV_REPORT"
+    script "../main.nf"
+    workflow "IGV_REPORT"
+    config "./nextflow.config"
+    tag "subworkflows"
+    tag "subworkflows_local"
+    tag "igv_report"
+    tag "igvreports"
+
+    test("seqc2 small - one sample, wgs + wes, three sites in two pages") {
+
+        when {
+            workflow {
+                """
+                def base = params.pipelines_testdata_base_path + 'seqc2/small/'
+                def entry = { tech, lib ->
+                    def bam = { role -> file(base + 'bam/IL_1_' + tech + '_' + role + '.bam') }
+                    [[id: 'SEQC2_IL_1_' + tech, sample: 'SEQC2_IL_1', technology: tech, library_type: lib,
+                      tumor_id: 'TUMOR', normal_id: 'NORMAL'],
+                     file(base + 'vcf/IL_1_' + tech + '.bwa.muTect2.vcf.gz'), [],
+                     bam.call('T'), file(base + 'bam/IL_1_' + tech + '_T.bam.bai'),
+                     bam.call('N'), file(base + 'bam/IL_1_' + tech + '_N.bam.bai'), []]
+                }
+                input[0] = channel.of(entry.call('wgs', 'wgs'), entry.call('wes', 'capture'))
+                // the input VCFs stand in for the normalized ones (same contigs)
+                input[1] = channel.of('wgs', 'wes').map { tech ->
+                    [[id: 'SEQC2_IL_1_' + tech], file(base + 'vcf/IL_1_' + tech + '.bwa.muTect2.vcf.gz'),
+                     file(base + 'vcf/IL_1_' + tech + '.bwa.muTect2.vcf.gz.tbi')]
+                }
+                // three compared variants of SEQC2_IL_1: FN (filtered), TP, FP
+                def variants = file("${outputDir}/variants.tsv")
+                variants.parent.mkdirs()
+                variants.text = [
+                    'sample\\ttruth\\tquery\\tstatus\\tchrom\\tpos\\tref\\talt\\ttype\\treasons\\tgene',
+                    'SEQC2_IL_1\\twgs\\twes\\tFN\\tchr22\\t23164333\\tC\\tT\\tSNV\\tfiltered_non_pass,low_vaf\\tRAB36',
+                    'SEQC2_IL_1\\twgs\\twes\\tTP\\tchr22\\t23573200\\tG\\tA\\tSNV\\tconcordant\\tIGLL1',
+                    'SEQC2_IL_1\\twgs\\twes\\tFP\\tchr22\\t23834391\\tT\\tC\\tSNV\\tno_evidence\\tSMARCB1',
+                ].join('\\n') + '\\n'
+                input[2] = channel.value(variants)
+                input[3] = channel.value([])
+                def sheet = file("${outputDir}/samplesheet.validated.csv")
+                sheet.text = [
+                    'sample,technology,library_type,tumor_id,normal_id,caller,is_truth,vcf,tumor_bam,normal_bam,target_bed',
+                    'SEQC2_IL_1,wgs,wgs,TUMOR,NORMAL,muTect2,true,a.vcf.gz,t.bam,n.bam,',
+                    'SEQC2_IL_1,wes,capture,TUMOR,NORMAL,muTect2,false,b.vcf.gz,t.bam,n.bam,',
+                ].join('\\n') + '\\n'
+                input[4] = channel.value(sheet)
+                // plain FASTA (as from PREPARE_REFERENCE) of the bgzipped chr22 test reference
+                def fasta = file("${outputDir}/chr22.fa")
+                new java.util.zip.GZIPInputStream(new FileInputStream(base + 'reference/GRCh38.d1.vd1_chr22.fa.gz')).withStream { gz ->
+                    fasta.withOutputStream { out -> out << gz }
+                }
+                def fai = file("${outputDir}/chr22.fa.fai")
+                fai.text = file(base + 'reference/GRCh38.d1.vd1_chr22.fa.gz.fai').text
+                input[5] = channel.value([[id: 'chr22'], fasta, fai, []])
+                input[6] = file("${baseDir}/assets/igv/variant_template.html")
+                input[7] = file("${baseDir}/assets/igv/igv.min.js")
+                """
+            }
+        }
+
+        then {
+            def links = path(workflow.out.links[0][1]).readLines()
+            def pages = workflow.out.reports.collectEntries { item -> [(file(item[1]).name): path(item[1]).text] }
+            assertAll(
+                { assert workflow.success },
+                // one link per site, two pages of at most two sites (igv_max_sites = 2)
+                { assert links == [
+                    'variant_id\tsample\tpart\tigv_file',
+                    'SEQC2_IL_1:chr22:23164333:C>T\tSEQC2_IL_1\t001\tSEQC2_IL_1_001_report.html',
+                    'SEQC2_IL_1:chr22:23573200:G>A\tSEQC2_IL_1\t001\tSEQC2_IL_1_001_report.html',
+                    'SEQC2_IL_1:chr22:23834391:T>C\tSEQC2_IL_1\t002\tSEQC2_IL_1_002_report.html'] },
+                { assert pages.keySet() == ['SEQC2_IL_1_001_report.html', 'SEQC2_IL_1_002_report.html'] as Set },
+                // igv.js inlined (offline), the deep link, the sites and the title of the page
+                { assert pages.values().every { text -> !text.contains('cdn.jsdelivr.net') && text.contains('selectFromHash') } },
+                { assert pages['SEQC2_IL_1_002_report.html'].contains('SEQC2_IL_1:chr22:23834391:T&gt;C') },
+                { assert pages['SEQC2_IL_1_001_report.html'].contains('<title>SEQC2_IL_1 part 001: variantcomp IGV view</title>') },
+                { assert path(workflow.out.index[0][1]).text.contains("href='SEQC2_IL_1_002_report.html'") },
+                { assert snapshot(workflow.out.links).match() }
+            )
+        }
+    }
+}
