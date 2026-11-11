@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1640" height="3020" viewBox="0 0 1640 3020">
-<rect width="1640" height="3020" fill="#fff"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1640" height="3058" viewBox="0 0 1640 3058">
+<rect width="1640" height="3058" fill="#fff"/>
 <text x="40" y="56" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="30" font-weight="bold">core-unit-bioinformatics/workflow-nxf-somatic-variantcomp</text>
 <text x="40" y="88" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17" fill="#444">Each box is a subworkflow, each row a step (top to bottom). The green line is the VCFs; every other input line merges into the step that uses it.</text>
 <line x1="575" y1="128" x2="625" y2="128" stroke="#3F2B29" stroke-width="10" stroke-linecap="round"/>
@@ -9,7 +9,7 @@
 <line x1="575" y1="184" x2="625" y2="184" stroke="#24B064" stroke-width="10" stroke-linecap="round"/>
 <text x="641" y="190" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="16">VCFs of all technologies: the central line to the results</text>
 <line x1="575" y1="212" x2="625" y2="212" stroke="#F18046" stroke-width="10" stroke-linecap="round"/>
-<text x="641" y="218" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="16">Alignments: callable regions (--callable_regions), read evidence (--read_evidence)</text>
+<text x="641" y="218" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="16">Alignments: callable regions (--callable_regions), read evidence (--read_evidence), IGV views (--igv_report)</text>
 <line x1="575" y1="240" x2="625" y2="240" stroke="#E879E3" stroke-width="10" stroke-linecap="round"/>
 <text x="641" y="246" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="16">GIAB (--giab_&lt;name&gt;) and other stratification BEDs, repeat regions</text>
 <line x1="575" y1="268" x2="625" y2="268" stroke="#FA6863" stroke-width="10" stroke-linecap="round"/>
@@ -49,7 +49,7 @@
 <rect x="30" y="2502" width="1580" height="206" rx="12" fill="#f7f7f7" stroke="#9a9a9a" stroke-width="2" stroke-dasharray="7 5"/>
 <text x="575" y="2531" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="17" font-weight="bold" fill="#333">PREPARE_KNOWN_VARIANTS, KNOWN_VARIANTS</text>
 <text x="1590" y="2531" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="16" font-style="italic" fill="#555" text-anchor="end">check known variants</text>
-<rect x="30" y="2722" width="1580" height="244" rx="12" fill="#f7f7f7" stroke="#9a9a9a" stroke-width="2" stroke-dasharray="7 5"/>
+<rect x="30" y="2722" width="1580" height="282" rx="12" fill="#f7f7f7" stroke="#9a9a9a" stroke-width="2" stroke-dasharray="7 5"/>
 <text x="575" y="2751" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="17" font-weight="bold" fill="#333">REPORT</text>
 <text x="1590" y="2751" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="16" font-style="italic" fill="#555" text-anchor="end">summarize</text>
 <path d="M 80 585.0 L 80 668.2 L 230 691.0" fill="none" stroke="#3F2B29" stroke-width="4" stroke-dasharray="8 6" stroke-linejoin="round"/>
@@ -58,12 +58,13 @@
 <path d="M 80 585.0 L 80 1662.2 L 230 1685.0" fill="none" stroke="#3F2B29" stroke-width="4" stroke-dasharray="8 6" stroke-linejoin="round"/>
 <path d="M 80 585.0 L 80 1920.2 L 230 1943.0" fill="none" stroke="#3F2B29" stroke-width="4" stroke-dasharray="8 6" stroke-linejoin="round"/>
 <path d="M 80 585.0 L 80 2322.2 L 445 2345.0" fill="none" stroke="#3F2B29" stroke-width="4" stroke-dasharray="8 6" stroke-linejoin="round"/>
-<path d="M 230 265 L 230 403.0 L 230 441.0 L 230 691.0 L 230 1533.0 L 230 1571.0 L 230 1609.0 L 230 1647.0 L 230 1685.0 L 230 1723.0 L 230 1761.0 L 230 1799.0 L 230 1837.0 L 230 1943.0 L 230 1981.0 L 230 2019.0 L 230 2057.0 L 230 2201.0 L 230 2307.0 L 230 2459.0 L 230 2785.0 L 230 2823.0 L 230 2861.0 L 230 2899.0 L 230 2937.0" fill="none" stroke="#24B064" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M 230 265 L 230 403.0 L 230 441.0 L 230 691.0 L 230 1533.0 L 230 1571.0 L 230 1609.0 L 230 1647.0 L 230 1685.0 L 230 1723.0 L 230 1761.0 L 230 1799.0 L 230 1837.0 L 230 1943.0 L 230 1981.0 L 230 2019.0 L 230 2057.0 L 230 2201.0 L 230 2307.0 L 230 2459.0 L 230 2785.0 L 230 2823.0 L 230 2861.0 L 230 2937.0 L 230 2975.0" fill="none" stroke="#24B064" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
 <path d="M 80 265 L 80 547.0 L 80 585.0" fill="none" stroke="#3F2B29" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
 <path d="M 145 265 L 145 767.0 L 145 1055.0 L 145 1093.0 L 145 1131.0 L 145 1169.0 L 145 1240.8 L 315 1275.0" fill="none" stroke="#3d95fd" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
 <path d="M 315 265 L 315 729.0 L 315 949.0 L 315 1275.0 L 315 1313.0 L 315 1351.0 L 315 1389.0 L 315 1764.8 L 230 1799.0" fill="none" stroke="#F18046" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
 <path d="M 315 1389.0 L 315 1427.0 L 315 2826.8 L 230 2861.0" fill="none" stroke="#F18046" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
 <path d="M 315 1389.0 L 315 2163.0 L 315 2166.8 L 230 2201.0" fill="none" stroke="#F18046" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M 315 2163.0 L 315 2899.0 L 315 2902.8 L 230 2937.0" fill="none" stroke="#F18046" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
 <path d="M 380 265 L 380 805.0 L 380 2383.0 L 380 2421.0 L 380 2424.8 L 230 2459.0" fill="none" stroke="#E879E3" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
 <path d="M 445 265 L 445 2345.0 L 445 2424.8 L 230 2459.0" fill="none" stroke="#FA6863" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
 <path d="M 510 265 L 510 843.0 L 510 2565.0 L 510 2603.0 L 510 2641.0 L 510 2679.0 L 510 2788.8 L 230 2823.0" fill="none" stroke="#ECDC86" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
@@ -258,13 +259,17 @@
 <line x1="246" y1="2861.0" x2="565" y2="2861.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
 <text x="575" y="2867.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">12.3</tspan>  Report sections and variant tables</text>
 <text x="1170" y="2867.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">report_content.py</text>
-<circle cx="230" cy="2899.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
-<line x1="246" y1="2899.0" x2="565" y2="2899.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
-<text x="575" y="2905.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">12.4</tspan>  MultiQC report, table browser and zip</text>
-<text x="1170" y="2905.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">MultiQC, datavzrd, report_bundle.py</text>
+<circle cx="315" cy="2899.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
+<line x1="331" y1="2899.0" x2="565" y2="2899.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
+<text x="575" y="2905.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">12.4</tspan>  IGV views of every compared variant (--igv_report)</text>
+<text x="1170" y="2905.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">igv_inputs.py, igv-reports</text>
 <circle cx="230" cy="2937.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
 <line x1="246" y1="2937.0" x2="565" y2="2937.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
-<text x="575" y="2943.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">12.5</tspan>  Stop the run if a check failed</text>
-<text x="1170" y="2943.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">consistency_checks.py gate</text>
-<text x="40" y="3004" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="13" fill="#666">Metro-map style: nf-core components (CC0), J. A. Fellows Yates, M. U. Garcia, L. Le Nezet. Step details: README.md</text>
+<text x="575" y="2943.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">12.5</tspan>  MultiQC report, table browser and zip</text>
+<text x="1170" y="2943.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">MultiQC, datavzrd, report_bundle.py</text>
+<circle cx="230" cy="2975.0" r="11" fill="#fff" stroke="#000" stroke-width="5"/>
+<line x1="246" y1="2975.0" x2="565" y2="2975.0" stroke="#d0d0d0" stroke-width="1.5" stroke-dasharray="2 4"/>
+<text x="575" y="2981.0" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="17"><tspan font-weight="bold">12.6</tspan>  Stop the run if a check failed</text>
+<text x="1170" y="2981.0" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="14" fill="#555">consistency_checks.py gate</text>
+<text x="40" y="3042" font-family="Maven Pro, Helvetica, Arial, sans-serif" font-size="13" fill="#666">Metro-map style: nf-core components (CC0), J. A. Fellows Yates, M. U. Garcia, L. Le Nezet. Step details: README.md</text>
 </svg>

@@ -63,12 +63,16 @@ steps that process it and merges into the step that consumes it:
 - **red — VEP cache or GTF (`--vep`):** consequence, gene, impact (step 10.2);
 - **yellow — `--known_variants`:** a required clinical checklist (PASS/FAIL per sample,
   technology and variant) or an external truth set; merges into the report.
+- **IGV views (`--igv_report`):** an optional step after the report tables (step 12.4,
+  on the orange line): the alignments of every technology and the normalized VCFs are
+  embedded around every compared and required variant with igv-reports (`IGV_SITES`,
+  `IGV_TRACKS`, `IGV_TEMPLATE`, `IGVREPORTS`, `IGV_INDEX`; igv.js, offline);
+  needs the tumor and normal BAMs.
 
 Every step runs one tool (mostly nf-core modules) or one script of `bin/`; the options of
 every step are set in `conf/modules/<subworkflow>.config`.
 
 <!-- steps:start (generated: scripts/make_metro_map.py --markdown) -->
-
 | Step | What happens | Tools | Line |
 | --- | --- | --- | --- |
 | **PIPELINE_INITIALISATION, CHECK_SAMPLESHEET** | _read and check the samplesheet_ | | |
@@ -129,9 +133,9 @@ every step are set in `conf/modules/<subworkflow>.config`.
 | 12.1 | **Enrichment, gene and annotation tables, plots.** Are discordant variants enriched for indels, low VAF, non-synonymous consequences, repeats, strata or genes (Fisher's exact test, Benjamini-Hochberg from SciPy)? Discordance per annotation value, gene table, plots. | `variantcomp_report.py` | VCFs of all technologies |
 | 12.2 | **Consistency checks of all counts.** At the end: do the counts of all steps add up (accounting per VCF, metrics vs. variant tables, aggregation over samples, discordance classes, regions, required variants)? `report/consistency_checks.tsv`. | `consistency_checks.py` | VCFs of all technologies |
 | 12.3 | **Report sections and variant tables.** The variantcomp sections of the MultiQC report (summary cards, introduction, recall/precision per sample with a toggle of the matching method, truth variants found, known variants, why variants differ, discordant variants in detail, metrics per sample, region in Mbp, filtering, coverage, checks; vertical bars with the samples on the x-axis) and the linked variant tables of datavzrd (gene and HGVS.p first, coloured status columns, links to dbSNP, COSMIC, Ensembl). | `report_content.py` | VCFs of all technologies |
-| 12.4 | **MultiQC report, table browser and zip.** MultiQC: the main report, results first, then the QC of every step (input checks, bcftools norm, harmonization, mosdepth, VEP) and the software versions; datavzrd: `report/tables/`, with the MultiQC report as a page; `report/variantcomp_report.zip` with both reports. | `MultiQC, datavzrd, report_bundle.py` | VCFs of all technologies |
-| 12.5 | **Stop the run if a check failed.** A failed consistency check stops the run with an error, after all reports were written. | `consistency_checks.py gate` | VCFs of all technologies |
-
+| 12.4 | **IGV views of every compared variant (--igv_report).** With `--igv_report`: one igv-reports page per sample (in parts of `--igv_max_sites` sites) with every compared variant and the required known variants, the tumor and normal alignment and the normalized VCF of every technology; igv.js is inlined, so the pages work offline. Every variant table links its row to the page (`#<variant_id>`): `report/igv/`. | `igv_inputs.py, igv-reports` | Alignments |
+| 12.5 | **MultiQC report, table browser and zip.** MultiQC: the main report, results first, then the QC of every step (input checks, bcftools norm, harmonization, mosdepth, VEP) and the software versions; datavzrd: `report/tables/`, with the MultiQC report as a page; `report/variantcomp_report.zip` with both reports and the IGV views. | `MultiQC, datavzrd, report_bundle.py` | VCFs of all technologies |
+| 12.6 | **Stop the run if a check failed.** A failed consistency check stops the run with an error, after all reports were written. | `consistency_checks.py gate` | VCFs of all technologies |
 <!-- steps:end -->
 
 All tools and datasets, with their authors and publications, are listed in
@@ -157,6 +161,10 @@ menu at the top switches to the variant tables.
   to the compared variants, normalization, harmonization, VEP), **5 Coverage and genomic
   regions**, **6 Methods and quality control** (consistency checks, input checks, methods,
   versions).
+- **IGV views** (`report/igv/`, only with `--igv_report`): per sample, pages with the reads
+  of the tumor and normal alignment of every technology and the called variants around every
+  compared and required variant, opened from the `IGV` column of the variant tables or from
+  `report/igv/index.html`; offline (igv-reports, igv.js).
 - **Table browser** (`report/tables/`, datavzrd): every truth, compared and discordant
   variant with gene and HGVS.p first, reasons, links to GeneCards, Ensembl, dbSNP and
   COSMIC.

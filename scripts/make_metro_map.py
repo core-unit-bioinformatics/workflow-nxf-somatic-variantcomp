@@ -38,7 +38,7 @@ TRACKS = {
     "bam": (
         "#F18046",
         "bam",
-        "Alignments: callable regions (--callable_regions), read evidence (--read_evidence)",
+        "Alignments: callable regions (--callable_regions), read evidence (--read_evidence), IGV views (--igv_report)",
     ),
     "annot": (
         "#E879E3",
@@ -313,11 +313,17 @@ BANDS = [
             ),
             (
                 "12.4",
+                "IGV views of every compared variant (--igv_report)",
+                "igv_inputs.py, igv-reports",
+                "bam",
+            ),
+            (
+                "12.5",
                 "MultiQC report, table browser and zip",
                 "MultiQC, datavzrd, report_bundle.py",
                 "core",
             ),
-            ("12.5", "Stop the run if a check failed", "consistency_checks.py gate", "core"),
+            ("12.6", "Stop the run if a check failed", "consistency_checks.py gate", "core"),
         ],
     ),
 ]
@@ -349,8 +355,8 @@ LINES = [
             "12.1",
             "12.2",
             "12.3",
-            "12.4",
             "12.5",
+            "12.6",
         ],
     ),
     ("ref", ["2.1", "2.2"]),
@@ -358,6 +364,7 @@ LINES = [
     ("bam", ["3.2", "4.1", "6.1", "6.2", "6.3", "6.4", "7.8"]),
     ("bam", ["6.4", "6.5", "12.3"]),
     ("bam", ["6.4", "9.1", "9.2"]),
+    ("bam", ["9.1", "12.4", "12.5"]),
     ("annot", ["3.4", "10.3", "10.4", "10.5"]),
     ("vep", ["10.2", "10.5"]),
     ("known", ["3.5", "11.1", "11.2", "11.3", "11.4", "12.2"]),
@@ -413,8 +420,9 @@ DETAILS = {
     "12.1": "Are discordant variants enriched for indels, low VAF, non-synonymous consequences, repeats, strata or genes (Fisher's exact test, Benjamini-Hochberg from SciPy)? Discordance per annotation value, gene table, plots.",
     "12.2": "At the end: do the counts of all steps add up (accounting per VCF, metrics vs. variant tables, aggregation over samples, discordance classes, regions, required variants)? `report/consistency_checks.tsv`.",
     "12.3": "The variantcomp sections of the MultiQC report (summary cards, introduction, recall/precision per sample with a toggle of the matching method, truth variants found, known variants, why variants differ, discordant variants in detail, metrics per sample, region in Mbp, filtering, coverage, checks; vertical bars with the samples on the x-axis) and the linked variant tables of datavzrd (gene and HGVS.p first, coloured status columns, links to dbSNP, COSMIC, Ensembl).",
-    "12.4": "MultiQC: the main report, results first, then the QC of every step (input checks, bcftools norm, harmonization, mosdepth, VEP) and the software versions; datavzrd: `report/tables/`, with the MultiQC report as a page; `report/variantcomp_report.zip` with both reports.",
-    "12.5": "A failed consistency check stops the run with an error, after all reports were written.",
+    "12.4": "With `--igv_report`: one igv-reports page per sample (in parts of `--igv_max_sites` sites) with every compared variant and the required known variants, the tumor and normal alignment and the normalized VCF of every technology; igv.js is inlined, so the pages work offline. Every variant table links its row to the page (`#<variant_id>`): `report/igv/`.",
+    "12.5": "MultiQC: the main report, results first, then the QC of every step (input checks, bcftools norm, harmonization, mosdepth, VEP) and the software versions; datavzrd: `report/tables/`, with the MultiQC report as a page; `report/variantcomp_report.zip` with both reports and the IGV views.",
+    "12.6": "A failed consistency check stops the run with an error, after all reports were written.",
 }
 
 # geometry

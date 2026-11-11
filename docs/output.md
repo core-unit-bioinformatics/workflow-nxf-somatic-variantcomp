@@ -28,6 +28,7 @@ line. Missing values are `NA` (numbers) or `.` (names, alleles).
 - [Discordance](#discordance) - why variants differ, with read evidence and annotation
 - [Annotation](#annotation) - VEP consequences and repeat regions
 - [Known variants](#known-variants) - required variants and external truth sets
+- [IGV views](#igv-views) - reads and calls of every investigated variant (`--igv_report`)
 - [Report](#report) - the MultiQC report (main report), the table browser, the zip to send
   both, the consistency checks, enrichment statistics, gene and annotation tables, plots
 - [MultiQC](#multiqc) - output files and configuration of the MultiQC report
@@ -45,6 +46,7 @@ Tools that produce each output folder (citations in [`CITATIONS.md`](../CITATION
 | `discordance/` | `bcftools query`, `read_evidence.py` (pysam), `classify_discordance.py`, `annotate_variants.py` |
 | `annotation/` | Ensembl VEP, `bcftools +split-vep`, msisensor-pro, `bedtools map`, `bedtools intersect` |
 | `known_variants/` | `known_variants.py`, `bcftools norm`, `bcftools isec`, `rtg vcfeval`, `benchmark_metrics.py`, `known_summary.py` |
+| `report/igv/` | `igv_inputs.py` (steps `IGV_SITES`, `IGV_TRACKS`, `IGV_TEMPLATE`, `IGV_INDEX`), `samtools view`, [igv-reports](https://github.com/igvteam/igv-reports) 1.16.0 `create_report` (nf-core module `igvreports`, patched; step `IGVREPORTS`), igv.js 3.5.2 |
 | `report/` | `variantcomp_report.py` (pandas, SciPy, Matplotlib), `consistency_checks.py`, `report_content.py` (pandas), datavzrd, `report_bundle.py` |
 | `multiqc/` | MultiQC (with the sections of `report_content.py`; plots with the Plotly library bundled in MultiQC), `mqc_tables.py` |
 
@@ -537,6 +539,60 @@ Annotation columns of `discordance/variants.annotated.tsv`:
 
 </details>
 
+### IGV views
+
+<details markdown="1">
+<summary>Output files (only with <code>--igv_report</code>)</summary>
+
+- `report/igv/`
+  - `<sample>_<part>_report.html`: one self-contained page per sample and part (`part` is
+    1-based with at least 3 digits, e.g. `P01_001_report.html`).
+  - `index.html`: one row per page: sample, part, number of sites, link; links to the
+    MultiQC report and the tables.
+  - `igv_links.tsv`: `variant_id`, `sample`, `part`, `igv_file`.
+
+</details>
+
+Each page shows a table of sites above an IGV view (igv.js) with the tracks of the sample:
+the tumor and normal alignment of every technology (truth technology first) and the
+normalized VCF of every technology, including non-PASS records. Open a page at a variant
+with `<page>.html#<variant_id>`; clicking a row updates the address, so it can be copied,
+and the arrow keys step through the rows. The pages need no internet connection. How the
+sites are chosen, the duplicate handling, size and tested inputs are described in
+[usage](usage.md#igv-views).
+
+Columns of the site table:
+
+| Column | Meaning |
+| --- | --- |
+| `variant_id` | `sample:chrom:pos:ref>alt`. |
+| `chrom`, `pos` | Contig and 1-based position. |
+| `end` | Last REF base (1-based, inclusive). |
+| `gene` | Gene, if annotated. |
+| `type` | Variant type (SNV, indel). |
+| `status_<c>` | TP, FN or FP in comparison `<c>`; `.` = the variant is not in that comparison. |
+| `reasons_<c>` | Reasons of the discordance in comparison `<c>`; `.` as above. |
+| `known_required` | `yes`/`no`: the variant is in a `required` known-variant list. |
+| `required_<technology>` | `PASS` or `FAIL_*` per technology; only if required variants exist. |
+
+`<c>` is the query technology, or `<truth>_vs_<query>` with `--comparison_mode all_pairs`.
+
+The datavzrd tables `compared-variants`, `discordant-variants`, `truth-variants`,
+`required-variants` and `removed-records` have a column `igv` (label "IGV") that opens the
+page at the variant in a new window; it is empty for a variant without a page (for example
+a removed record that is not a site). `known-benchmark` has no `variant_id` and no IGV
+column. `report/variantcomp_report.zip` includes `report/igv/*.html`, `main.html` links to
+`report/igv/index.html`, and the introduction of MultiQC chapter 3 links the index.
+
+Consistency checks (category `igv`): per sample "compared variants without IGV page" = 0
+and "compared variants with more than one IGV link" = 0; per page "sites per IGV page" at
+most `--igv_max_sites`.
+
+Tools: igv-reports 1.16.0 (`create_report`, nf-core module `igvreports`, patched for a track
+configuration, the template and the newer version), igv.js 3.5.2, `bin/igv_inputs.py`
+(steps `IGV_SITES`, `IGV_TRACKS`, `IGV_TEMPLATE`, `IGV_INDEX`; `IGVREPORTS` runs
+igv-reports).
+
 ### Report
 
 **Start here: `main.html`** at the top of the output folder. It opens the table browser
@@ -717,7 +773,7 @@ not work).
 
 | Column | Type | Meaning |
 | --- | --- | --- |
-| `category` | text | `accounting` (the checks of every `*.checks.tsv`), `benchmark` (per pair: TP_baseline + FN ≥ compared truth records and TP_call + FP ≥ compared query records, equal unless `rtg vcfeval --decompose` splits complex records; FN and FP rows of the variant table = FN and FP of the metrics), `aggregation` (summed counts = sum over the samples), `discordance` (classes add up to FN / FP; every FN/FP has a known class), `regions` (last region step = common region; callable ≤ common region), `known` (passed + failed = required) |
+| `category` | text | `accounting` (the checks of every `*.checks.tsv`), `benchmark` (per pair: TP_baseline + FN ≥ compared truth records and TP_call + FP ≥ compared query records, equal unless `rtg vcfeval --decompose` splits complex records; FN and FP rows of the variant table = FN and FP of the metrics), `aggregation` (summed counts = sum over the samples), `discordance` (classes add up to FN / FP; every FN/FP has a known class), `regions` (last region step = common region; callable ≤ common region), `known` (passed + failed = required), `igv` (every compared variant has exactly one IGV page link; sites per page at most `--igv_max_sites`) |
 | `scope` | text | the sample, VCF or comparison checked |
 | `check` | text | what is checked |
 | `expected`, `observed` | text | the values compared |

@@ -56,6 +56,14 @@ is in the [README](README.md#pipeline-summary).
 
   > Wiegand F, Lähnemann D, Mölder F, Uzuner H, Prinz A, Schramm A, Köster J. datavzrd: Rapid programming- and maintenance-free interactive visualization and communication of tabular data. PLOS ONE. 2025;20(7):e0323079. doi: 10.1371/journal.pone.0323079.
 
+- [igv-reports](https://github.com/igvteam/igv-reports) (`create_report`: self-contained HTML pages with the reads around a variant; version 1.16.0, MIT license, Broad Institute and the Regents of the University of California; the page template of `assets/igv/variant_template.html` is derived from igv-reports and keeps its MIT license)
+
+  > igv-reports: generate self-contained HTML reports of genomic variants with embedded IGV. https://github.com/igvteam/igv-reports (v1.16.0)
+
+- [igv.js](https://pubmed.ncbi.nlm.nih.gov/36562559/) (interactive genome browser inside the IGV pages; version 3.5.2, MIT license; shipped in `assets/igv/` together with its LICENSE and inlined into the pages, so no download is needed at run time)
+
+  > Robinson JT, Thorvaldsdottir H, Turner D, Mesirov JP. igv.js: an embeddable JavaScript implementation of the Integrative Genomics Viewer (IGV). Bioinformatics. 2023 Jan 1;39(1):btac830. doi: 10.1093/bioinformatics/btac830.
+
 - [MultiQC](https://pubmed.ncbi.nlm.nih.gov/27312411/) (main report; its bundled [Plotly.js](https://plotly.com/javascript/) library, Plotly Technologies Inc., MIT license, draws the vertical bar plots of the variantcomp sections)
 
   > Ewels P, Magnusson M, Lundin S, Käller M. MultiQC: summarize analysis results for multiple tools and samples in a single report. Bioinformatics. 2016 Oct 1;32(19):3047-8. doi: 10.1093/bioinformatics/btw354. PubMed PMID: 27312411; PubMed Central PMCID: PMC5039924.

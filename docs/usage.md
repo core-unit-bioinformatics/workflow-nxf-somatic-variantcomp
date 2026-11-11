@@ -434,6 +434,57 @@ technology, is compared with it by `rtg vcfeval` within `regions` ∩ the compar
 with the same metrics as the main benchmark. If the list contains a VAF (VCF `INFO/TVAF`,
 `VAF` or `AF`, or the TSV column `vaf`), recall is also stratified by it.
 
+## IGV views
+
+`--igv_report` writes interactive IGV views of every investigated variant: the reads of
+all technologies and the called variants side by side, in self-contained HTML pages
+(`report/igv/`, see [output](output.md#igv-views)).
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `--igv_report` | `false` | Write the IGV views. Needs the tumor BAM of every samplesheet row and the normal BAM of every row with a `normal_id`; otherwise the run stops at the start with an error that names this parameter. |
+| `--igv_max_sites` | `100` | Maximum number of sites (variants) per page, minimum 1. A sample with more sites is split into several pages (parts), because all reads are embedded in the HTML file. |
+| `--igv_flanking` | `200` | Bases of alignments embedded around a site (igv-reports puts half on each side). |
+| `--igv_window` | `100` | Width in bp of the initial view around a site. `0` uses the igv.js default. Must be at most `--igv_flanking`, otherwise `IGV_SITES` stops with an error. |
+| `--igv_subsample` | `1` | Fraction (0 to 1) of the reads embedded; passed as `--subsample` to igv-reports only if below 1. |
+| `--igv_sampling_depth` | `500` | `samplingDepth` of every igv.js alignment track: at most this many reads are drawn per window. Display only, the embedded reads are not changed. |
+| `--igv_js` | `null` | Local `igv.min.js` to inline into the pages. `null` uses `assets/igv/igv.min.js` (igv.js 3.5.2). Nothing is downloaded at run time. |
+
+Duplicates: `--amplicon_keep_duplicates` (see [Coverage](#coverage-and-callable-regions)) is
+reused for the views.
+
+**Which variants become sites.** Every compared variant (TP, FN and FP of every
+comparison, from `discordance/variants.annotated.tsv`, the rows of the datavzrd table
+`compared-variants`) and every variant of a `required` known-variant list
+(`known_variants/required_variants.tsv`). There is one site per `variant_id`
+(`sample:chrom:pos:ref>alt`) with its status and reasons in every comparison.
+
+**Tracks of a page** (one page per sample and part):
+
+1. the tumor alignment, then the normal alignment, of every technology: the truth
+   technology first, then the other technologies in samplesheet order;
+2. the normalized VCF of every technology, including the non-PASS records, so that a
+   variant that was called but filtered is visible.
+
+**Duplicates.** Before the reads are embedded, `samtools view` removes reads with the
+flags 1536 (duplicates and QC-fail). If a library of the sample is an amplicon library and
+`--amplicon_keep_duplicates` is set, only 512 (QC-fail) is excluded. In addition the igv.js
+filter hides duplicates in the tracks of non-amplicon libraries.
+
+**Offline.** igv.js is inlined into the page template, so the pages open without an
+internet connection.
+
+**Size.** All reads around the sites are embedded in the HTML. Measured on SEQC2 small
+(WES about 150-500x, WGS about 40x, four alignments per sample): 0.18-0.27 MB per site plus
+1.3 MB of igv.js per page, so 100 sites are about 20-30 MB. For deep panels lower
+`--igv_max_sites` or `--igv_subsample`.
+
+**Tested inputs.** SEQC2 small (MuTect2 3.8 VCFs, BWA BAMs, chr22), 3 samples x WGS/WES,
+12 BAMs, `-profile test_seqc2,conda` on aarch64. Not tested: CRAM; BAMs whose contig names
+differ from the reference (chr/no-chr): igv-reports aliases the names when it reads the
+BAM, but the embedded reads keep the BAM names, so the display relies on the aliasing of
+igv.js.
+
 ## Filters
 
 The input VCFs are **unfiltered** (all calls with the caller's FILTER column). The pipeline

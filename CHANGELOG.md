@@ -21,9 +21,25 @@ Dates follow ISO 8601 (`YYYY-MM-DD`).
   bullets with bold terms, how to read it; larger text in the report.
 - Known variants and coverage are always written as chapters/sections, with a short note
   if their inputs are missing (stable chapter numbers).
+- `check_sheets.py`: `--require-*-bam` options can be repeated.
+- The report bundle `variantcomp_report.zip` includes the IGV pages (`report/igv/*.html`);
+  `main.html` and MultiQC chapter 3 link the IGV index.
+- New consistency check category `igv` (one IGV page link per compared variant, sites per
+  page at most `--igv_max_sites`).
 
 ### `Added`
 
+- **IGV views of every investigated variant** (decision D40, `--igv_report`, default off):
+  self-contained HTML pages per sample and part (`report/igv/<sample>_<part>_report.html`,
+  at most `--igv_max_sites` sites each) with a site table and an igv.js view of the tumor
+  and normal alignment of every technology and the normalized VCFs (including non-PASS
+  records). Sites are all compared variants (TP/FN/FP) and the `required` known variants.
+  Deep links `#<variant_id>`, `report/igv/index.html`, `report/igv/igv_links.tsv`, an `igv`
+  column in the datavzrd tables with a `variant_id`. Uses igv-reports 1.16.0 (nf-core
+  module `igvreports`, patched) and igv.js 3.5.2, shipped in `assets/igv/` (offline); new
+  params `--igv_max_sites`, `--igv_flanking`, `--igv_window`, `--igv_subsample`,
+  `--igv_sampling_depth`, `--igv_js`. Needs the tumor BAM of every row and the normal BAM of
+  every row with a `normal_id`; the run stops at the start otherwise.
 - **Filtering funnel** (section 4.1): one box per preprocessing step in the order of the
   normalization chain (input, PASS filter, contigs, gVCF blocks, normalization,
   harmonization, uniform filters and region, compared), its width the share of the input
