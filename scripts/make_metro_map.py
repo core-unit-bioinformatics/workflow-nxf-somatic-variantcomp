@@ -210,7 +210,12 @@ BANDS = [
         "compare every technology with the truth technology",
         [
             ("8.1", "Match calls haplotype-aware: TP, FN, FP", "rtg vcfeval", "core"),
-            ("8.2", "Same-allele and same-position matches with their own metrics", "bcftools isec", "core"),
+            (
+                "8.2",
+                "Same-allele and same-position matches with their own metrics",
+                "bcftools isec",
+                "core",
+            ),
             (
                 "8.3",
                 "Recall, precision, F1 per sample (overall, type, VAF)",
