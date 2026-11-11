@@ -273,3 +273,10 @@ def test_pass_call_removed_by_uniform_filters_is_present_but_filtered(tmp_path):
     header, row = (tmp_path / "x.discordance.tsv").read_text().splitlines()
     values = dict(zip(header.split("\t"), row.split("\t"), strict=True))
     assert values["class"] == "present_but_filtered" and values["other_filter"] == "PASS"
+
+
+def test_concordant_variant_gets_germline_reason():
+    reasons = classify_discordance.reasons
+    # TP: concordant first; germline_in_normal applies to concordant variants too
+    assert reasons("concordant", 10, 0.4, ARGS) == ["concordant", "germline_in_normal"]
+    assert reasons("concordant", 1, 0.4, ARGS) == ["concordant"]

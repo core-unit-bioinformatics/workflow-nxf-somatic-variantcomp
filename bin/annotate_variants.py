@@ -44,11 +44,13 @@ Subcommands
       --stratum   NAME=FILE, output of `bedtools intersect -c` of the variant BED with
                   a stratification BED -> column NAME = yes (> 0 intervals) / no
       --context-reasons  (needs a column `reasons`, classify_discordance.py) adds to the
-                  reasons of every FN and FP row the context that applies, after its main
-                  reason and germline_in_normal, in this order: indel (type INS, DEL or
-                  COMPLEX), low_vaf (VAF of the existing call < --low-vaf: truth_vaf of an
-                  FN, query_vaf of an FP), in_repeat (in_repeat = yes), and the NAME of every
-                  --stratum with yes (GIAB stratifications are named giab_<name>)
+                  reasons of every TP, FN and FP row the context that applies, after its
+                  main reason (or `concordant`) and germline_in_normal, in this order: indel
+                  (type INS, DEL or COMPLEX), low_vaf (VAF of the call < --low-vaf:
+                  truth_vaf of a TP or FN, query_vaf of an FP), in_repeat (in_repeat =
+                  yes), and the NAME of every --stratum with yes (GIAB stratifications are
+                  named giab_<name>). TP rows get them too, to show which hard variants
+                  were still found by both technologies
 
 Every variant (row number, resp. CHROM/POS/REF/ALT) must appear in every tool result,
 otherwise the script stops: a missing row would silently lose an annotation.
@@ -284,13 +286,14 @@ def optional_vep_values(fields):
 
 
 def context_reasons(row, strata, low_vaf):
-    """Context reasons of one FN/FP row (see the module docstring), in a fixed order."""
+    """Context reasons of one TP/FN/FP row (see the module docstring), in a fixed order."""
     found = []
     # indels are harder to call and to represent the same way
     if row.get("type") in ("INS", "DEL", "COMPLEX"):
         found.append("indel")
-    # low VAF of the call that exists (truth call of an FN, query call of an FP)
-    vaf_text = row.get("truth_vaf" if row["status"] == "FN" else "query_vaf", "NA")
+    # low VAF of the call: the truth call of a TP or FN (as the VAF bins of the recall),
+    # the query call of an FP
+    vaf_text = row.get("query_vaf" if row["status"] == "FP" else "truth_vaf", "NA")
     try:
         vaf = float(vaf_text)
     except (TypeError, ValueError):
@@ -305,22 +308,25 @@ def context_reasons(row, strata, low_vaf):
 
 
 def add_context_reasons(rows, header, strata, args):
-    """Append the context reasons to the column reasons of every FN and FP row."""
+    """Append the context reasons to the column reasons of every TP, FN and FP row."""
     missing = [c for c in ("reasons", "status", "type") if c not in header]
     if missing:
         sys.exit(
             f"ERROR: {args.table}: --context-reasons needs the column(s) {', '.join(missing)} "
             "(table of classify_discordance.py)"
         )
-    counts = {}
-    for row in rows:
-        if row["status"] not in ("FN", "FP"):
-            continue
+    # counts per group (concordant = TP, discordant = FN/FP) and reason, for the log
+    counts = {"concordant": {}, "discordant": {}}
+    for i, row in enumerate(rows, start=2):
+        if row["status"] not in ("TP", "FN", "FP"):
+            sys.exit(f"ERROR: {args.table}: line {i}: status '{row['status']}' is not TP, FN or FP")
         extra = context_reasons(row, strata, args.low_vaf)
         row["reasons"] = ",".join(row["reasons"].split(",") + extra)
+        group = counts["concordant" if row["status"] == "TP" else "discordant"]
         for reason in extra:
-            counts[reason] = counts.get(reason, 0) + 1
-    print(f"INFO: context reasons of the discordant variants: {counts}", file=sys.stderr)
+            group[reason] = group.get(reason, 0) + 1
+    for group, found in counts.items():
+        print(f"INFO: context reasons of the {group} variants: {found}", file=sys.stderr)
 
 
 def merge(args):
@@ -426,7 +432,7 @@ def main():
     m.add_argument(
         "--context-reasons",
         action="store_true",
-        help="add indel, low_vaf, in_repeat and the strata to the reasons of FN/FP rows",
+        help="add indel, low_vaf, in_repeat and the strata to the reasons of TP/FN/FP rows",
     )
     m.add_argument("--low-vaf", type=float, default=0.1, help="low_vaf: VAF of the call below this")
     m.add_argument("--output", required=True)

@@ -180,7 +180,7 @@ def test_truth_variants_found_per_query():
         v2["found_panel"],
         v2["reasons_panel"],
         v2["reasons_wes"],
-    ) == (1, 2, "yes", "no", "absent,in_repeat", ".")
+    ) == (1, 2, "yes", "no", "absent,in_repeat", "concordant")
 
 
 def test_annotation_counts_per_set():

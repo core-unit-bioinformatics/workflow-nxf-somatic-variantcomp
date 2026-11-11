@@ -268,7 +268,7 @@ def test_datavzrd_tables_and_links(tmp_path):
     assert links["gene table"]["table-row"] == "genes/gene"
     # every view starts with a description that links back to the MultiQC report
     assert all("[MultiQC report](" in v["desc"] for k, v in views.items() if k != "multiqc-report")
-    # columns: variant name first, coloured status/class, links to dbSNP and Ensembl
+    # columns: coloured status/class, links to dbSNP and Ensembl
     columns = views["discordant-variants"]["render-table"]["columns"]
     assert columns["status"]["plot"]["heatmap"]["domain"] == ["TP", "FN", "FP"]
     assert (
@@ -278,11 +278,14 @@ def test_datavzrd_tables_and_links(tmp_path):
     for dataset in config["datasets"].values():
         assert (tmp_path / "dv" / dataset["path"]).exists()
     header = (tmp_path / "dv" / "discordant-variants.tsv").read_text().splitlines()[0].split("\t")
-    assert header[:4] == ["variant", "gene", "hgvsp", "consequence"] and header[-1] == "variant_id"
+    # sample, gene, protein change and status first; the combined column variant last
+    assert header[:4] == ["sample", "gene", "hgvsp", "status"]
+    assert header[-2:] == ["variant", "variant_id"]
     # the main reason is the first entry of reasons: no column class in the tables
     assert "class" not in header and "reasons" in header
     rows = (tmp_path / "dv" / "discordant-variants.tsv").read_text().splitlines()
-    assert rows[1].startswith("TP53 p.Arg175fs\tTP53\t")  # fmt: skip
+    assert rows[1].startswith("S1\tTP53\tp.Arg175fs\tFN\t")  # fmt: skip
+    assert rows[1].endswith("\tTP53 p.Arg175fs\tS1:chr1:300:AT>A")  # fmt: skip
 
 
 def test_variant_label():

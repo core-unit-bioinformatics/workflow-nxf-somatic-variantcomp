@@ -219,16 +219,19 @@ def test_merge_context_reasons(tmp_path):
     table = write(
         tmp_path / "v.tsv",
         "chrom\tpos\tref\talt\tstatus\ttype\ttruth_vaf\tquery_vaf\treasons\n"
-        "chr1\t100\tA\tC\tTP\tSNV\t0.3\t0.3\tconcordant\n"
+        "chr1\t100\tA\tC\tTP\tSNV\t0.05\t0.3\tconcordant\n"
         "chr1\t200\tGTT\tG\tFN\tDEL\t0.05\tNA\tno_evidence,germline_in_normal\n"
-        "chr1\t300\tA\tC\tFP\tSNV\tNA\t0.4\tfiltered_non_pass\n",
+        "chr1\t300\tA\tC\tFP\tSNV\tNA\t0.4\tfiltered_non_pass\n"
+        "chr1\t400\tA\tC\tTP\tSNV\t0.3\t0.05\tconcordant\n",
     )
     repeats = write(
         tmp_path / "rep.bed",
-        "chr1\t99\t100\t1\t.\t.\nchr1\t199\t202\t2\tT\t9\nchr1\t299\t300\t3\t.\t.\n",
+        "chr1\t99\t100\t1\t.\t.\nchr1\t199\t202\t2\tT\t9\nchr1\t299\t300\t3\t.\t.\n"
+        "chr1\t399\t400\t4\t.\t.\n",
     )
     hp = write(
-        tmp_path / "hp.bed", "chr1\t99\t100\t1\t1\nchr1\t199\t202\t2\t2\nchr1\t299\t300\t3\t0\n"
+        tmp_path / "hp.bed",
+        "chr1\t99\t100\t1\t1\nchr1\t199\t202\t2\t2\nchr1\t299\t300\t3\t0\nchr1\t399\t400\t4\t0\n",
     )
     out = tmp_path / "a.tsv"
     proc = run(
@@ -246,9 +249,11 @@ def test_merge_context_reasons(tmp_path):
         str(out),
     )
     assert proc.returncode == 0, proc.stderr
-    tp, fn, fp = rows_of(out)
-    # TP: no reasons added (in a homopolymer, but concordant)
-    assert tp["reasons"] == "concordant"
+    tp, fn, fp, tp2 = rows_of(out)
+    # TP: concordant first, then the context: low truth VAF (0.05) and the homopolymer
+    assert tp["reasons"] == "concordant,low_vaf,giab_homopolymer"
+    # TP: low_vaf uses the truth VAF (0.3), not the query VAF (0.05): nothing added
+    assert tp2["reasons"] == "concordant"
     # FN: main reason, germline, then indel, low VAF (truth VAF 0.05), repeat, stratum
     assert (
         fn["reasons"] == "no_evidence,germline_in_normal,indel,low_vaf,in_repeat,giab_homopolymer"

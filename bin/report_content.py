@@ -197,7 +197,7 @@ COLUMN_TEXT = {
     "query": "query technology compared with the truth",
     "status": "TP: found by both; FN: truth variant missed by the query (in the truth only); FP: query call without truth variant (in the query only)",
     "class": "main reason: the call and reads of the technology that misses the variant (exactly one; concordant for TP)",
-    "reasons": "all reasons of a discordant variant: the main reason first, then germline_in_normal and the context (indel, low_vaf, in_repeat, stratifications)",
+    "reasons": "all reasons of a variant: the main reason first (concordant for a TP), then germline_in_normal and the context (indel, low_vaf, in_repeat, stratifications)",
     "other_tumor_other": "reads with another allele at the variant in that alignment (e.g. another indel in a repeat)",
     "locus": "position as chrom:pos (1-based), linked to the Ensembl genome browser",
     "chrom": "contig",
@@ -2368,44 +2368,48 @@ DETAIL_COLUMNS = [
     "query_alt",
     "other_in_normalized",
     "other_vaf_normalized",
-    "normal_dp",
     "normal_alt",
     "query_power",
     "chrom",
     "pos",
 ]
+# first columns of the variant tables: sample, gene and protein change, status and
+# technologies, VAF/depth of the truth, query and normal, then the reasons and the
+# consequence; the column variant (gene + protein change in one text, the same as gene and
+# hgvsp) comes last (VARIANT_BACK)
 VARIANT_FRONT = [
-    "variant",
+    "sample",
     "gene",
     "hgvsp",
-    "consequence",
-    "impact",
-    "sample",
     "status",
     "class",
-    "reasons",
     "truth",
     "query",
+    "truth_vaf",
+    "query_vaf",
+    "normal_vaf",
+    "truth_dp",
+    "query_dp",
+    "normal_dp",
+    "reasons",
+    "consequence",
+    "impact",
     "locus",
     "ref",
     "alt",
     "type",
     "length",
-    "truth_vaf",
-    "query_vaf",
-    "truth_dp",
-    "query_dp",
     "query_filter",
     "other_filter",
     "other_tumor_dp",
     "other_tumor_alt",
-    "normal_vaf",
     "detectable",
     "in_repeat",
     "dbsnp",
     "cosmic",
     "clin_sig",
 ]
+VARIANT_BACK = ["variant", "variant_id"]
 
 
 def heatmap(spec):
@@ -2595,7 +2599,7 @@ def write_datavzrd(args, d):
         """One table: file, dataset and view (columns ordered, configured)."""
         if df.empty:
             return
-        df = order_columns(df, front, back=["variant_id"])
+        df = order_columns(df, front, back=VARIANT_BACK)
         # the main reason is the first entry of reasons: no separate column class
         df = df.drop(columns=[c for c in ("class",) if c in df.columns and "reasons" in df.columns])
         for col in df.columns:
@@ -2639,7 +2643,7 @@ def write_datavzrd(args, d):
     }
     status_how = [
         "**status**: TP found by both technologies (green), FN in the truth technology only = missed by the query (orange), FP in the query technology only (purple).",
-        "**reasons**: every reason of a discordant variant. The first is its main reason (exactly one: the call and the reads of the technology that misses the variant); then germline evidence in the normal and the context (indel, low VAF, repeat, stratifications).",
+        "**reasons**: every reason of a variant. A discordant variant has its main reason first (exactly one: the call and the reads of the technology that misses the variant), a concordant one `concordant`; then germline evidence in the normal and the context (indel, low VAF, repeat, stratifications). Filter reasons for e.g. low_vaf or giab_ to see which hard variants were found by both technologies (TP) and which were missed.",
         "Click a row to see the detail columns (HGVS.c, transcript, biotype, evidence counts).",
         "Links: gene to GeneCards/Ensembl, locus to the Ensembl genome browser, dbSNP and COSMIC IDs (with a VEP cache).",
     ]
@@ -2649,8 +2653,8 @@ def write_datavzrd(args, d):
         "Truth variants",
         "Every variant of the truth technology that was compared, per sample: gene and protein "
         "change first, then whether each query technology found it (found_&lt;query&gt;, green "
-        "yes / red no) and, if missed, why (reasons_&lt;query&gt;: all reasons, main reason "
-        "first).",
+        "yes / red no) and its reasons (reasons_&lt;query&gt;: if missed, the main reason "
+        "first; if found, concordant first; then the context such as low_vaf or giab_*).",
         how=[
             "Sort by found_by to see the variants found by no query technology: they may be artefacts of the truth technology.",
             "Filter a column with the funnel icon in its header, e.g. impact = HIGH.",
@@ -2666,12 +2670,9 @@ def write_datavzrd(args, d):
         },
         see=[("discordant-variants", "Discordant variants"), ("genes", "Genes")],
         front=[
-            "variant",
+            "sample",
             "gene",
             "hgvsp",
-            "consequence",
-            "impact",
-            "sample",
             "found_by",
             *[c for c in truth.columns if c.startswith(("found_", "reasons_"))],
             *VARIANT_FRONT,

@@ -23,7 +23,7 @@ nextflow_workflow {
                 table.text = [
                     'comparison\\tchrom\\tpos\\tref\\talt\\tstatus\\ttype\\ttruth_vaf\\tquery_vaf\\treasons',
                     'S1_wes\\tchr1\\t4100\\tA\\tC\\tTP\\tSNV\\t0.3\\t0.3\\tconcordant',
-                    'S1_panel\\tchr1\\t4100\\tA\\tC\\tTP\\tSNV\\t0.3\\t0.3\\tconcordant',
+                    'S1_panel\\tchr1\\t4100\\tA\\tC\\tTP\\tSNV\\t0.05\\t0.3\\tconcordant',
                     'S1_wes\\tchr1\\t4999\\tGA\\tG\\tFN\\tDEL\\t0.05\\tNA\\tno_evidence',
                     'S1_wes\\tchr2\\t15000\\tA\\tC\\tFP\\tSNV\\tNA\\t0.3\\tabsent',
                 ].join('\\n') + '\\n'
@@ -58,9 +58,11 @@ nextflow_workflow {
                 { assert rows[0].consequence_group in ['synonymous', 'non_synonymous'] },
                 { assert rows[2].gene == 'GENE_B' && rows[2].variant_class == 'deletion' },
                 { assert rows[2].homopolymer == 'yes' && rows[0].homopolymer == 'no' },
-                // context reasons of the discordant rows (TP rows unchanged)
+                // context reasons of every row: discordant and concordant (TP)
                 { assert rows[2].reasons == 'no_evidence,indel,low_vaf,in_repeat,homopolymer' },
                 { assert rows[3].reasons == 'absent' && rows[0].reasons == 'concordant' },
+                // a concordant variant with a low truth VAF: concordant, then low_vaf
+                { assert rows[1].reasons == 'concordant,low_vaf' },
                 { assert rows[3].gene == '.' && rows[3].consequence_group == 'other' },
                 // --hgvs (default --vep_args): HGVS columns; IDs only with a cache ('.')
                 { assert ['transcript', 'hgvsc', 'hgvsp', 'dbsnp', 'cosmic', 'clin_sig'].every { c -> c in header } },

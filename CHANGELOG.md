@@ -35,6 +35,9 @@ Dates follow ISO 8601 (`YYYY-MM-DD`).
 
 ### `Changed`
 
+- Further reasons for concordant variants too (decision D39): TP rows get `concordant` followed by `germline_in_normal` and the context reasons (`indel`, `low_vaf` from the truth VAF, `in_repeat`, `giab_<name>`, stratifications), so the tables show which low-VAF variants or variants in difficult regions were still found by both technologies; `reasons_<query>` of the truth-variant table is filled for found variants too; the consistency checks verify the reasons of TP rows with the same rules. The MultiQC section "Why variants differ" still counts discordant variants only
+- datavzrd variant tables: column order `sample`, `gene`, `hgvsp`, `status`, `truth`, `query`, VAF and depth of truth, query and normal (`normal_dp` moved from the detail view to the table), `reasons`, then `consequence`, `impact` and the rest; the column `variant` (gene + HGVS.p in one text) moved to the end
+
 - The narrative report `report/variantcomp_report.html` (`bin/report_html.py`, `REPORT_HTML`, decision D33) is replaced by the MultiQC report (decision D37); its texts (`CLASS_TEXT`, `REASON_TEXT`, `COLUMN_TEXT`) moved to `bin/report_content.py`
 - `assets/multiqc_config.yml`: title and introduction, section order (results first, QC of the steps after them), fixed output names, no General Statistics table (MultiQC puts it above all sections; coverage is in the section Coverage)
 - The MultiQC sections of `variantcomp_report.py` (metrics, per sample, classes, recall by VAF, strata) and the `mqc_tables.py` sections regions, region steps, accounting, callable regions and consistency checks are replaced by the `report_content.py` sections

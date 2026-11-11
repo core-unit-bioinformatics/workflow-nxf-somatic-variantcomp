@@ -21,15 +21,18 @@ technology. Exactly one applies; they exclude each other:
     low_coverage           tumor depth at the variant < --min-coverage
     subthreshold_evidence  depth >= --min-coverage and >= 1 read with the alt allele
     no_evidence            depth >= --min-coverage and no read with the alt allele
-TP variants get `concordant`.
+TP variants get `concordant` (instead of a main reason).
 
-Further reasons that can come in addition to the main reason (column `reasons` = the
-main reason first, then these, comma-separated):
+Further reasons that can come in addition to the main reason or `concordant` (column
+`reasons` = the main reason or `concordant` first, then these, comma-separated; TP
+variants get them too, so that e.g. germline-like or low-VAF variants that were still
+found by both technologies can be seen):
     germline_in_normal     the normal alignments (summed) show the alt allele (alt reads
                            >= --min-alt-reads and VAF >= --germline-vaf): likely a
                            germline variant (or a contaminated normal)
 Context reasons (indel, low VAF, repeat, GIAB and other stratifications) need the
-annotation and are added by `annotate_variants.py merge --context-reasons`.
+annotation and are added by `annotate_variants.py merge --context-reasons` (to TP, FN
+and FP rows).
 
 Read evidence comes from read_evidence.py (one VCF per alignment, one sample each, one
 record per variant: FORMAT/DP, AD = REF and ALT reads, OT = reads with another allele):
@@ -265,10 +268,8 @@ def classify(status, in_other, other_filter, tumor_dp, tumor_alt, args):
 
 
 def reasons(main_reason, normal_alt, normal_vaf, args):
-    """The reasons of one variant: the main reason first, then germline_in_normal if the
-    normals show the alt allele; ['concordant'] for TP."""
-    if main_reason == "concordant":
-        return ["concordant"]
+    """The reasons of one variant: the main reason (or 'concordant' for TP) first, then
+    germline_in_normal if the normals show the alt allele (for TP, FN and FP alike)."""
     found = [main_reason]
     # alt reads in the normal(s): likely germline (in addition to the main reason)
     if (normal_alt or 0) >= args.min_alt_reads and (normal_vaf or 0) >= args.germline_vaf:

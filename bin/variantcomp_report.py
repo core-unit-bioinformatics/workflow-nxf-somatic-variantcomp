@@ -25,8 +25,9 @@ Outputs (prefix "variantcomp"):
                              ref, alt), found_by (number of query technologies that found
                              it), queries, its annotation (type, length, truth VAF/depth,
                              gene, consequence, impact, variant class, repeat) and per query
-                             technology found_<query> (yes/no) and reasons_<query> (every reason
-                             of a miss, '.' if found)
+                             technology found_<query> (yes/no) and reasons_<query> (every
+                             reason: of a miss the main reason first, of a found variant
+                             concordant first, then the further reasons)
   <prefix>.annotation_counts.tsv  annotation counts per sample, technology and set
                              (truth_variants, query_calls, missed_FN, extra_FP): sample,
                              technology, set, annotation (type, consequence_group, impact,
@@ -396,8 +397,8 @@ def truth_variants(df):
     whether it was found (TP) or missed (FN) and the reasons of a miss.
 
     One row per sample, truth technology and variant (chrom, pos, ref, alt); columns
-    found_<query> (yes/no) and reasons_<query> (all reasons of an FN, main reason first,
-    '.' if found).
+    found_<query> (yes/no) and reasons_<query> (all reasons: main reason first for an FN,
+    concordant first for a TP, then the further reasons such as low_vaf or giab_*).
     """
     truth = df[df["status"].isin(["TP", "FN"])].copy()
     if truth.empty:
@@ -408,8 +409,9 @@ def truth_variants(df):
     for query, rows in truth.groupby("query"):
         rows = rows.drop_duplicates(keys).set_index(keys)
         table[f"found_{query}"] = rows["status"].map({"TP": "yes", "FN": "no"})
-        # every reason of a miss (main reason first), '.' if found
-        table[f"reasons_{query}"] = rows["reasons"].where(rows["status"] == "FN", ".")
+        # every reason: of a miss the main reason first, of a found variant concordant
+        # first, then the context (shows which hard variants were still found)
+        table[f"reasons_{query}"] = rows["reasons"]
     table = table.reset_index()
     # how many query technologies found the variant
     found = [c for c in table.columns if c.startswith("found_")]

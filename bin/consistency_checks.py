@@ -29,7 +29,8 @@ Checks of `check` (scope = the sample/technology or comparison the check is abou
                reads; germline_in_normal agrees with the normal reads (--min-alt-reads,
                --germline-vaf); indel, low_vaf (--low-vaf), in_repeat and every
                stratification agree with their columns; no unknown reason; TP rows have
-               only `concordant`
+               `concordant` first (no main reason) and the same germline and context
+               rules
   evidence     per comparison and variant group (SNV, indel): the share of TP variants with
                alt reads in the query tumor alignment >= --evidence-min-fraction (a TP was
                called by both technologies, so its reads must show it; a low share points
@@ -253,16 +254,25 @@ def number(text):
 
 
 def reason_errors(row, strata, args):
-    """The rules of the reason model that one FN/FP row breaks (list of short texts)."""
+    """The rules of the reason model that one TP/FN/FP row breaks (list of short texts)."""
     errors = []
     reasons = row["reasons"].split(",")
-    main = [r for r in reasons if r in CLASSES]
-    # exactly one main reason, first in the list and equal to class
-    if len(main) != 1 or reasons[0] != main[0] or row["class"] != main[0]:
-        return ["main reason"]
-    main = main[0]
-    # called reasons if and only if the other technology has the call
-    if (main in CALLED) != (row.get("other_in_normalized") == "yes"):
+    if row["status"] == "TP":
+        # concordant first and as class, no main reason; then the further reasons below
+        if reasons[0] != "concordant" or row["class"] != "concordant":
+            return ["TP not concordant"]
+        if [r for r in reasons if r in CLASSES] or reasons.count("concordant") != 1:
+            return ["TP with a main reason"]
+        main = "concordant"
+    else:
+        main = [r for r in reasons if r in CLASSES]
+        # exactly one main reason, first in the list and equal to class
+        if len(main) != 1 or reasons[0] != main[0] or row["class"] != main[0]:
+            return ["main reason"]
+        main = main[0]
+    # called reasons if and only if the other technology has the call (FN/FP only: a TP
+    # was called by both, maybe in another representation that vcfeval matched)
+    if main != "concordant" and (main in CALLED) != (row.get("other_in_normalized") == "yes"):
         errors.append("called")
     has_evidence = "other_tumor_dp" in row
     dp, alt = number(row.get("other_tumor_dp")), number(row.get("other_tumor_alt"))
@@ -289,7 +299,8 @@ def reason_errors(row, strata, args):
     # context reasons agree with their columns (only if the column exists)
     if "type" in row and (row["type"] in INDEL_TYPES) != ("indel" in reasons):
         errors.append("indel")
-    vaf = number(row.get("truth_vaf" if row["status"] == "FN" else "query_vaf"))
+    # the VAF of the call: truth call of a TP or FN, query call of an FP
+    vaf = number(row.get("query_vaf" if row["status"] == "FP" else "truth_vaf"))
     if (vaf is not None and vaf < args.low_vaf) != ("low_vaf" in reasons):
         errors.append("low_vaf")
     if "in_repeat" in row and (row["in_repeat"] == "yes") != ("in_repeat" in reasons):
@@ -298,7 +309,7 @@ def reason_errors(row, strata, args):
         if (row.get(name) == "yes") != (name in reasons):
             errors.append(name)
     # no reason outside the vocabulary
-    if [r for r in reasons if r not in CLASSES + FURTHER + strata]:
+    if [r for r in reasons if r not in ["concordant"] + CLASSES + FURTHER + strata]:
         errors.append("unknown reason")
     return errors
 
@@ -324,11 +335,6 @@ def reason_checks(variants, checks, args):
     for v in variants:
         scope = f"{v['sample']} {v['truth']} vs {v['query']}"
         totals[scope] += 1
-        if v["status"] == "TP":
-            # concordant variants have no reason
-            if v["reasons"] != "concordant" or v["class"] != "concordant":
-                bad[scope]["TP not concordant"] += 1
-            continue
         for error in reason_errors(v, strata, args):
             bad[scope][error] += 1
     for scope in sorted(totals):

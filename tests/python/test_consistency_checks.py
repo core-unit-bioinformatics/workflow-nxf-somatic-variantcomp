@@ -87,9 +87,9 @@ FP_ROW = [
 ]
 
 
-def inputs(tmp_path, fn=1, fn_row=None, tp_alt=20):
+def inputs(tmp_path, fn=1, fn_row=None, tp_alt=20, tp_row=None):
     """A consistent run of one pair (S1 wgs vs wes); fn sets FN of the metrics, fn_row
-    replaces the FN variant row, tp_alt the alt reads of the TP rows."""
+    replaces the FN variant row, tp_alt the alt reads of the TP rows, tp_row the TP rows."""
     metric = [
         "sample",
         "truth",
@@ -109,7 +109,7 @@ def inputs(tmp_path, fn=1, fn_row=None, tp_alt=20):
         ["truth", "query", "stratum_type", "stratum", "tp_baseline", "fn", "tp_call", "fp"],
         [["wgs", "wes", "overall", "all", 9, fn, 9, 1]],
     )
-    tp_row = TP_ROW[:11] + [tp_alt] + TP_ROW[12:]
+    tp_row = tp_row or TP_ROW[:11] + [tp_alt] + TP_ROW[12:]
     variants = tsv(
         tmp_path / "v.tsv",
         VARIANT_HEADER,
@@ -209,3 +209,41 @@ def test_inconsistent_counts_fail_and_gate_stops(tmp_path):
     assert "discordance classes add up to the variants" in failed
     gate = run("gate", "--checks", str(out))
     assert gate.returncode == 1 and "consistency checks failed" in gate.stderr
+
+
+def tp_with(reasons, **columns):
+    """A TP row with the given reasons and changed columns."""
+    row = dict(zip(VARIANT_HEADER, TP_ROW, strict=True))
+    row.update(reasons=reasons, **columns)
+    return [row[c] for c in VARIANT_HEADER]
+
+
+def test_concordant_context_reasons_pass(tmp_path):
+    # TP in a repeat with a low truth VAF and germline reads in the normal: all reasons
+    good = tp_with(
+        "concordant,germline_in_normal,low_vaf,in_repeat",
+        truth_vaf=0.05,
+        in_repeat="yes",
+        normal_alt=10,
+        normal_vaf=0.4,
+    )
+    out = tmp_path / "checks.tsv"
+    assert run("check", *inputs(tmp_path, tp_row=good), "--output", str(out)).returncode == 0
+    assert [c for c in rows(out) if c["status"] != "ok"] == []
+
+
+def test_concordant_missing_context_reason_fails(tmp_path):
+    # TP with a low truth VAF, but without low_vaf (9 TP rows of the pair)
+    bad = tp_with("concordant", truth_vaf=0.05)
+    out = tmp_path / "checks.tsv"
+    assert run("check", *inputs(tmp_path, tp_row=bad), "--output", str(out)).returncode == 0
+    failed = [c for c in rows(out) if c["status"] != "ok"]
+    assert len(failed) == 1 and "low_vaf: 9" in failed[0]["check"]
+
+
+def test_concordant_with_main_reason_fails(tmp_path):
+    bad = tp_with("concordant,no_evidence")
+    out = tmp_path / "checks.tsv"
+    assert run("check", *inputs(tmp_path, tp_row=bad), "--output", str(out)).returncode == 0
+    failed = [c for c in rows(out) if c["status"] != "ok"]
+    assert len(failed) == 1 and "TP with a main reason: 9" in failed[0]["check"]

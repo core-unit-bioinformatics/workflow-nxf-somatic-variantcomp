@@ -389,7 +389,7 @@ Discordance columns:
 | Column | Type | Meaning |
 | --- | --- | --- |
 | `class` | text | the main reason (below): exactly one per FN/FP; `concordant` for TP. Not shown in the table browser: it is the first entry of `reasons` |
-| `reasons` | text | all reasons, comma-separated: the main reason first, then `germline_in_normal` and the context reasons (below); `concordant` for TP |
+| `reasons` | text | all reasons, comma-separated: the main reason first (`concordant` for TP), then `germline_in_normal` and the context reasons (below). TP variants get the further reasons too, so that e.g. low-VAF variants or variants in GIAB difficult regions that were still found by both technologies can be seen |
 | `other_in_normalized` | yes/no | the technology that misses the variant has it in its normalized VCF (called) |
 | `other_filter` | text | its FILTER (`NA` if not called) |
 | `other_vaf_normalized` | float | its VAF |
@@ -421,13 +421,14 @@ used for variants that the other technology did not call: a call (PASS or not) i
 explained by its call. A variant can't be `filtered_non_pass` and `subthreshold_evidence`
 at the same time.
 
-**Further reasons** (after the main reason, any number):
+**Further reasons** (after the main reason or `concordant`, any number; for TP, FN and FP
+variants alike):
 
 | Reason | Meaning |
 | --- | --- |
 | `germline_in_normal` | The normal alignments show the alt allele (alt reads ≥ `--evidence_min_alt_reads`, VAF ≥ `--germline_vaf`): likely germline (or a contaminated normal). |
 | `indel` | The variant is an insertion, deletion or complex variant. |
-| `low_vaf` | The VAF of the call that exists (truth call of an FN, query call of an FP) is below `--low_vaf`. |
+| `low_vaf` | The VAF of the call (truth call of a TP or an FN, query call of an FP) is below `--low_vaf`. |
 | `in_repeat` | The variant lies in a repeat (microsatellite) region of the reference (column `in_repeat`). |
 | `giab_<name>`, `<stratum>` | The variant overlaps this GIAB stratification (`--giab_<name>`) or `--stratification` BED (column of the same name). |
 
@@ -605,9 +606,13 @@ explanations), all compared variants, genes, enrichment, metrics per sample, req
 variants, known-variant benchmark, removed records, preprocessing accounting, region steps,
 coverage, consistency checks, samplesheet. In the variant tables:
 
-- the first columns are `variant` (gene and protein change, e.g. `KRAS p.Gly12Val`; HGVS.c
-  or the consequence if there is no protein change), `gene`, `hgvsp`, `consequence`,
-  `impact`, then sample, status, class and reasons, then position, alleles, VAF and the rest;
+- the first columns are `sample`, `gene`, `hgvsp`, then `status`, `truth`, `query`, the
+  VAF and depth of the truth, query and normal (`truth_vaf`, `query_vaf`, `normal_vaf`,
+  `truth_dp`, `query_dp`, `normal_dp`), `reasons`, then `consequence`, `impact`, position,
+  alleles and the rest; the truth-variant table has `found_by`, `found_<query>` and
+  `reasons_<query>` after `hgvsp`. The column `variant` (gene and protein change in one
+  text, e.g. `KRAS p.Gly12Val`; HGVS.c or the consequence if there is no protein change)
+  comes last, before `variant_id`;
 - coloured columns: `status` (TP green, FN orange, FP purple), `reasons_<query>`,
   `reasons` (one coloured pill per reason), `found_<query>` and other yes/no columns,
   `impact`, metrics (red to green), q-values; VAF columns as ticks on 0 to 1;
@@ -639,8 +644,8 @@ not work).
   (`type`, `length`, `truth_vaf`, `truth_dp`, `gene`, `hgvsp`, `hgvsc`, `consequence`,
   `consequence_group`, `impact`, `variant_class`, `in_repeat`, `transcript`, `dbsnp`,
   `cosmic`, `clin_sig`, `biotype`, if present) and per query technology
-  `found_<query>` (yes/no) and `reasons_<query>` (all reasons of a miss, main reason
-  first, `.` if found).
+  `found_<query>` (yes/no) and `reasons_<query>` (all reasons: of a miss the main reason
+  first, of a found variant `concordant` first, then the further reasons).
 - `report/variantcomp.annotation_counts.tsv`: counts per `sample`, `technology`, `set`
   (`truth_variants`: TP+FN of the truth technology, each variant once; `query_calls`: TP+FP
   of a query technology; `missed_FN`; `extra_FP`), `annotation` (`type`,

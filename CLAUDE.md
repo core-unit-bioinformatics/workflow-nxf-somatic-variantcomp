@@ -246,7 +246,8 @@ nf-core-style pipelines.
     (PASS, but removed by the uniform filters/region);
   - not called: `absent` (no alignment), `low_coverage`, `subthreshold_evidence` (alt
     reads), `no_evidence` (no alt reads). Read-evidence reasons never for called variants.
-  - **Further reasons** in addition: `germline_in_normal`, and the context `indel`,
+  - **Further reasons** in addition (also for concordant TP variants, after `concordant`;
+    D39): `germline_in_normal`, and the context `indel`,
     `low_vaf`, `in_repeat`, `giab_<name>`, stratifications.
   - `reasons` is what readers see; `consistency_checks.py` recomputes every rule.
   - There is no `outside_callable` reason: both technologies of a sample are compared in
