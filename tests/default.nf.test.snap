@@ -4,14 +4,14 @@
             {
                 "AGGREGATE_METRICS": {
                     "pandas": "2.2.1",
-                    "python": "3.12.15"
+                    "python": "3.12.16"
                 },
                 "AGGREGATE_POWER": {
                     "pandas": "2.2.1",
-                    "python": "3.12.15"
+                    "python": "3.12.16"
                 },
                 "ANNOTATION_MERGE": {
-                    "python": "3.12.15"
+                    "python": "3.12.16"
                 },
                 "BCFTOOLS_ANNOTATE": {
                     "bcftools": "1.23.1"
@@ -72,31 +72,31 @@
                 },
                 "BENCHMARK_METRICS": {
                     "pysam": "0.24.1",
-                    "python": "3.12.15"
+                    "python": "3.12.16"
                 },
                 "CHECK_KNOWN": {
-                    "python": "3.12.15"
+                    "python": "3.12.16"
                 },
                 "CHECK_REFERENCE_BED": {
                     "pysam": "0.24.1",
-                    "python": "3.12.15"
+                    "python": "3.12.16"
                 },
                 "CHECK_REFERENCE_VCF": {
                     "pysam": "0.24.1",
-                    "python": "3.12.15"
+                    "python": "3.12.16"
                 },
                 "CHECK_SAMPLESHEET": {
-                    "python": "3.12.15"
+                    "python": "3.12.16"
                 },
                 "CHECK_STRATIFICATION": {
-                    "python": "3.12.15"
+                    "python": "3.12.16"
                 },
                 "CLASSIFY_DISCORDANCE": {
                     "pysam": "0.24.1",
-                    "python": "3.12.15"
+                    "python": "3.12.16"
                 },
                 "CONSISTENCY_CHECKS": {
-                    "python": "3.12.15"
+                    "python": "3.12.16"
                 },
                 "ENSEMBLVEP_VEP": {
                     "ensemblvep": 116.1,
@@ -111,14 +111,14 @@
                 },
                 "HARMONIZE_VCF": {
                     "pysam": "0.24.1",
-                    "python": "3.12.15"
+                    "python": "3.12.16"
                 },
                 "KNOWN_AGGREGATE": {
                     "pandas": "2.2.1",
-                    "python": "3.12.15"
+                    "python": "3.12.16"
                 },
                 "KNOWN_CHECK": {
-                    "python": "3.12.15"
+                    "python": "3.12.16"
                 },
                 "KNOWN_ISEC_EXACT": {
                     "bcftools": "1.23.1"
@@ -128,42 +128,42 @@
                 },
                 "KNOWN_METRICS": {
                     "pysam": "0.24.1",
-                    "python": "3.12.15"
+                    "python": "3.12.16"
                 },
                 "KNOWN_NORM": {
                     "bcftools": "1.23.1"
                 },
                 "KNOWN_PREPARE": {
                     "pysam": "0.24.1",
-                    "python": "3.12.15"
+                    "python": "3.12.16"
                 },
                 "KNOWN_REGIONS": {
                     "bedtools": "2.31.1"
                 },
                 "KNOWN_SUMMARY": {
-                    "python": "3.12.15"
+                    "python": "3.12.16"
                 },
                 "KNOWN_VCFEVAL": {
                     "rtgtools": 3.13
                 },
                 "MQC_TABLES": {
-                    "python": "3.12.15"
+                    "python": "3.12.16"
                 },
                 "MSISENSORPRO_SCAN": {
                     "msisensor-pro": "1.3.0"
                 },
                 "REGION_STEPS": {
-                    "python": "3.12.15"
+                    "python": "3.12.16"
                 },
                 "REGION_SUMMARY": {
-                    "python": "3.12.15"
+                    "python": "3.12.16"
                 },
                 "REPEATS_TO_BED": {
-                    "python": "3.12.15"
+                    "python": "3.12.16"
                 },
                 "REPORT_CONTENT": {
                     "pandas": "2.2.3",
-                    "python": "3.12.15"
+                    "python": "3.12.16"
                 },
                 "RTGTOOLS_FORMAT": {
                     "rtgtools": 3.13
@@ -177,18 +177,18 @@
                 "VARIANTCOMP_REPORT": {
                     "matplotlib": "3.9.2",
                     "pandas": "2.2.3",
-                    "python": "3.12.15",
+                    "python": "3.12.16",
                     "scipy": "1.14.1"
                 },
                 "VARIANTS_TO_BED": {
-                    "python": "3.12.15"
+                    "python": "3.12.16"
                 },
                 "VARIANTS_TO_VCF": {
-                    "python": "3.12.15"
+                    "python": "3.12.16"
                 },
                 "VARIANT_ACCOUNTING": {
                     "pysam": "0.24.1",
-                    "python": "3.12.15"
+                    "python": "3.12.16"
                 },
                 "Workflow": {
                     "core-unit-bioinformatics/workflow-nxf-somatic-variantcomp": "v0.16.0-dev"
@@ -783,7 +783,7 @@
                 "S2_wgs.pass.norm.norm.log:md5,c54ce01fd99970fb0a3ee17d82f03252"
             ]
         ],
-        "timestamp": "2026-10-28T12:04:32.702496606",
+        "timestamp": "2026-11-11T13:43:09.511378142",
         "meta": {
             "nf-test": "0.9.5",
             "nextflow": "26.10.2"
