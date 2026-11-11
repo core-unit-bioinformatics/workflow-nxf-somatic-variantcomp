@@ -8,7 +8,7 @@ Dates follow ISO 8601 (`YYYY-MM-DD`).
 
 ### `Changed`
 
-- **MultiQC report as a book** (decision D39): six numbered chapters, each with an
+- **MultiQC report as a book** (decision D40): six numbered chapters, each with an
   introduction that explains what is shown and what was done: 1 Summary (results at a
   glance, what was compared, recall and precision, metrics per sample right after the
   recall/precision plot, overlap, truth variants found), 2 Known variants, 3 Discordance
@@ -29,7 +29,7 @@ Dates follow ISO 8601 (`YYYY-MM-DD`).
 
 ### `Added`
 
-- **IGV views of every investigated variant** (decision D40, `--igv_report`, default off):
+- **IGV views of every investigated variant** (decision D41, `--igv_report`, default off):
   self-contained HTML pages per sample and part (`report/igv/<sample>_<part>_report.html`,
   at most `--igv_max_sites` sites each) with a site table and an igv.js view of the tumor
   and normal alignment of every technology and the normalized VCFs (including non-PASS

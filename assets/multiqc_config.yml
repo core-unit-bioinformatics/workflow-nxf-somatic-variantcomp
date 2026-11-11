@@ -24,7 +24,7 @@ show_analysis_paths: false
 # would show is in the section Coverage
 skip_generalstats: true
 
-# The report reads like a book (decision D39): six numbered chapters. The variantcomp
+# The report reads like a book (decision D40): six numbered chapters. The variantcomp
 # sections (bin/report_content.py) are grouped into one MultiQC module per chapter
 # (vc_ch_<chapter>, with an introduction); the tool modules, the step tables, the methods
 # description, the software versions and the workflow summary can't be nested, so they get

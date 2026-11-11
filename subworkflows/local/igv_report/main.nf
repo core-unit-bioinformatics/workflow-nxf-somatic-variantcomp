@@ -1,5 +1,5 @@
 //
-// IGV views of every investigated variant (--igv_report, decision D40): one igv-reports
+// IGV views of every investigated variant (--igv_report, decision D41): one igv-reports
 // HTML page per sample and part of at most --igv_max_sites sites, with the tumor and
 // normal alignments and the normalized calls of every technology of the sample, and an
 // overview page. Sites, track configuration, template and overview are written by

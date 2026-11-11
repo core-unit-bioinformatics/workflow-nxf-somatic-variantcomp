@@ -540,7 +540,7 @@ CSS = """
 .vc-dot { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 6px; opacity: 0.8; }
 /* the MultiQC welcome banner (tutorial video) is not needed in this report */
 #mqc_welcome { display: none !important; }
-/* the report as a book (decision D39): larger text, chapters with a heading line and an
+/* the report as a book (decision D40): larger text, chapters with a heading line and an
    introduction box; the tool modules after a chapter (anchors in TOOL_MODULES) look like
    its sections, in the text and in the table of contents */
 .mqc-module-section p, .mqc-module-section li, .mqc-section-description { font-size: 15px; line-height: 1.55; }
@@ -727,7 +727,7 @@ JS_LIB = r"""
 
 # ----------------------------------------------------------------------------- chapters
 
-# The MultiQC report reads like a book (decision D39): six chapters, each one MultiQC
+# The MultiQC report reads like a book (decision D40): six chapters, each one MultiQC
 # module (custom content grouped by parent_id) with an introduction; chapters and
 # sections are numbered, and MultiQC sorts the sections of a chapter by their numbered
 # names. The tool modules (VEP, mosdepth), the step tables (MQC_TABLES), the methods

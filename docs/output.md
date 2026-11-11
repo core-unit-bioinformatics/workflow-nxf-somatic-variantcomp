@@ -603,7 +603,7 @@ tab. `main.html` also links to the MultiQC report and the tables on their own.
 The **MultiQC report** `multiqc/multiqc_report.html` is the main report of a run (decision
 D37): one self-contained HTML file, interactive (hover, zoom, export of every plot; the
 toolbox hides, highlights and renames samples in all plots and tables). It reads like a book
-(decision D39): six numbered chapters, each with an introduction (what the chapter shows,
+(decision D40): six numbered chapters, each with an introduction (what the chapter shows,
 what was done, which section answers which question); every section starts with a
 description of what is shown and how to read it. The table of contents lists the chapters
 and their sections; the MultiQC modules of the tools follow their chapter, numbered and

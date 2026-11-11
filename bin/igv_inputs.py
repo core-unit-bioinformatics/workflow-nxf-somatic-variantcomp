@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Inputs of the IGV views (--igv_report, decision D40): sites, tracks, template, index.
+"""Inputs of the IGV views (--igv_report, decision D41): sites, tracks, template, index.
 
 igv-reports (create_report) writes one self-contained HTML file per sites table: a table
 of the sites and an igv.js browser with the reads of every alignment around each site.

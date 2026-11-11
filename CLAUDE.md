@@ -310,7 +310,7 @@ nf-core-style pipelines.
 ### Report and end-of-run checks (feedback 2026-10-22 and 2026-10-26, D34/D37)
 
 - **MultiQC is the main report** (D37, replaces the narrative report of D33). It reads like
-  a book (D39): six numbered chapters (`CHAPTERS`, `SECTIONS` in `bin/report_content.py`;
+  a book (D40): six numbered chapters (`CHAPTERS`, `SECTIONS` in `bin/report_content.py`;
   custom content grouped by `parent_id` `vc_ch_<chapter>`): 1 Summary, 2 Known variants,
   3 Discordance, 4 Variant filtering, 5 Coverage and genomic regions, 6 Methods and quality
   control. Every chapter starts with an introduction (markdown, `chapter_intros()`), every
